@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LMS Exam</title>
+<link rel="stylesheet" href="css/login.css">
+</head>
+<body>
+
+<div class="screen screen-1 active" id="screen1">
+  <div class="gradient-bg"></div>
+  <div class="landing-content">
+    <h1><!-- TEXTO AQUÍ --></h1>
+    <p><!-- TEXTO AQUÍ --></p>
+    <button class="btn-arrow" id="btnArrow">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M5 12h14M13 5l7 7-7 7"/>
+      </svg>
+    </button>
+  </div>
+</div>
+
+<div class="screen screen-2" id="screen2">
+    <div class="split-left">
+      <div class="form-wrap">
+        <div class="form-accent"></div>
+        <h2 class="form-title">Inicia sesión</h2>
+        <p class="form-subtitle">Introduce tu correo para continuar.</p>
+        <label class="form-label">Correo electrónico</label>
+        <input class="email-input" id="emailInput" type="email" placeholder="correo@ejemplo.com" autocomplete="email">
+        <button class="btn-continue" id="btnContinue">Continuar</button>
+      </div>
+    </div>
+  <div class="split-right">
+    <div class="gradient-bg"></div>
+    <div class="info-wrap">
+      <h3 class="info-name">LMS Exam</h3>
+      <p class="info-desc">Tu plataforma de estudio inteligente.</p>
+      <ul class="info-features">
+        <li>★ Exámenes personalizados con IA</li>
+        <li>✦ Estadísticas y progreso detallado</li>
+        <li>◆ Estudio adaptativo inteligente</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="curtain" id="curtain">
+  <div class="spinner" id="spinner"></div>
+</div>
+
+<div class="screen screen-3" id="screen3">
+  <div class="gradient-bg"></div>
+  <div class="otp-card" id="otpCard">
+    <p class="otp-label">Revisa tu correo</p>
+    <p class="otp-sub">Introduce el código de 6 dígitos que enviamos a <span id="otpEmail"></span></p>
+    <div class="otp-input-wrap">
+      <input type="text" id="otpInput" maxlength="6" inputmode="numeric" autocomplete="one-time-code" />
+      <div class="otp-segments" aria-hidden="true">
+        <span></span><span></span><span></span>
+        <span></span><span></span><span></span>
+      </div>
+    </div>
+    <p class="otp-attempts" id="otpAttempts">3 intentos restantes</p>
+    <div class="otp-timer" id="otpTimer">05:00</div>
+    <div class="otp-flood" id="otpFlood"></div>
+  </div>
+</div>
+
+<script src="js/login.js?v=2" defer></script>
+</body>
+</html>

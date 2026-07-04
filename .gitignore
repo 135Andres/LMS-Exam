@@ -1,0 +1,58 @@
+# === 🔑 SECRETOS Y CONFIG PRIVADA ===
+# API keys, contraseñas, SMTP — NUNCA subir a GitHub
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# === 📦 DEPENDENCIAS ===
+node_modules/
+backend/node_modules/
+backend-python/__pycache__/
+__pycache__/
+*.pyc
+
+# === 🗄️ BASE DE DATOS (contiene datos de usuarios) ===
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+backend/data/*.sqlite*
+
+# === 🔒 DATOS PERSONALES / PRIVACIDAD ===
+# Lista blanca de correos autorizados para OTP
+backend-python/whitelist.json
+# Reportes de interacciones con IA (contienen UUIDs de usuarios)
+backend/src/data/reports.json
+# Perfiles de usuario generados por IA
+backend/data/profiles/
+
+# === 📝 LOGS ===
+logs/
+backend/logs/
+*.log
+
+# === 🏗️ BUILD ===
+backend/dist/
+dist/
+
+# === 🖥️ SISTEMA OPERATIVO ===
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# === 💻 IDE / EDITOR ===
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# === 📁 CARPETAS VACÍAS (estructura temporal) ===
+users/
+public/data/
+public/users/

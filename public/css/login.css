@@ -1,0 +1,392 @@
+﻿*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+  background: #f0f0f0;
+}
+
+.screen {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.screen.active {
+  pointer-events: auto;
+  visibility: visible;
+}
+
+.screen-1 {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.gradient-bg {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.gradient-bg::before {
+  content: '';
+  position: absolute;
+  width: 200%;
+  height: 200%;
+  top: -50%;
+  left: -50%;
+  background:
+    radial-gradient(ellipse at 30% 40%, #c8d0ff 0%, transparent 40%),
+    radial-gradient(ellipse at 70% 60%, #b0b8e8 0%, transparent 40%),
+    radial-gradient(ellipse at 50% 30%, #d8dfff 0%, transparent 35%),
+    radial-gradient(ellipse at 50% 70%, #a0a8d0 0%, transparent 40%);
+  background-color: #e0e4f0;
+}
+
+.landing-content {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  color: #1a1a1a;
+}
+
+.landing-content h1 {
+  font-size: 3.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: #1a1a1a;
+}
+
+.landing-content p {
+  font-size: 1.25rem;
+  font-weight: 400;
+  margin-top: 0.75rem;
+  color: #888;
+}
+
+.btn-arrow {
+  margin-top: 2.5rem;
+  width: 56px;
+  height: 48px;
+  border-radius: 14px;
+  border: none;
+  background: rgba(0, 0, 0, 0.06);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-arrow svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: #1a1a1a;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.btn-arrow:hover {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.screen-2 {
+  pointer-events: none;
+}
+
+.split-left {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 50vw;
+  height: 100vh;
+  background: #fff;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+}
+
+.split-right {
+  position: fixed;
+  right: 0;
+  top: 0;
+  width: 50vw;
+  height: 100vh;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.form-wrap {
+  width: 100%;
+  max-width: 360px;
+  padding: 2rem;
+}
+
+.form-accent {
+  width: 40px;
+  height: 2px;
+  background: #8b9aff;
+  border-radius: 2px;
+  margin-bottom: 1.5rem;
+}
+
+.form-title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  line-height: 1.2;
+}
+
+.form-subtitle {
+  color: #888;
+  font-size: 0.875rem;
+  margin-top: 0.5rem;
+  margin-bottom: 2.5rem;
+}
+
+.form-label {
+  display: block;
+  color: #888;
+  font-size: 0.75rem;
+  margin-bottom: 0.4rem;
+}
+
+.email-input {
+  display: block;
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-bottom: 1.5px solid #e0e0e0;
+  padding: 10px 0;
+  font-size: 1rem;
+  font-family: inherit;
+  color: #1a1a1a;
+  outline: none;
+}
+
+.email-input:focus {
+  border-color: #8b9aff;
+}
+
+.email-input::placeholder {
+  color: #aaa;
+}
+
+.btn-continue {
+  display: block;
+  margin-top: 2rem;
+  background: #8b9aff;
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: 12px 36px;
+  font-size: 1rem;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.btn-continue:hover {
+  background: #7a8be8;
+}
+
+.info-wrap {
+  position: relative;
+  z-index: 1;
+  color: #1a1a1a;
+  text-align: center;
+  padding: 2rem;
+}
+
+.info-name {
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.info-desc {
+  margin-top: 0.5rem;
+  font-size: 1rem;
+  color: #888;
+}
+
+.info-features {
+  list-style: none;
+  margin-top: 2rem;
+  text-align: left;
+  display: inline-block;
+}
+
+.info-features li {
+  font-size: 0.95rem;
+  margin-bottom: 0.75rem;
+  color: #888;
+  line-height: 1.4;
+}
+
+.curtain {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background: rgba(240, 240, 240, 0.95);
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+.curtain.active {
+  display: flex;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(0, 0, 0, 0.1);
+  border-top-color: #8b9aff;
+  border-radius: 50%;
+}
+
+.screen-3 {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 15;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.screen-3.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.otp-card {
+  position: relative;
+  background: #fff;
+  border-radius: 20px;
+  padding: 2.5rem 2rem;
+  width: 340px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+
+.otp-label {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin-bottom: 0.5rem;
+}
+
+.otp-sub {
+  font-size: 0.78rem;
+  color: #888;
+  margin-bottom: 2rem;
+  line-height: 1.5;
+}
+
+.otp-sub span {
+  color: #8b9aff;
+  font-weight: 600;
+}
+
+.otp-input-wrap {
+  position: relative;
+  margin-bottom: 1.5rem;
+}
+
+#otpInput {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: text;
+  font-size: 1.5rem;
+  letter-spacing: 2.1rem;
+  border: none;
+  background: transparent;
+  z-index: 2;
+}
+
+.otp-segments {
+  display: flex;
+  gap: 8px;
+}
+
+.otp-segments span {
+  flex: 1;
+  height: 52px;
+  border-radius: 10px;
+  border: 2px solid #e0e0e0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.otp-segments span.active {
+  border-color: #8b9aff;
+}
+
+.otp-segments span.filled {
+  border-color: #8b9aff;
+  background: rgba(139, 154, 255, 0.04);
+}
+
+.otp-segments span.error {
+  border-color: #ff6b6b;
+  background: rgba(255, 107, 107, 0.05);
+}
+
+.otp-attempts {
+  font-size: 0.75rem;
+  color: #bbb;
+  text-align: center;
+  margin-bottom: 0.75rem;
+}
+
+.otp-timer {
+  font-size: 0.8rem;
+  color: #8b9aff;
+  text-align: center;
+  font-weight: 600;
+}
+
+.otp-flood {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 30% 40%, #c8d0ff, #b0b8e8);
+  border-radius: inherit;
+  transform: scale(0);
+  transform-origin: center;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.otp-flood.active {
+  transform: scale(3);
+}
+
+.hidden {
+  display: none !important;
+}
+
