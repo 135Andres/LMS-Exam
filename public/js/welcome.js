@@ -45,6 +45,15 @@ let availableModels = [];
 let pendingAttachments = [];
 let sessionId = sessionStorage.getItem('chatSessionId') || '';
 let historyLoaded = null;
+let linkModeActive = false;
+let activeLinks = [];
+
+// Placeholder: se usará para obtener metadatos/título de una URL vía backend
+async function fetchLinkPreview(url) {
+  // TODO: implementar con webfetch del backend
+  // Debe retornar { title, description, image } o null
+  return null;
+}
 
 loadChatHistory().then(data => {
   historyLoaded = data;
@@ -812,13 +821,32 @@ function transformBottomBar() {
           <div class="chat-input-inner" id="chatInputInner">
             <div class="input-resize-handle"></div>
             <textarea id="messageInput" placeholder="Message..." rows="1"></textarea>
+            <div id="chatLinksList"></div>
+            <div class="link-mode-bar" id="linkModeBar">
+              <span>Modo enlace — Escribe una URL y presiona Enter</span>
+              <button class="link-mode-close" id="linkModeClose">&times;</button>
+            </div>
           </div>
           <div class="chat-input-actions" id="chatInputActions">
             <button id="plusBtn">+</button>
             <button id="sendBtn">↑</button>
-            <div class="plus-menu">
-              <button class="plus-menu-item" id="optFiles">+ Añadir archivos</button>
-              <button class="plus-menu-item" id="optSources">+ Añadir fuentes</button>
+            <div class="plus-menu" id="plusMenu">
+              <button class="plus-menu-item" data-action="image">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+                <span>Imagen</span>
+              </button>
+              <button class="plus-menu-item" data-action="link">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 1 1 0 10h-2"/><line x1="8" x2="16" y1="12" y2="12"/></svg>
+                <span>Enlace</span>
+              </button>
+              <button class="plus-menu-item" data-action="file">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/></svg>
+                <span>Documento</span>
+              </button>
+              <button class="plus-menu-item" data-action="camera">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"/><circle cx="12" cy="13" r="3"/></svg>
+                <span>Cámara</span>
+              </button>
             </div>
           </div>
         </div>
@@ -833,43 +861,154 @@ function transformBottomBar() {
       openSidebar();
       populateTopBarModels();
 
-      document.getElementById('plusBtn').addEventListener('click', () => {
-        const isOpen = menu.classList.toggle('open');
-        document.getElementById('plusBtn').classList.toggle('open', isOpen);
+      const plusBtn = document.getElementById('plusBtn');
+      const plusMenu = document.getElementById('plusMenu');
+      const linkModeBar = document.getElementById('linkModeBar');
+      const chatLinksList = document.getElementById('chatLinksList');
+      linkModeBar.style.display = 'none';
+
+      function closePlusMenu() {
+        plusMenu.classList.remove('open');
+        plusBtn.classList.remove('open');
+      }
+
+      function togglePlusMenu() {
+        const isOpen = plusMenu.classList.toggle('open');
+        plusBtn.classList.toggle('open', isOpen);
+      }
+
+      function renderLinksList() {
+        if (!chatLinksList) return;
+        if (activeLinks.length === 0) {
+          chatLinksList.innerHTML = '';
+          chatLinksList.style.display = 'none';
+          return;
+        }
+        chatLinksList.style.display = 'flex';
+        chatLinksList.innerHTML = activeLinks.map((link, i) =>
+          `<span class="link-chip">${escapeHtml(link)}<button class="link-chip-remove" data-index="${i}">&times;</button></span>`
+        ).join('');
+        chatLinksList.querySelectorAll('.link-chip-remove').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const idx = parseInt(btn.dataset.index);
+            activeLinks.splice(idx, 1);
+            renderLinksList();
+          });
+        });
+      }
+
+      plusBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (linkModeActive) {
+          exitLinkMode();
+        }
+        togglePlusMenu();
       });
 
       document.addEventListener('click', (e) => {
-        if (!e.target.closest('#chatInputActions')) {
-          menu.classList.remove('open');
-          document.getElementById('plusBtn').classList.remove('open');
+        if (!e.target.closest('.chat-input-wrapper') && !e.target.closest('.plus-menu')) {
+          closePlusMenu();
+        }
+        if (linkModeActive && !e.target.closest('.bottom-bar')) {
+          exitLinkMode();
         }
       });
 
-      document.getElementById('optFiles').addEventListener('click', () => {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = 'image/*,audio/*';
-        input.multiple = true;
-        input.onchange = () => {
-          for (const file of input.files) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-              const data = e.target.result.split(',')[1];
-              const att = { type: file.type.startsWith('image/') ? 'image' : 'audio', mime: file.type, data, name: file.name };
-              pendingAttachments.push(att);
-              renderAttachmentPreviews();
-            };
-            reader.readAsDataURL(file);
-          }
-        };
-        input.click();
-        menu.classList.remove('open');
-        document.getElementById('plusBtn').classList.remove('open');
+      function exitLinkMode() {
+        linkModeActive = false;
+        linkModeBar.style.display = 'none';
+        const inp = document.getElementById('messageInput');
+        if (inp) inp.placeholder = 'Message...';
+      }
+
+      function enterLinkMode() {
+        linkModeActive = true;
+        linkModeBar.querySelector('span').textContent = 'Modo enlace — Escribe una URL y presiona Enter';
+        linkModeBar.style.display = 'flex';
+        renderLinksList();
+        const inp = document.getElementById('messageInput');
+        if (inp) {
+          inp.placeholder = 'https://ejemplo.com';
+          inp.focus();
+        }
+      }
+
+      document.getElementById('linkModeClose').addEventListener('click', (e) => {
+        e.stopPropagation();
+        exitLinkMode();
       });
-      document.getElementById('optSources').addEventListener('click', () => {
-        console.log('añadir fuentes');
-        menu.classList.remove('open');
-        document.getElementById('plusBtn').classList.remove('open');
+
+      // Hidden file inputs
+      const imageInput = document.createElement('input');
+      imageInput.type = 'file';
+      imageInput.accept = 'image/*';
+      imageInput.multiple = true;
+      imageInput.style.display = 'none';
+      imageInput.id = 'imageInput';
+      bar.appendChild(imageInput);
+
+      const fileInput = document.createElement('input');
+      fileInput.type = 'file';
+      fileInput.accept = '.txt,.pdf,.json';
+      fileInput.multiple = true;
+      fileInput.style.display = 'none';
+      fileInput.id = 'fileInput';
+      bar.appendChild(fileInput);
+
+      plusMenu.addEventListener('click', (e) => {
+        const item = e.target.closest('.plus-menu-item');
+        if (!item) return;
+        const action = item.dataset.action;
+        closePlusMenu();
+
+        switch (action) {
+          case 'image':
+            imageInput.click();
+            break;
+          case 'link':
+            enterLinkMode();
+            break;
+          case 'file':
+            fileInput.click();
+            break;
+          case 'camera':
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+              navigator.mediaDevices.getUserMedia({ video: true })
+                .then((stream) => {
+                  stream.getTracks().forEach(t => t.stop());
+                })
+                .catch(() => {});
+            }
+            break;
+        }
+      });
+
+      imageInput.addEventListener('change', () => {
+        for (const file of imageInput.files) {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const data = e.target.result.split(',')[1];
+            const att = { type: 'image', mime: file.type, data, name: file.name };
+            pendingAttachments.push(att);
+            renderAttachmentPreviews();
+          };
+          reader.readAsDataURL(file);
+        }
+        imageInput.value = '';
+      });
+
+      fileInput.addEventListener('change', () => {
+        for (const file of fileInput.files) {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const data = e.target.result.split(',')[1];
+            const att = { type: 'file', mime: file.type, data, name: file.name };
+            pendingAttachments.push(att);
+            renderAttachmentPreviews();
+          };
+          reader.readAsDataURL(file);
+        }
+        fileInput.value = '';
       });
 
       document.getElementById('sendBtn').addEventListener('click', handleSend);
@@ -877,7 +1016,27 @@ function transformBottomBar() {
       msgInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
           e.preventDefault();
-          handleSend();
+          if (linkModeActive) {
+            const url = msgInput.value.trim();
+            if (url) {
+              if (activeLinks.includes(url)) {
+                const label = linkModeBar.querySelector('span');
+                label.textContent = 'Ese enlace ya está en la lista';
+                msgInput.value = '';
+                setTimeout(() => {
+                  label.textContent = 'Modo enlace — Escribe una URL y presiona Enter';
+                }, 1500);
+              } else {
+                activeLinks.push(url);
+                msgInput.value = '';
+                renderLinksList();
+                const label = linkModeBar.querySelector('span');
+                label.textContent = 'Modo enlace — Escribe una URL y presiona Enter';
+              }
+            }
+          } else {
+            handleSend();
+          }
         }
       });
       function resetInputHeight() {
@@ -1146,6 +1305,13 @@ function renderAttachmentPreviews() {
       chip.innerHTML = `
         <img class="att-chip-preview" src="data:${att.mime};base64,${att.data}" />
         <span class="att-remove" data-index="${i}">×</span>`;
+    } else if (att.type === 'file') {
+      chip.innerHTML = `
+        <span class="att-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/></svg>
+        </span>
+        <span class="att-name">${att.name || 'documento'}</span>
+        <span class="att-remove" data-index="${i}">×</span>`;
     } else {
       chip.innerHTML = `
         <span class="att-icon">🎵</span>
@@ -1219,8 +1385,11 @@ function openLightbox(src, name, triggerImg) {
 
 function clearAttachments() {
   pendingAttachments = [];
+  activeLinks = [];
   const container = document.getElementById('attachmentPreviews');
   if (container) container.innerHTML = '';
+  const linksList = document.getElementById('chatLinksList');
+  if (linksList) { linksList.innerHTML = ''; linksList.style.display = 'none'; }
 }
 
 function handleCopy(text, btn) {
@@ -1332,6 +1501,9 @@ async function sendToChatAPI(text) {
     if (pendingAttachments.length > 0) {
       body.attachments = pendingAttachments.map(a => ({ type: a.type, mime: a.mime, data: a.data }));
     }
+    if (activeLinks.length > 0) {
+      body.links = activeLinks.slice();
+    }
     const res = await fetch('/api/chat/tutor', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1384,6 +1556,7 @@ async function handleSend() {
   }
 
   const attSnapshot = pendingAttachments.slice();
+  const linksSnapshot = activeLinks.slice();
   addMessage(text, 'user', attSnapshot);
   input.value = '';
   input.style.height = 'auto';
@@ -1453,6 +1626,9 @@ async function handleSend() {
     const body = { message: text, modelId: selectedModelId || undefined, sessionId };
     if (attSnapshot.length > 0) {
       body.attachments = attSnapshot.map(a => ({ type: a.type, mime: a.mime, data: a.data }));
+    }
+    if (linksSnapshot.length > 0) {
+      body.links = linksSnapshot;
     }
 
     const res = await fetch('/api/chat/tutor/stream', {
