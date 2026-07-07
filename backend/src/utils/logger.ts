@@ -1,8 +1,11 @@
 import winston from 'winston';
 import 'winston-daily-rotate-file';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { config } from '../config/index.js';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 const logsDir = path.resolve(__dirname, '../../logs');
 
 const fileTransport = new winston.transports.DailyRotateFile({
