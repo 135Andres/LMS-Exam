@@ -6,6 +6,7 @@ import { config, modelRegistry } from '../config/index.js';
 import { SYSTEM_PROMPT_TUTOR } from '../prompts/system.js';
 import { ChatModel } from '../models/chat.model.js';
 import { EmbeddingModel } from '../models/embedding.model.js';
+import { EmbeddingOutboxModel } from '../models/embedding-outbox.model.js';
 import { ProfileService } from './profile.service.js';
 import { findTopK } from '../utils/vector.js';
 import { logger } from '../utils/logger.js';
@@ -14,7 +15,19 @@ const TIMEOUT_MS = 30000;
 const RAG_MIN_EMBEDDINGS = 2;
 const RAG_TOP_K = 3;
 
-const PROFILE_EDIT_REGEX = /cambia|ajusta|modifica|ahora|modo|evita|explica|habla/i;
+const PROFILE_EDIT_WHITELIST = [
+  /^explícame /i, /^qué es /i, /^qué son /i, /^cómo /i, /^por qué /i,
+  /^dame /i, /^muestra /i, /^ayuda/i, /^gracias/i, /^ok/i, /^vale/i,
+  /^entendido/i, /^perfecto/i, /^ahora (entiendo|veo|sí|comprendo)/i,
+  /modo (examen|práctica|estudio|sargento)/i, /^evita /i, /^habla /i,
+];
+
+const PROFILE_EDIT_REGEX = /\b(?:quiero que|cambia mi|actualiza mi|prefiero que|configura mi|ajusta mi|modifica mi)\b/i;
+
+function isProfileEditIntent(message: string): boolean {
+  if (PROFILE_EDIT_WHITELIST.some(r => r.test(message))) return false;
+  return PROFILE_EDIT_REGEX.test(message);
+}
 
 const SYSTEM_PROMPT_CLASSIFIER = `Eres un clasificador de intención. Analiza si el mensaje del estudiante contiene una instrucción para CAMBIAR o AJUSTAR la forma en que el tutor IA debe comportarse (preferencias de aprendizaje, tono, profundidad, temas, etc.).
 
@@ -31,7 +44,7 @@ Mensaje: "evita usar ejemplos de física" → {"update_profile": true, "change":
 Mensaje: "hola" → {"update_profile": false}`;
 
 interface Attachment {
-  type: 'image' | 'audio';
+  type: 'image' | 'audio' | 'file';
   mime: string;
   data: string;
 }
@@ -47,19 +60,26 @@ function resolveModel(modelId?: string) {
   };
 }
 
-async function buildRagContext(message: string, userId: string, excludeMsgId: string, queryVector: number[]): Promise<string> {
+async function buildRagContext(userId: string, excludeMessageId: string, queryVector: number[]): Promise<string> {
   try {
     const pastEmbeddings = EmbeddingModel.getUserEmbeddings(userId, 100);
-    const filtered = pastEmbeddings.filter(e => e.messageId !== excludeMsgId);
+    const filtered = pastEmbeddings.filter(e => e.messageId !== excludeMessageId);
 
     if (filtered.length < RAG_MIN_EMBEDDINGS) return '';
 
     const topK = findTopK(queryVector, filtered, RAG_TOP_K);
+    logger.debug('RAG context recuperado', {
+      total_embeddings: filtered.length,
+      above_threshold: topK.length,
+      min_score: topK.length > 0 ? topK[topK.length - 1].score.toFixed(3) : 'N/A',
+      max_score: topK.length > 0 ? topK[0].score.toFixed(3) : 'N/A',
+    });
     if (topK.length === 0) return '';
 
-    const contextParts = topK.map((item, i) =>
-      `[Contexto ${i + 1}] (relevancia: ${(item.score * 100).toFixed(0)}%)\n${item.content}`
-    );
+    const contextParts = topK.map((item, i) => {
+      const roleLabel = item.role === 'assistant' ? 'Tu explicación anterior' : 'Pregunta anterior';
+      return `[Contexto ${i + 1}] (${roleLabel}, relevancia: ${(item.score * 100).toFixed(0)}%)\n${item.content}`;
+    });
 
     return `\n\n--- Contexto de conversaciones anteriores ---\n${contextParts.join('\n\n')}\n---`;
   } catch (err) {
@@ -101,7 +121,7 @@ function buildContent(message: string, attachments?: Attachment[]): Array<Record
 
 // Fase 4: clasificador de edición de perfil
 async function detectProfileEdit(message: string, userId: string): Promise<string | null> {
-  if (!PROFILE_EDIT_REGEX.test(message)) return null;
+  if (!isProfileEditIntent(message)) return null;
 
   try {
     const result = await generateFromAI('nvidia', SYSTEM_PROMPT_CLASSIFIER, message, {
@@ -123,6 +143,9 @@ async function detectProfileEdit(message: string, userId: string): Promise<strin
       ProfileService.invalidateCache(userId);
       return parsed.change;
     }
+    logger.debug('ProfileEdit: clasificador descartó (regex pasó pero IA dice no)', {
+      message_preview: message.slice(0, 50)
+    });
   } catch (err) {
     logger.warn('Error en clasificador de perfil', { error: (err as Error).message });
   }
@@ -143,35 +166,32 @@ export async function sendChatMessageStream(
     throw new Error(`El modelo **${resolved.label}** no soporta archivos adjuntos.`);
   }
 
-  // Paso 1: guardar mensaje del usuario
+  // Paso 1-2: guardar mensaje + encolar outbox (atómico)
   const userMsgId = uuidv4();
   ChatModel.saveMessage(userMsgId, userId, sessionId, 'user', message);
+  const outboxId = uuidv4();
+  EmbeddingOutboxModel.enqueue(outboxId, userMsgId, userId, message, 'user');
 
-  // Paso 2: generar embedding (una sola llamada API)
+  // Paso 2b: generar embedding inline (best-effort para RAG inmediato)
   let queryVector: number[] | null = null;
   try {
     queryVector = await generateEmbedding(message);
+    if (queryVector) {
+      const embId = uuidv4();
+      EmbeddingModel.saveEmbedding(embId, userMsgId, userId, queryVector, config.embeddings.model, config.embeddings.dimensions);
+      EmbeddingOutboxModel.markDone(outboxId);
+    }
   } catch (err) {
-    logger.warn('Error generando embedding', { error: (err as Error).message });
+    logger.warn('Embedding inline falló, worker lo reintentará', { error: (err as Error).message });
   }
 
   // Paso 3: RAG context usando el vector generado
-  const ragContext = queryVector ? await buildRagContext(message, userId, userMsgId, queryVector) : '';
+  const ragContext = queryVector ? await buildRagContext(userId, userMsgId, queryVector) : '';
 
-  // Paso 4: guardar embedding en DB
-  if (queryVector) {
-    try {
-      const embId = uuidv4();
-      EmbeddingModel.saveEmbedding(embId, userMsgId, userId, queryVector, config.embeddings.model, config.embeddings.dimensions);
-    } catch (err) {
-      logger.warn('Error guardando embedding', { error: (err as Error).message });
-    }
-  }
-
-  // Paso 5: detectar edición de perfil desde el chat
+  // Paso 4: detectar edición de perfil desde el chat
   await detectProfileEdit(message, userId);
 
-  // Paso 6: construir prompts con RAG
+  // Paso 5: construir prompts con RAG
   const systemPrompt = buildSystemPrompt(resolved.label, ragContext, userId);
   const content = buildContent(message, attachments);
 
@@ -204,6 +224,9 @@ export async function sendChatMessageStream(
       if (fullResponse) {
         const aiMsgId = uuidv4();
         ChatModel.saveMessage(aiMsgId, userId, sessionId, 'assistant', fullResponse);
+        if (config.embeddings.embedAssistantResponses) {
+          EmbeddingOutboxModel.enqueue(uuidv4(), aiMsgId, userId, fullResponse, 'assistant');
+        }
       }
     }
   }
@@ -231,35 +254,32 @@ export async function sendChatMessage(
     attachmentsCount: attachments?.length || 0,
   });
 
-  // Paso 1: guardar mensaje del usuario
+  // Paso 1-2: guardar mensaje + encolar outbox (atómico)
   const userMsgId = uuidv4();
   ChatModel.saveMessage(userMsgId, userId, sessionId, 'user', message);
+  const outboxId = uuidv4();
+  EmbeddingOutboxModel.enqueue(outboxId, userMsgId, userId, message, 'user');
 
-  // Paso 2: generar embedding (una sola llamada API)
+  // Paso 2b: generar embedding inline (best-effort para RAG inmediato)
   let queryVector: number[] | null = null;
   try {
     queryVector = await generateEmbedding(message);
+    if (queryVector) {
+      const embId = uuidv4();
+      EmbeddingModel.saveEmbedding(embId, userMsgId, userId, queryVector, config.embeddings.model, config.embeddings.dimensions);
+      EmbeddingOutboxModel.markDone(outboxId);
+    }
   } catch (err) {
-    logger.warn('Error generando embedding', { error: (err as Error).message });
+    logger.warn('Embedding inline falló, worker lo reintentará', { error: (err as Error).message });
   }
 
   // Paso 3: RAG context usando el vector generado
-  const ragContext = queryVector ? await buildRagContext(message, userId, userMsgId, queryVector) : '';
+  const ragContext = queryVector ? await buildRagContext(userId, userMsgId, queryVector) : '';
 
-  // Paso 4: guardar embedding en DB
-  if (queryVector) {
-    try {
-      const embId = uuidv4();
-      EmbeddingModel.saveEmbedding(embId, userMsgId, userId, queryVector, config.embeddings.model, config.embeddings.dimensions);
-    } catch (err) {
-      logger.warn('Error guardando embedding', { error: (err as Error).message });
-    }
-  }
-
-  // Paso 5: detectar edición de perfil desde el chat
+  // Paso 4: detectar edición de perfil desde el chat
   await detectProfileEdit(message, userId);
 
-  // Paso 6: construir prompts con RAG
+  // Paso 5: construir prompts con RAG
   const systemPrompt = buildSystemPrompt(resolved.label, ragContext, userId);
   const content = buildContent(message, attachments);
 
@@ -278,6 +298,9 @@ export async function sendChatMessage(
     // Paso 7: guardar respuesta del asistente
     const aiMsgId = uuidv4();
     ChatModel.saveMessage(aiMsgId, userId, sessionId, 'assistant', result.content);
+    if (config.embeddings.embedAssistantResponses) {
+      EmbeddingOutboxModel.enqueue(uuidv4(), aiMsgId, userId, result.content, 'assistant');
+    }
 
     return { response: result.content };
   } catch {

@@ -35,6 +35,7 @@ export const config = {
     model: process.env.NVIDIA_EMBEDDINGS_MODEL || 'nvidia/nv-embed-v1',
     dimensions: parseInt(process.env.NVIDIA_EMBEDDINGS_DIM || '4096', 10),
     baseUrl: process.env.NVIDIA_BASE_URL || 'https://integrate.api.nvidia.com/v1',
+    embedAssistantResponses: process.env.EMBED_ASSISTANT_RESPONSES !== 'false',
   },
 
   jwt: {

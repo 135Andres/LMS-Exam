@@ -125,6 +125,24 @@ CREATE TABLE IF NOT EXISTS chat_insights (
 CREATE UNIQUE INDEX IF NOT EXISTS uq_chat_insights_user_subject_date
   ON chat_insights(user_id, subject, date);
 CREATE INDEX IF NOT EXISTS idx_chat_insights_user_date ON chat_insights(user_id, date);
+
+-- Embedding outbox: desacopla generación de embeddings del request HTTP
+CREATE TABLE IF NOT EXISTS embedding_outbox (
+  id TEXT PRIMARY KEY,
+  message_id TEXT NOT NULL REFERENCES chat_logs(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL REFERENCES users(id),
+  text_content TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'user',
+  status TEXT DEFAULT 'pending' CHECK(status IN ('pending','processing','done','failed')),
+  attempts INTEGER DEFAULT 0,
+  max_attempts INTEGER DEFAULT 3,
+  error TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  processed_at TEXT,
+  next_retry_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_outbox_status_retry ON embedding_outbox(status, next_retry_at);
+CREATE INDEX IF NOT EXISTS idx_outbox_message ON embedding_outbox(message_id);
 `;
 
 function migrateUsersTable(db: Database.Database): void {

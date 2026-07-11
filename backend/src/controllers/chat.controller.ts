@@ -22,6 +22,15 @@ export async function sendChatMessageHandler(req: Request, res: Response): Promi
   const userId = req.user!.id;
   const sid = sessionId || crypto.randomUUID();
 
+  if (sessionId) {
+    try {
+      ChatModel.assertSessionOwnership(sid, userId);
+    } catch {
+      res.status(403).json({ error: 'No tienes acceso a esta sesión' });
+      return;
+    }
+  }
+
   logger.info('Petición de chat', {
     userId,
     messageLength: message.length,
@@ -45,6 +54,15 @@ export async function sendChatMessageStreamHandler(req: Request, res: Response):
 
   const userId = req.user!.id;
   const sid = sessionId || crypto.randomUUID();
+
+  if (sessionId) {
+    try {
+      ChatModel.assertSessionOwnership(sid, userId);
+    } catch {
+      res.status(403).json({ error: 'No tienes acceso a esta sesión' });
+      return;
+    }
+  }
 
   logger.info('Petición de chat streaming', {
     userId,
@@ -90,6 +108,16 @@ export async function getChatHistoryHandler(req: Request, res: Response): Promis
   let sessionId: string | null;
 
   if (reqSessionId) {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(reqSessionId)) {
+      res.status(400).json({ error: 'session_id inválido' });
+      return;
+    }
+    try {
+      ChatModel.assertSessionOwnership(reqSessionId, userId);
+    } catch {
+      res.status(403).json({ error: 'No tienes acceso a esta sesión' });
+      return;
+    }
     sessionId = reqSessionId;
   } else {
     sessionId = ChatModel.getLastSessionId(userId);

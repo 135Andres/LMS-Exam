@@ -15,6 +15,7 @@ import chatRoutes from './src/routes/chat.routes.js';
 import userRoutes from './src/routes/user.routes.js';
 import { generateDailyInsights } from './src/services/insights.service.js';
 import { updateProfileForUser } from './src/services/profile-update.service.js';
+import { startEmbeddingWorker, stopEmbeddingWorker, processEmbeddingOutbox } from './src/workers/embedding-worker.js';
 
 const app = express();
 
@@ -101,6 +102,12 @@ app.get('/api/status', (_req, res) => {
 
 app.use(errorHandler);
 
+// Embedding outbox worker: procesa embeddings pendientes en background
+startEmbeddingWorker();
+
+// Recuperar outbox pendiente tras restart/crash
+processEmbeddingOutbox().catch(err => logger.error('Outbox recovery failed', { error: (err as Error).message }));
+
 getDb();
 
 app.listen(config.port, () => {
@@ -140,3 +147,7 @@ cron.schedule('0 3 * * *', async () => {
     logger.error('Cron: error en actualización de perfiles', { error: (err as Error).message });
   }
 });
+
+// Graceful shutdown para embedding worker
+process.on('SIGTERM', () => { stopEmbeddingWorker(); process.exit(0); });
+process.on('SIGINT', () => { stopEmbeddingWorker(); process.exit(0); });

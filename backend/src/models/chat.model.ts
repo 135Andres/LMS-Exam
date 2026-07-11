@@ -72,4 +72,14 @@ export const ChatModel = {
     getDb().prepare('DELETE FROM chat_logs WHERE session_id = ? AND user_id = ?').run(sessionId, userId);
     getDb().prepare('DELETE FROM chat_sessions WHERE session_id = ? AND user_id = ?').run(sessionId, userId);
   },
+
+  assertSessionOwnership(sessionId: string, userId: string): void {
+    const session = getDb().prepare(
+      'SELECT user_id FROM chat_sessions WHERE session_id = ?'
+    ).get(sessionId) as { user_id: string } | undefined;
+    if (!session) return;
+    if (session.user_id !== userId) {
+      throw new Error('SESSION_OWNERSHIP_VIOLATION');
+    }
+  },
 };

@@ -1,4 +1,6 @@
-function cosineSimilarity(a: number[], b: number[]): number {
+const MIN_SIMILARITY_THRESHOLD = parseFloat(process.env.RAG_MIN_SIMILARITY || '0.35');
+
+export function cosineSimilarity(a: number[], b: number[]): number {
   if (a.length !== b.length) return 0;
 
   let dot = 0, normA = 0, normB = 0;
@@ -14,14 +16,18 @@ function cosineSimilarity(a: number[], b: number[]): number {
 
 export function findTopK(
   queryVector: number[],
-  items: Array<{ vector: number[]; content: string }>,
+  items: Array<{ vector: number[]; content: string; role?: string }>,
   k: number,
-): Array<{ content: string; score: number }> {
-  const scored = items.map(item => ({
-    content: item.content,
-    score: cosineSimilarity(queryVector, item.vector),
-  }));
-
-  scored.sort((a, b) => b.score - a.score);
+  minScore: number = MIN_SIMILARITY_THRESHOLD,
+): Array<{ content: string; score: number; role?: string }> {
+  if (items.length === 0) return [];
+  const scored = items
+    .map(item => ({
+      content: item.content,
+      score: cosineSimilarity(queryVector, item.vector),
+      role: item.role,
+    }))
+    .filter(item => item.score >= minScore)
+    .sort((a, b) => b.score - a.score);
   return scored.slice(0, k);
 }

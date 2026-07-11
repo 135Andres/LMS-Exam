@@ -8,20 +8,21 @@ export const EmbeddingModel = {
     ).run(id, messageId, userId, JSON.stringify(vector), model, dimensions);
   },
 
-  getUserEmbeddings(userId: string, limit = 100): Array<{ vector: number[]; content: string; messageId: string }> {
+  getUserEmbeddings(userId: string, limit = 100): Array<{ vector: number[]; content: string; messageId: string; role: string }> {
     const rows = getDb().prepare(
-      `SELECT e.vector_text, c.content, e.message_id
+      `SELECT e.vector_text, c.content, e.message_id, c.role
        FROM chat_embeddings e
        JOIN chat_logs c ON c.id = e.message_id
        WHERE e.user_id = ?
        ORDER BY c.created_at DESC
        LIMIT ?`
-    ).all(userId, limit) as Array<{ vector_text: string; content: string; message_id: string }>;
+    ).all(userId, limit) as Array<{ vector_text: string; content: string; message_id: string; role: string }>;
 
     return rows.map(r => ({
       vector: JSON.parse(r.vector_text) as number[],
       content: r.content,
       messageId: r.message_id,
+      role: r.role,
     }));
   },
 
