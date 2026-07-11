@@ -1,4 +1,4 @@
-import { callNvidiaStream, parseNvidiaStream, type StreamChunk } from '../ai/nvidia.js';
+import { callNineRouterStream, parseNineRouterStream, type StreamChunk } from '../ai/nineRouter.js';
 import { logger } from '../../utils/logger.js';
 import type { ChatPersistenceService } from './chat.persistence.service.js';
 import type { ChatEmbeddingService } from './chat.embedding.service.js';
@@ -47,15 +47,15 @@ export class ChatStreamingService {
 
     let responseBody: ReadableStream<Uint8Array>;
     try {
-      const response = await callNvidiaStream(systemPrompt, content, {
-        model: resolved.model, apiKey: resolved.apiKey, baseUrl: resolved.baseUrl, signal: controller.signal,
+      const response = await callNineRouterStream(systemPrompt, content, {
+        model: resolved.model, signal: controller.signal,
       });
       responseBody = response.body!;
     } finally {
       clearTimeout(timeoutId);
     }
 
-    const originalStream = parseNvidiaStream(responseBody);
+    const originalStream = parseNineRouterStream(responseBody);
 
     async function* persistedStream(self: ChatStreamingService): AsyncGenerator<StreamChunk> {
       let fullResponse = '';

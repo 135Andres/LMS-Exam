@@ -88,7 +88,7 @@ export async function saveOnboardingHandler(req: Request, res: Response): Promis
 
     const userPrompt = `Respuestas de la encuesta:\n- Preparación para examen: ${exam}\n- Arquetipo de tutor: ${archetype}\n- Estilo de feedback: ${feedback_style}\n- Nivel de estrictez: ${strictness}`;
 
-    const aiResult = await generateFromAI('nvidia', systemPrompt, userPrompt, null, {
+    const aiResult = await generateFromAI('nineRouter', systemPrompt, userPrompt, null, {
       model: config.models.chat,
       temperature: 0.3,
       max_tokens: 1024,

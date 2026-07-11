@@ -35,7 +35,7 @@ export async function generateDailyInsights(userId: string, date: string): Promi
     .slice(0, 3000); // Truncar a 3K chars para no exceder tokens
 
   try {
-    const result = await generateFromAI('nvidia', INSIGHT_PROMPT, conversationText, null, {
+    const result = await generateFromAI('nineRouter', INSIGHT_PROMPT, conversationText, null, {
       model: config.models.chat,
       temperature: 0.3,
       max_tokens: 500,

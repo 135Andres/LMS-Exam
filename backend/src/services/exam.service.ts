@@ -64,7 +64,7 @@ async function generateWithParseRetry(
       parseAttempt: parseAttempt + 1,
     });
 
-    const result = await generateFromAI('nvidia', SYSTEM_PROMPT_EXAM, userPrompt);
+    const result = await generateFromAI('nineRouter', SYSTEM_PROMPT_EXAM, userPrompt);
 
     try {
       const questions = parseAndCleanJSON(result.content) as unknown[];
@@ -116,7 +116,7 @@ export async function suggestSubtopics(syllabusText: string): Promise<string[]> 
 
   logger.info('Sugiriendo subtemas desde temario');
 
-  const result = await generateFromAI('nvidia', SYSTEM_SUGERIR_PROMPT, userPrompt);
+  const result = await generateFromAI('nineRouter', SYSTEM_SUGERIR_PROMPT, userPrompt);
 
   try {
     const subtopics = parseAndCleanJSON(result.content) as string[];

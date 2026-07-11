@@ -14,24 +14,24 @@ export const config = {
   nodeEnv: process.env.NODE_ENV || 'development',
   isProd: process.env.NODE_ENV === 'production',
 
+  nineRouter: {
+    apiKey: required('NINE_ROUTER_API_KEY'),
+    baseUrl: process.env.NINE_ROUTER_BASE_URL || 'https://rky8wp8.abc-tunnel.us/v1',
+  },
+
   nvidia: {
-    apiKey: required('NVIDIA_API_KEY'),
+    apiKey: process.env.NVIDIA_API_KEY || '',
     baseUrl: process.env.NVIDIA_BASE_URL || 'https://integrate.api.nvidia.com/v1',
   },
 
-  zenmux: {
-    apiKey: process.env.ZENMUX_API_KEY || '',
-    baseUrl: process.env.ZENMUX_BASE_URL || 'https://zenmux.ai/api/v1',
-  },
-
   models: {
-    generate: process.env.GENERATE_MODEL || 'minimaxai/minimax-m2.7',
-    polish: process.env.POLISH_MODEL || 'deepseek-ai/deepseek-v4-flash',
-    chat: process.env.CHAT_MODEL || 'deepseek-ai/deepseek-v4-flash',
+    generate: process.env.GENERATE_MODEL || 'nvidia/minimaxai/minimax-m2.7',
+    polish: process.env.POLISH_MODEL || 'nvidia/deepseek-ai/deepseek-v4-flash',
+    chat: process.env.CHAT_MODEL || 'nvidia/deepseek-ai/deepseek-v4-flash',
   },
 
   embeddings: {
-    apiKey: required('NVIDIA_API_KEY_EMBEDDINGS'),
+    apiKey: process.env.NVIDIA_API_KEY_EMBEDDINGS || required('NVIDIA_API_KEY_EMBEDDINGS'),
     model: process.env.NVIDIA_EMBEDDINGS_MODEL || 'nvidia/nv-embed-v1',
     dimensions: parseInt(process.env.NVIDIA_EMBEDDINGS_DIM || '4096', 10),
     baseUrl: process.env.NVIDIA_BASE_URL || 'https://integrate.api.nvidia.com/v1',
@@ -80,55 +80,4 @@ export interface ModelEntry {
   contextLength?: number;
 }
 
-export const modelRegistry: Record<string, ModelEntry> = {
-  'nemotron-3-nano': {
-    apiKey: process.env.NVIDIA_API_KEY_NEMOTRON_NANO || config.nvidia.apiKey,
-    model: process.env.NVIDIA_MODEL_NEMOTRON_NANO || '',
-    baseUrl: process.env.NVIDIA_BASE_URL_NEMOTRON_NANO || config.nvidia.baseUrl,
-    label: 'Nemotron 3 Nano (multimodal)',
-    multimodal: true,
-    contextLength: 128000,
-  },
-  'nemotron-3-super': {
-    apiKey: process.env.NVIDIA_API_KEY_NEMOTRON_SUPER || config.nvidia.apiKey,
-    model: process.env.NVIDIA_MODEL_NEMOTRON_SUPER || '',
-    baseUrl: process.env.NVIDIA_BASE_URL_NEMOTRON_SUPER || config.nvidia.baseUrl,
-    label: 'Nemotron 3 Super',
-    contextLength: 128000,
-  },
-  'deepseek-v4-flash': {
-    apiKey: process.env.NVIDIA_API_KEY_DEEPSEEK || config.nvidia.apiKey,
-    model: process.env.NVIDIA_MODEL_DEEPSEEK || 'deepseek-ai/deepseek-v4-flash',
-    baseUrl: process.env.NVIDIA_BASE_URL_DEEPSEEK || config.nvidia.baseUrl,
-    label: 'DeepSeek V4 Flash',
-    contextLength: 128000,
-  },
-  'claude-fable-5-free': {
-    apiKey: config.zenmux.apiKey,
-    model: process.env.ZENMUX_MODEL_CLAUDE_FABLE_5 || 'anthropic/claude-fable-5-free',
-    baseUrl: config.zenmux.baseUrl,
-    label: 'Claude Fable 5 (free)',
-    contextLength: 128000,
-  },
-  'claude-sonnet-5-free': {
-    apiKey: config.zenmux.apiKey,
-    model: process.env.ZENMUX_MODEL_CLAUDE_SONNET_5 || 'anthropic/claude-sonnet-5-free',
-    baseUrl: config.zenmux.baseUrl,
-    label: 'Claude Sonnet 5 (free)',
-    contextLength: 128000,
-  },
-  'step-3.7-flash-free': {
-    apiKey: config.zenmux.apiKey,
-    model: process.env.ZENMUX_MODEL_STEP_3_7_FLASH || 'stepfun/step-3.7-flash-free',
-    baseUrl: config.zenmux.baseUrl,
-    label: 'Step 3.7 Flash (free)',
-    contextLength: 128000,
-  },
-  'glm-4.7-flash-free': {
-    apiKey: config.zenmux.apiKey,
-    model: process.env.ZENMUX_MODEL_GLM_4_7_FLASH || 'z-ai/glm-4.7-flash-free',
-    baseUrl: config.zenmux.baseUrl,
-    label: 'GLM 4.7 Flash (free)',
-    contextLength: 128000,
-  },
-};
+export const modelRegistry: Record<string, ModelEntry> = {};

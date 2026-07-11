@@ -54,11 +54,11 @@ export class ChatCompletionService {
 
     try {
       const result = await generateFromAI(
-        'nvidia',
+        'nineRouter',
         systemPrompt,
         content,
         null,
-        { model: resolved.model, temperature: 0.5, apiKey: resolved.apiKey, baseUrl: resolved.baseUrl, signal: controller.signal },
+        { model: resolved.model, temperature: 0.5, signal: controller.signal },
       );
 
       this.persistence.saveAssistantMessageWithOutbox(userId, sessionId, result.content);

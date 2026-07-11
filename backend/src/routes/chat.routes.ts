@@ -3,7 +3,7 @@ import { sendChatMessageHandler, sendChatMessageStreamHandler, getChatHistoryHan
 import { authenticate } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { chatMessageSchema } from '../validators/chat.js';
-import { modelRegistry } from '../config/index.js';
+import { fetchAvailableModels } from '../services/ai/nineRouter.js';
 
 const router = Router();
 
@@ -19,15 +19,17 @@ router.post('/unarchive', unarchiveSessionHandler);
 router.post('/delete', deleteSessionHandler);
 router.get('/sessions/archived', getArchivedSessionsHandler);
 
-router.get('/models', (_req, res) => {
-  const models = Object.entries(modelRegistry).map(([id, entry]) => ({
-    id,
-    label: entry.label,
-    model: entry.model,
-    multimodal: !!entry.multimodal,
-    contextLength: entry.contextLength || 128000,
-  }));
-  res.json({ models });
+router.get('/models', async (_req, res) => {
+  const models = await fetchAvailableModels();
+  res.json({
+    models: models.map(m => ({
+      id: m.id,
+      label: m.label,
+      model: m.id,
+      multimodal: m.id.includes('nemotron') || m.id.includes('gemma') || m.id.includes('multimodal'),
+      contextLength: 128000,
+    })),
+  });
 });
 
 export default router;

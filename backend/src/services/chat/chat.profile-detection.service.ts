@@ -28,7 +28,7 @@ export class ChatProfileDetectionService {
     if (!isProfileEditIntent(message)) return null;
 
     try {
-      const result = await generateFromAI('nvidia', SYSTEM_PROMPT_CLASSIFIER, message, {
+      const result = await generateFromAI('nineRouter', SYSTEM_PROMPT_CLASSIFIER, message, {
         type: 'json_object',
         json_schema: {
           type: 'object',

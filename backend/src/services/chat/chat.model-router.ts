@@ -1,24 +1,22 @@
-import { config, modelRegistry, type ModelEntry } from '../../config/index.js';
+import { config } from '../../config/index.js';
 
 export interface ResolvedModel {
   model: string;
-  apiKey?: string;
-  baseUrl?: string;
   label: string;
   multimodal: boolean;
   contextLength?: number;
 }
 
+const MULTIMODAL_HINTS = ['nemotron', 'gemma', 'multimodal', 'nano'];
+
 export class ChatModelRouter {
   resolve(modelId?: string): ResolvedModel {
-    const entry = modelId && modelRegistry[modelId] ? modelRegistry[modelId] : null;
+    const model = modelId || config.models.chat;
     return {
-      model: entry?.model || config.models.chat,
-      apiKey: entry?.apiKey,
-      baseUrl: entry?.baseUrl,
-      label: entry?.label || entry?.model || config.models.chat,
-      multimodal: !!entry?.multimodal,
-      contextLength: entry?.contextLength,
+      model,
+      label: model.split('/').pop() || model,
+      multimodal: MULTIMODAL_HINTS.some(h => model.toLowerCase().includes(h)),
+      contextLength: 128000,
     };
   }
 

@@ -44,7 +44,7 @@ export async function updateProfileForUser(userId: string): Promise<boolean> {
   const userPrompt = `--- Perfil Actual ---\n${currentProfile}\n\n--- Últimos Chats ---\n${transcript}\n---`;
 
   try {
-    const result = await generateFromAI('nvidia', PROMPT, userPrompt, null, {
+    const result = await generateFromAI('nineRouter', PROMPT, userPrompt, null, {
       model: config.models.chat,
       temperature: 0.3,
       max_tokens: 2048,

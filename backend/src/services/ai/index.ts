@@ -1,4 +1,4 @@
-import { callNvidia, type NvidiaOptions } from './nvidia.js';
+import { callNineRouter, type NineRouterOptions } from './nineRouter.js';
 import { logger } from '../../utils/logger.js';
 import type { AIResponse } from '../../types/db.js';
 
@@ -6,14 +6,15 @@ type AiProvider = (
   systemPrompt: string,
   userPrompt: string | Record<string, unknown>[],
   schema: Record<string, unknown> | null,
-  options?: NvidiaOptions,
+  options?: NineRouterOptions,
 ) => Promise<AIResponse>;
 
 const providers: Record<string, AiProvider> = {
-  nvidia: callNvidia,
+  nineRouter: callNineRouter,
+  nvidia: callNineRouter, // compat alias
 };
 
-export interface GenerateOptions extends NvidiaOptions {}
+export interface GenerateOptions extends NineRouterOptions {}
 
 const RETRY_TEMPERATURES = [0.3, 0.5, 0.7];
 const TIMEOUT_MS = 30000;
@@ -76,6 +77,7 @@ export async function generateFromAI(
         signal: controller.signal,
         apiKey: options?.apiKey,
         baseUrl: options?.baseUrl,
+        max_tokens: options?.max_tokens,
       });
 
       if (onAbort && options?.signal) options.signal.removeEventListener('abort', onAbort);
