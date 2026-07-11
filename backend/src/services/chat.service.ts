@@ -1,14 +1,11 @@
-import { v4 as uuidv4 } from 'uuid';
-import { generateFromAI } from './ai/index.js';
-import { callNvidiaStream, parseNvidiaStream } from './ai/nvidia.js';
-import { config } from '../config/index.js';
-import { logger } from '../utils/logger.js';
 import { ChatPersistenceService } from './chat/chat.persistence.service.js';
 import { ChatEmbeddingService } from './chat/chat.embedding.service.js';
 import { ChatRAGService } from './chat/chat.rag.service.js';
 import { ChatProfileDetectionService, isProfileEditIntent } from './chat/chat.profile-detection.service.js';
 import { ChatModelRouter } from './chat/chat.model-router.js';
 import { ChatPromptService, type Attachment } from './chat/chat.prompt.service.js';
+import { ChatStreamingService } from './chat/chat.streaming.service.js';
+import { ChatCompletionService } from './chat/chat.completion.service.js';
 
 export { isProfileEditIntent };
 
@@ -19,18 +16,15 @@ const profileDetectionService = new ChatProfileDetectionService();
 const modelRouter = new ChatModelRouter();
 const promptService = new ChatPromptService();
 
-const TIMEOUT_MS = 30000;
+const streamingService = new ChatStreamingService(
+  persistence, embeddingService, ragService, profileDetectionService, modelRouter, promptService,
+);
+const completionService = new ChatCompletionService(
+  persistence, embeddingService, ragService, profileDetectionService, modelRouter, promptService,
+);
 
 export function buildContent(message: string, attachments?: Attachment[]): Array<Record<string, unknown>> {
   return promptService.buildContent(message, attachments);
-}
-
-function resolveModel(modelId?: string) {
-  return modelRouter.resolve(modelId);
-}
-
-function validateAttachments(resolved: ReturnType<typeof resolveModel>, attachments?: Attachment[]) {
-  modelRouter.validateMultimodal(resolved, attachments);
 }
 
 export async function sendChatMessageStream(
@@ -40,60 +34,7 @@ export async function sendChatMessageStream(
   userId: string,
   sessionId: string,
 ): Promise<AsyncGenerator<{ type: string; content: string }>> {
-  const resolved = resolveModel(modelId);
-  validateAttachments(resolved, attachments);
-
-  // Paso 1-2: guardar mensaje + encolar outbox
-  const { msgId: userMsgId, outboxId } = persistence.saveUserMessageWithOutbox(userId, sessionId, message);
-
-  // Paso 2b: generar embedding inline (best-effort para RAG inmediato)
-  const queryVector = await embeddingService.generateAndSave(userMsgId, userId, message, outboxId);
-
-  // Paso 3: RAG context usando el vector generado
-  const ragContext = queryVector ? await ragService.buildContext(userId, userMsgId, queryVector) : '';
-
-  // Paso 4: detectar edición de perfil desde el chat (fire-and-forget, no bloquea stream)
-  profileDetectionService.detectAndApply(message, userId).catch(err =>
-    logger.warn('Profile detection async failed', { error: (err as Error).message })
-  );
-
-  // Paso 5: construir prompts con RAG
-  const systemPrompt = promptService.buildSystemPrompt(resolved.label, ragContext, userId);
-  const content = promptService.buildContent(message, attachments);
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
-
-  let responseBody: ReadableStream<Uint8Array>;
-  try {
-    const response = await callNvidiaStream(systemPrompt, content, {
-      model: resolved.model, apiKey: resolved.apiKey, baseUrl: resolved.baseUrl, signal: controller.signal,
-    });
-    responseBody = response.body!;
-  } finally {
-    clearTimeout(timeoutId);
-  }
-
-  const originalStream = parseNvidiaStream(responseBody);
-
-  // Wrap generator: recolecta chunks de contenido (no reasoning) para guardar al cerrar
-  async function* persistedStream(): AsyncGenerator<{ type: string; content: string }> {
-    let fullResponse = '';
-    try {
-      for await (const chunk of originalStream) {
-        if (chunk.type === 'content') {
-          fullResponse += chunk.content;
-        }
-        yield chunk;
-      }
-    } finally {
-      if (fullResponse) {
-        persistence.saveAssistantMessageWithOutbox(userId, sessionId, fullResponse);
-      }
-    }
-  }
-
-  return persistedStream();
+  return streamingService.execute(message, modelId, attachments, userId, sessionId);
 }
 
 export async function sendChatMessage(
@@ -103,52 +44,5 @@ export async function sendChatMessage(
   userId: string,
   sessionId: string,
 ): Promise<{ response: string }> {
-  const resolved = resolveModel(modelId);
-  validateAttachments(resolved, attachments);
-
-  logger.info('Enviando mensaje al tutor IA', {
-    messageLength: message.length,
-    model: resolved.model,
-    modelId: modelId || 'default',
-    attachmentsCount: attachments?.length || 0,
-  });
-
-  // Paso 1-2: guardar mensaje + encolar outbox
-  const { msgId: userMsgId, outboxId } = persistence.saveUserMessageWithOutbox(userId, sessionId, message);
-
-  // Paso 2b: generar embedding inline (best-effort para RAG inmediato)
-  const queryVector = await embeddingService.generateAndSave(userMsgId, userId, message, outboxId);
-
-  // Paso 3: RAG context usando el vector generado
-  const ragContext = queryVector ? await ragService.buildContext(userId, userMsgId, queryVector) : '';
-
-  // Paso 4: detectar edición de perfil desde el chat (fire-and-forget, no bloquea)
-  profileDetectionService.detectAndApply(message, userId).catch(err =>
-    logger.warn('Profile detection async failed', { error: (err as Error).message })
-  );
-
-  // Paso 5: construir prompts con RAG
-  const systemPrompt = promptService.buildSystemPrompt(resolved.label, ragContext, userId);
-  const content = promptService.buildContent(message, attachments);
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
-
-  try {
-    const result = await generateFromAI(
-      'nvidia',
-      systemPrompt,
-      content,
-      null,
-      { model: resolved.model, temperature: 0.5, apiKey: resolved.apiKey, baseUrl: resolved.baseUrl, signal: controller.signal },
-    );
-
-    persistence.saveAssistantMessageWithOutbox(userId, sessionId, result.content);
-
-    return { response: result.content };
-  } catch {
-    return { response: `El modelo **${resolved.label}** no respondió a tiempo. Cambia a otro modelo desde el selector e intenta de nuevo.` };
-  } finally {
-    clearTimeout(timeoutId);
-  }
+  return completionService.execute(message, modelId, attachments, userId, sessionId);
 }
