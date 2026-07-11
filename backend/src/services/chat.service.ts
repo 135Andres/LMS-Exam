@@ -3,19 +3,17 @@ import { generateFromAI } from './ai/index.js';
 import { callNvidiaStream, parseNvidiaStream } from './ai/nvidia.js';
 import { config, modelRegistry } from '../config/index.js';
 import { SYSTEM_PROMPT_TUTOR } from '../prompts/system.js';
-import { EmbeddingModel } from '../models/embedding.model.js';
 import { ProfileService } from './profile.service.js';
-import { findTopK } from '../utils/vector.js';
 import { logger } from '../utils/logger.js';
 import { ChatPersistenceService } from './chat/chat.persistence.service.js';
 import { ChatEmbeddingService } from './chat/chat.embedding.service.js';
+import { ChatRAGService } from './chat/chat.rag.service.js';
 
 const persistence = new ChatPersistenceService();
 const embeddingService = new ChatEmbeddingService();
+const ragService = new ChatRAGService();
 
 const TIMEOUT_MS = 30000;
-const RAG_MIN_EMBEDDINGS = 2;
-const RAG_TOP_K = 3;
 
 const PROFILE_EDIT_REGEX = /\b(?:quiero que|cambia mi|actualiza mi|prefiero que|configura mi|ajusta mi|modifica mi)\b/i;
 
@@ -54,34 +52,6 @@ function resolveModel(modelId?: string) {
     label: entry?.label || entry?.model || config.models.chat,
     multimodal: !!entry?.multimodal,
   };
-}
-
-async function buildRagContext(userId: string, excludeMessageId: string, queryVector: number[]): Promise<string> {
-  try {
-    const pastEmbeddings = EmbeddingModel.getUserEmbeddings(userId, 100);
-    const filtered = pastEmbeddings.filter(e => e.messageId !== excludeMessageId);
-
-    if (filtered.length < RAG_MIN_EMBEDDINGS) return '';
-
-    const topK = findTopK(queryVector, filtered, RAG_TOP_K);
-    logger.debug('RAG context recuperado', {
-      total_embeddings: filtered.length,
-      above_threshold: topK.length,
-      min_score: topK.length > 0 ? topK[topK.length - 1].score.toFixed(3) : 'N/A',
-      max_score: topK.length > 0 ? topK[0].score.toFixed(3) : 'N/A',
-    });
-    if (topK.length === 0) return '';
-
-    const contextParts = topK.map((item, i) => {
-      const roleLabel = item.role === 'assistant' ? 'Tu explicación anterior' : 'Pregunta anterior';
-      return `[Contexto ${i + 1}] (${roleLabel}, relevancia: ${(item.score * 100).toFixed(0)}%)\n${item.content}`;
-    });
-
-    return `\n\n--- Contexto de conversaciones anteriores ---\n${contextParts.join('\n\n')}\n---`;
-  } catch (err) {
-    logger.warn('Error generando RAG context', { error: (err as Error).message });
-    return '';
-  }
 }
 
 function buildSystemPrompt(modelLabel: string, ragContext: string, userId: string): string {
@@ -171,7 +141,7 @@ export async function sendChatMessageStream(
   const queryVector = await embeddingService.generateAndSave(userMsgId, userId, message, outboxId);
 
   // Paso 3: RAG context usando el vector generado
-  const ragContext = queryVector ? await buildRagContext(userId, userMsgId, queryVector) : '';
+  const ragContext = queryVector ? await ragService.buildContext(userId, userMsgId, queryVector) : '';
 
   // Paso 4: detectar edición de perfil desde el chat (fire-and-forget, no bloquea stream)
   detectProfileEdit(message, userId).catch(err =>
@@ -244,7 +214,7 @@ export async function sendChatMessage(
   const queryVector = await embeddingService.generateAndSave(userMsgId, userId, message, outboxId);
 
   // Paso 3: RAG context usando el vector generado
-  const ragContext = queryVector ? await buildRagContext(userId, userMsgId, queryVector) : '';
+  const ragContext = queryVector ? await ragService.buildContext(userId, userMsgId, queryVector) : '';
 
   // Paso 4: detectar edición de perfil desde el chat (fire-and-forget, no bloquea)
   detectProfileEdit(message, userId).catch(err =>
