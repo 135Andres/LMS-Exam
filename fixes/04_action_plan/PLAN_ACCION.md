@@ -20,15 +20,15 @@
 ### Bugs Post-Implementación — TODOS FIXEADOS
 Ver `04_action_plan/BUGS_POST_IMPLEMENTACION.md`. 8 bugs corregidos, 2 falsos positivos descartados.
 
-### `02_architecture_issues` — 0 de 5 pendientes
+### `02_architecture_issues` — 4 de 5 completados
 
 | # | Plan | Estado | Notas |
 |---|------|--------|-------|
-| 1 | Chat service god class | ⏳ Pendiente | chat.service.ts 311 líneas |
-| 2 | Sin tests (vitest) | ⏳ Pendiente | No hay vitest |
-| 3 | Frontend monolithic | ⏳ Pendiente | welcome.js 2059 líneas |
+| 1 | Chat service god class | ✅ Completado | chat.service.ts reducido a fachada de 44 líneas; 8 servicios extraídos |
+| 2 | Sin tests (vitest) | ✅ Completado | 63 tests en 7 suites, todos pasando |
+| 3 | Frontend monolithic | ⏳ Parcial | Módulos lib/state.js, lib/utils.js, features/sidebar.js creados. Migración real (type="module" + rewrite de bindings) requiere testing manual — documentado |
 | 5 | Cron jobs main process | ⏳ Pendiente | Crons en server.ts:118-149 |
-| 7 | Migracion 9router | ⏳ Pendiente | Bloqueado por API key |
+| 7 | Migracion 9router | ✅ Completado | Configurado con API key + tunnel |
 
 ### `03_knowledge_base` — 0 de 4 (fase de diseño)
 
