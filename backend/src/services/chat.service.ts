@@ -97,7 +97,7 @@ function buildSystemPrompt(modelLabel: string, ragContext: string, userId: strin
   return prompt;
 }
 
-function buildContent(message: string, attachments?: Attachment[]): Array<Record<string, unknown>> {
+export function buildContent(message: string, attachments?: Attachment[]): Array<Record<string, unknown>> {
   const content: Array<Record<string, unknown>> = [{ type: 'text', text: message }];
 
   if (attachments && attachments.length > 0) {
