@@ -3,6 +3,7 @@ import { EmbeddingModel } from '../models/embedding.model.js';
 import { generateEmbedding } from '../services/ai/embeddings.js';
 import { config } from '../config/index.js';
 import { logger } from '../utils/logger.js';
+import { getDb } from '../db/connection.js';
 import { v4 as uuidv4 } from 'uuid';
 
 const POLL_INTERVAL_MS = 30_000;
@@ -17,11 +18,11 @@ export async function processEmbeddingOutbox(): Promise<number> {
     EmbeddingOutboxModel.markProcessing(item.id);
     try {
       const vector = await generateEmbedding(item.text_content);
-      EmbeddingModel.saveEmbedding(
-        uuidv4(), item.message_id, item.user_id, vector,
-        config.embeddings.model, config.embeddings.dimensions
-      );
-      EmbeddingOutboxModel.markDone(item.id);
+      const embId = uuidv4();
+      getDb().transaction(() => {
+        EmbeddingModel.saveEmbedding(embId, item.message_id, item.user_id, vector, config.embeddings.model, config.embeddings.dimensions);
+        EmbeddingOutboxModel.markDone(item.id);
+      })();
       processed++;
     } catch (err) {
       const msg = (err as Error).message;

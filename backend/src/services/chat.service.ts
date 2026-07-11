@@ -15,19 +15,13 @@ const TIMEOUT_MS = 30000;
 const RAG_MIN_EMBEDDINGS = 2;
 const RAG_TOP_K = 3;
 
-const PROFILE_EDIT_WHITELIST = [
-  /^explícame /i, /^qué es /i, /^qué son /i, /^cómo /i, /^por qué /i,
-  /^dame /i, /^muestra /i, /^ayuda/i, /^gracias/i, /^ok/i, /^vale/i,
-  /^entendido/i, /^perfecto/i, /^ahora (entiendo|veo|sí|comprendo)/i,
-  /modo (examen|práctica|estudio|sargento)/i, /^evita /i, /^habla /i,
-];
-
 const PROFILE_EDIT_REGEX = /\b(?:quiero que|cambia mi|actualiza mi|prefiero que|configura mi|ajusta mi|modifica mi)\b/i;
 
 function isProfileEditIntent(message: string): boolean {
-  if (PROFILE_EDIT_WHITELIST.some(r => r.test(message))) return false;
-  return PROFILE_EDIT_REGEX.test(message);
+  if (PROFILE_EDIT_REGEX.test(message)) return true;
+  return false;
 }
+export { isProfileEditIntent };
 
 const SYSTEM_PROMPT_CLASSIFIER = `Eres un clasificador de intención. Analiza si el mensaje del estudiante contiene una instrucción para CAMBIAR o AJUSTAR la forma en que el tutor IA debe comportarse (preferencias de aprendizaje, tono, profundidad, temas, etc.).
 
@@ -112,6 +106,8 @@ function buildContent(message: string, attachments?: Attachment[]): Array<Record
         content.push({ type: 'image_url', image_url: { url: `data:${att.mime};base64,${att.data}` } });
       } else if (att.type === 'audio') {
         content.push({ type: 'audio_url', audio_url: { url: `data:${att.mime};base64,${att.data}` } });
+      } else if (att.type === 'file') {
+        content.push({ type: 'text', text: `\n\n[Archivo adjunto: ${att.mime}, ${att.data.length} chars base64]` });
       }
     }
   }
@@ -188,8 +184,10 @@ export async function sendChatMessageStream(
   // Paso 3: RAG context usando el vector generado
   const ragContext = queryVector ? await buildRagContext(userId, userMsgId, queryVector) : '';
 
-  // Paso 4: detectar edición de perfil desde el chat
-  await detectProfileEdit(message, userId);
+  // Paso 4: detectar edición de perfil desde el chat (fire-and-forget, no bloquea stream)
+  detectProfileEdit(message, userId).catch(err =>
+    logger.warn('Profile detection async failed', { error: (err as Error).message })
+  );
 
   // Paso 5: construir prompts con RAG
   const systemPrompt = buildSystemPrompt(resolved.label, ragContext, userId);
@@ -276,8 +274,10 @@ export async function sendChatMessage(
   // Paso 3: RAG context usando el vector generado
   const ragContext = queryVector ? await buildRagContext(userId, userMsgId, queryVector) : '';
 
-  // Paso 4: detectar edición de perfil desde el chat
-  await detectProfileEdit(message, userId);
+  // Paso 4: detectar edición de perfil desde el chat (fire-and-forget, no bloquea)
+  detectProfileEdit(message, userId).catch(err =>
+    logger.warn('Profile detection async failed', { error: (err as Error).message })
+  );
 
   // Paso 5: construir prompts con RAG
   const systemPrompt = buildSystemPrompt(resolved.label, ragContext, userId);

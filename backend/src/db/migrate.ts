@@ -113,6 +113,20 @@ CREATE TABLE IF NOT EXISTS chat_embeddings (
 CREATE INDEX IF NOT EXISTS idx_chat_embeddings_user_id ON chat_embeddings(user_id);
 CREATE INDEX IF NOT EXISTS idx_chat_embeddings_msg ON chat_embeddings(message_id);
 
+-- Tabla migrada: BLOB binario (Float32Array) en vez de JSON string
+-- 16KB por vector vs 40KB JSON, sin parse overhead
+CREATE TABLE IF NOT EXISTS chat_embeddings_vec (
+  id TEXT PRIMARY KEY,
+  message_id TEXT NOT NULL REFERENCES chat_logs(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL REFERENCES users(id),
+  embedding BLOB NOT NULL,
+  model TEXT NOT NULL,
+  dimensions INTEGER NOT NULL,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_chat_embeddings_vec_user ON chat_embeddings_vec(user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_chat_embeddings_vec_msg ON chat_embeddings_vec(message_id);
+
 -- Insights diarios por materia (clave única user_id + subject + date)
 CREATE TABLE IF NOT EXISTS chat_insights (
   id TEXT PRIMARY KEY,

@@ -78,7 +78,7 @@ def init_db():
 
 def store_otp(email: str, code_hash: str, salt: bytes, expires_at: datetime):
     with transaction() as conn:
-        conn.execute("UPDATE auth_otp_codes SET attempts = 0 WHERE email = ?", (email,))
+        conn.execute("DELETE FROM auth_otp_codes WHERE email = ?", (email,))
         conn.execute("""
             INSERT INTO auth_otp_codes (id, email, code_hash, salt, expires_at)
             VALUES (?, ?, ?, ?, ?)
@@ -95,8 +95,14 @@ def get_otp(email: str) -> dict | None:
 
 def increment_otp_attempts(email: str) -> int:
     with transaction() as conn:
-        conn.execute("UPDATE auth_otp_codes SET attempts = attempts + 1 WHERE email = ? AND expires_at > datetime('now')", (email,))
-        row = conn.execute("SELECT attempts FROM auth_otp_codes WHERE email = ? ORDER BY created_at DESC LIMIT 1", (email,)).fetchone()
+        conn.execute(
+            "UPDATE auth_otp_codes SET attempts = attempts + 1 WHERE email = ? AND expires_at > datetime('now')",
+            (email,)
+        )
+        row = conn.execute(
+            "SELECT attempts FROM auth_otp_codes WHERE email = ? AND expires_at > datetime('now') ORDER BY created_at DESC LIMIT 1",
+            (email,)
+        ).fetchone()
         return row["attempts"] if row else 0
 
 def delete_otp(email: str):

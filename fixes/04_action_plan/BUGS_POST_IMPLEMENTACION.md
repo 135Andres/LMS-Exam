@@ -2,6 +2,11 @@
 
 Documento generado tras revisar todos los cambios implementados de `01_critical_errors` (fixes #1-#5, #7-#10) contra el código real.
 
+## ESTADO: TODOS LOS BUGS FIXEADOS
+Todos los bugs de severidad media/baja han sido corregidos. Los 2 falsos positivos (BUG-3, BUG-9) no requirieron acción. TypeScript compila limpio.
+
+---
+
 ## BUGS CONFIRMADOS EN CÓIGO IMPLEMENTADO
 
 ### BUG-1: `markFailed` backoff hardcoded — no usa `attempts` (`embedding-outbox.model.ts:36`)

@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import { sendChatMessage, sendChatMessageStream } from '../services/chat.service.js';
 import { ChatModel } from '../models/chat.model.js';
+import { getDb } from '../db/connection.js';
 import { logger } from '../utils/logger.js';
 import type { Attachment } from '../validators/chat.js';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
@@ -174,10 +175,26 @@ export async function reportMessageHandler(req: Request, res: Response): Promise
   res.json({ success: true });
 }
 
+function requireOwnedSession(sessionId: string, userId: string, res: Response): boolean {
+  const session = getDb().prepare(
+    'SELECT user_id FROM chat_sessions WHERE session_id = ?'
+  ).get(sessionId) as { user_id: string } | undefined;
+  if (!session) {
+    res.status(404).json({ error: 'Sesión no encontrada' });
+    return false;
+  }
+  if (session.user_id !== userId) {
+    res.status(403).json({ error: 'No tienes acceso a esta sesión' });
+    return false;
+  }
+  return true;
+}
+
 export async function archiveSessionHandler(req: Request, res: Response): Promise<void> {
   const { sessionId } = req.body as { sessionId: string };
   const userId = req.user!.id;
   if (!sessionId) { res.status(400).json({ error: 'sessionId requerido' }); return; }
+  if (!requireOwnedSession(sessionId, userId, res)) return;
   ChatModel.archiveSession(sessionId, userId);
   res.json({ success: true });
 }
@@ -186,6 +203,7 @@ export async function unarchiveSessionHandler(req: Request, res: Response): Prom
   const { sessionId } = req.body as { sessionId: string };
   const userId = req.user!.id;
   if (!sessionId) { res.status(400).json({ error: 'sessionId requerido' }); return; }
+  if (!requireOwnedSession(sessionId, userId, res)) return;
   ChatModel.unarchiveSession(sessionId, userId);
   res.json({ success: true });
 }
@@ -194,6 +212,7 @@ export async function deleteSessionHandler(req: Request, res: Response): Promise
   const { sessionId } = req.body as { sessionId: string };
   const userId = req.user!.id;
   if (!sessionId) { res.status(400).json({ error: 'sessionId requerido' }); return; }
+  if (!requireOwnedSession(sessionId, userId, res)) return;
   ChatModel.deleteSession(sessionId, userId);
   res.json({ success: true });
 }

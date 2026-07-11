@@ -33,11 +33,19 @@ export const EmbeddingOutboxModel = {
   },
 
   markFailed(id: string, error: string): void {
-    const backoff = Math.min(60 * Math.pow(2, 1), 3600);
+    const row = getDb().prepare(
+      'SELECT attempts, max_attempts FROM embedding_outbox WHERE id = ?'
+    ).get(id) as { attempts: number; max_attempts: number } | undefined;
+    if (!row) return;
+
+    const exhausted = row.attempts >= row.max_attempts;
+    const backoff = Math.min(60 * Math.pow(2, row.attempts), 3600);
     const nextRetry = new Date(Date.now() + backoff * 1000).toISOString();
+    const newStatus = exhausted ? 'failed' : 'pending';
+
     getDb().prepare(
-      `UPDATE embedding_outbox SET status = 'failed', error = ?, next_retry_at = ? WHERE id = ?`
-    ).run(error.substring(0, 500), nextRetry, id);
+      `UPDATE embedding_outbox SET status = ?, error = ?, next_retry_at = ? WHERE id = ?`
+    ).run(newStatus, error.substring(0, 500), nextRetry, id);
   },
 
   countPending(): number {
