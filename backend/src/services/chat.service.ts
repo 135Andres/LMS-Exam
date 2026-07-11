@@ -4,12 +4,14 @@ import { callNvidiaStream, parseNvidiaStream } from './ai/nvidia.js';
 import { generateEmbedding } from './ai/embeddings.js';
 import { config, modelRegistry } from '../config/index.js';
 import { SYSTEM_PROMPT_TUTOR } from '../prompts/system.js';
-import { ChatModel } from '../models/chat.model.js';
 import { EmbeddingModel } from '../models/embedding.model.js';
 import { EmbeddingOutboxModel } from '../models/embedding-outbox.model.js';
 import { ProfileService } from './profile.service.js';
 import { findTopK } from '../utils/vector.js';
 import { logger } from '../utils/logger.js';
+import { ChatPersistenceService } from './chat/chat.persistence.service.js';
+
+const persistence = new ChatPersistenceService();
 
 const TIMEOUT_MS = 30000;
 const RAG_MIN_EMBEDDINGS = 2;
@@ -162,11 +164,8 @@ export async function sendChatMessageStream(
     throw new Error(`El modelo **${resolved.label}** no soporta archivos adjuntos.`);
   }
 
-  // Paso 1-2: guardar mensaje + encolar outbox (atómico)
-  const userMsgId = uuidv4();
-  ChatModel.saveMessage(userMsgId, userId, sessionId, 'user', message);
-  const outboxId = uuidv4();
-  EmbeddingOutboxModel.enqueue(outboxId, userMsgId, userId, message, 'user');
+  // Paso 1-2: guardar mensaje + encolar outbox
+  const { msgId: userMsgId, outboxId } = persistence.saveUserMessageWithOutbox(userId, sessionId, message);
 
   // Paso 2b: generar embedding inline (best-effort para RAG inmediato)
   let queryVector: number[] | null = null;
@@ -220,11 +219,7 @@ export async function sendChatMessageStream(
       }
     } finally {
       if (fullResponse) {
-        const aiMsgId = uuidv4();
-        ChatModel.saveMessage(aiMsgId, userId, sessionId, 'assistant', fullResponse);
-        if (config.embeddings.embedAssistantResponses) {
-          EmbeddingOutboxModel.enqueue(uuidv4(), aiMsgId, userId, fullResponse, 'assistant');
-        }
+        persistence.saveAssistantMessageWithOutbox(userId, sessionId, fullResponse);
       }
     }
   }
@@ -252,11 +247,8 @@ export async function sendChatMessage(
     attachmentsCount: attachments?.length || 0,
   });
 
-  // Paso 1-2: guardar mensaje + encolar outbox (atómico)
-  const userMsgId = uuidv4();
-  ChatModel.saveMessage(userMsgId, userId, sessionId, 'user', message);
-  const outboxId = uuidv4();
-  EmbeddingOutboxModel.enqueue(outboxId, userMsgId, userId, message, 'user');
+  // Paso 1-2: guardar mensaje + encolar outbox
+  const { msgId: userMsgId, outboxId } = persistence.saveUserMessageWithOutbox(userId, sessionId, message);
 
   // Paso 2b: generar embedding inline (best-effort para RAG inmediato)
   let queryVector: number[] | null = null;
@@ -295,12 +287,7 @@ export async function sendChatMessage(
       { model: resolved.model, temperature: 0.5, apiKey: resolved.apiKey, baseUrl: resolved.baseUrl, signal: controller.signal },
     );
 
-    // Paso 7: guardar respuesta del asistente
-    const aiMsgId = uuidv4();
-    ChatModel.saveMessage(aiMsgId, userId, sessionId, 'assistant', result.content);
-    if (config.embeddings.embedAssistantResponses) {
-      EmbeddingOutboxModel.enqueue(uuidv4(), aiMsgId, userId, result.content, 'assistant');
-    }
+    persistence.saveAssistantMessageWithOutbox(userId, sessionId, result.content);
 
     return { response: result.content };
   } catch {
