@@ -2,14 +2,13 @@ import { v4 as uuidv4 } from 'uuid';
 import { generateFromAI } from './ai/index.js';
 import { callNvidiaStream, parseNvidiaStream } from './ai/nvidia.js';
 import { config } from '../config/index.js';
-import { SYSTEM_PROMPT_TUTOR } from '../prompts/system.js';
-import { ProfileService } from './profile.service.js';
 import { logger } from '../utils/logger.js';
 import { ChatPersistenceService } from './chat/chat.persistence.service.js';
 import { ChatEmbeddingService } from './chat/chat.embedding.service.js';
 import { ChatRAGService } from './chat/chat.rag.service.js';
 import { ChatProfileDetectionService, isProfileEditIntent } from './chat/chat.profile-detection.service.js';
 import { ChatModelRouter } from './chat/chat.model-router.js';
+import { ChatPromptService, type Attachment } from './chat/chat.prompt.service.js';
 
 export { isProfileEditIntent };
 
@@ -18,45 +17,12 @@ const embeddingService = new ChatEmbeddingService();
 const ragService = new ChatRAGService();
 const profileDetectionService = new ChatProfileDetectionService();
 const modelRouter = new ChatModelRouter();
+const promptService = new ChatPromptService();
 
 const TIMEOUT_MS = 30000;
 
-interface Attachment {
-  type: 'image' | 'audio' | 'file';
-  mime: string;
-  data: string;
-}
-
-function buildSystemPrompt(modelLabel: string, ragContext: string, userId: string): string {
-  let prompt = SYSTEM_PROMPT_TUTOR.replace(/\{MODEL_NAME\}/g, modelLabel);
-
-  const profile = ProfileService.getProfile(userId);
-  if (profile) {
-    prompt += `\n\n--- Perfil del estudiante ---\n${profile}\n---`;
-  }
-
-  if (ragContext) {
-    prompt += ragContext;
-  }
-  return prompt;
-}
-
 export function buildContent(message: string, attachments?: Attachment[]): Array<Record<string, unknown>> {
-  const content: Array<Record<string, unknown>> = [{ type: 'text', text: message }];
-
-  if (attachments && attachments.length > 0) {
-    for (const att of attachments) {
-      if (att.type === 'image') {
-        content.push({ type: 'image_url', image_url: { url: `data:${att.mime};base64,${att.data}` } });
-      } else if (att.type === 'audio') {
-        content.push({ type: 'audio_url', audio_url: { url: `data:${att.mime};base64,${att.data}` } });
-      } else if (att.type === 'file') {
-        content.push({ type: 'text', text: `\n\n[Archivo adjunto: ${att.mime}, ${att.data.length} chars base64]` });
-      }
-    }
-  }
-
-  return content;
+  return promptService.buildContent(message, attachments);
 }
 
 function resolveModel(modelId?: string) {
@@ -92,8 +58,8 @@ export async function sendChatMessageStream(
   );
 
   // Paso 5: construir prompts con RAG
-  const systemPrompt = buildSystemPrompt(resolved.label, ragContext, userId);
-  const content = buildContent(message, attachments);
+  const systemPrompt = promptService.buildSystemPrompt(resolved.label, ragContext, userId);
+  const content = promptService.buildContent(message, attachments);
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -162,8 +128,8 @@ export async function sendChatMessage(
   );
 
   // Paso 5: construir prompts con RAG
-  const systemPrompt = buildSystemPrompt(resolved.label, ragContext, userId);
-  const content = buildContent(message, attachments);
+  const systemPrompt = promptService.buildSystemPrompt(resolved.label, ragContext, userId);
+  const content = promptService.buildContent(message, attachments);
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
