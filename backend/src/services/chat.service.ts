@@ -1,17 +1,17 @@
 import { v4 as uuidv4 } from 'uuid';
 import { generateFromAI } from './ai/index.js';
 import { callNvidiaStream, parseNvidiaStream } from './ai/nvidia.js';
-import { generateEmbedding } from './ai/embeddings.js';
 import { config, modelRegistry } from '../config/index.js';
 import { SYSTEM_PROMPT_TUTOR } from '../prompts/system.js';
 import { EmbeddingModel } from '../models/embedding.model.js';
-import { EmbeddingOutboxModel } from '../models/embedding-outbox.model.js';
 import { ProfileService } from './profile.service.js';
 import { findTopK } from '../utils/vector.js';
 import { logger } from '../utils/logger.js';
 import { ChatPersistenceService } from './chat/chat.persistence.service.js';
+import { ChatEmbeddingService } from './chat/chat.embedding.service.js';
 
 const persistence = new ChatPersistenceService();
+const embeddingService = new ChatEmbeddingService();
 
 const TIMEOUT_MS = 30000;
 const RAG_MIN_EMBEDDINGS = 2;
@@ -168,17 +168,7 @@ export async function sendChatMessageStream(
   const { msgId: userMsgId, outboxId } = persistence.saveUserMessageWithOutbox(userId, sessionId, message);
 
   // Paso 2b: generar embedding inline (best-effort para RAG inmediato)
-  let queryVector: number[] | null = null;
-  try {
-    queryVector = await generateEmbedding(message);
-    if (queryVector) {
-      const embId = uuidv4();
-      EmbeddingModel.saveEmbedding(embId, userMsgId, userId, queryVector, config.embeddings.model, config.embeddings.dimensions);
-      EmbeddingOutboxModel.markDone(outboxId);
-    }
-  } catch (err) {
-    logger.warn('Embedding inline falló, worker lo reintentará', { error: (err as Error).message });
-  }
+  const queryVector = await embeddingService.generateAndSave(userMsgId, userId, message, outboxId);
 
   // Paso 3: RAG context usando el vector generado
   const ragContext = queryVector ? await buildRagContext(userId, userMsgId, queryVector) : '';
@@ -251,17 +241,7 @@ export async function sendChatMessage(
   const { msgId: userMsgId, outboxId } = persistence.saveUserMessageWithOutbox(userId, sessionId, message);
 
   // Paso 2b: generar embedding inline (best-effort para RAG inmediato)
-  let queryVector: number[] | null = null;
-  try {
-    queryVector = await generateEmbedding(message);
-    if (queryVector) {
-      const embId = uuidv4();
-      EmbeddingModel.saveEmbedding(embId, userMsgId, userId, queryVector, config.embeddings.model, config.embeddings.dimensions);
-      EmbeddingOutboxModel.markDone(outboxId);
-    }
-  } catch (err) {
-    logger.warn('Embedding inline falló, worker lo reintentará', { error: (err as Error).message });
-  }
+  const queryVector = await embeddingService.generateAndSave(userMsgId, userId, message, outboxId);
 
   // Paso 3: RAG context usando el vector generado
   const ragContext = queryVector ? await buildRagContext(userId, userMsgId, queryVector) : '';
