@@ -1,7 +1,6 @@
 import type { Request, Response } from 'express';
 import { sendChatMessage, sendChatMessageStream } from '../services/chat.service.js';
 import { ChatModel } from '../models/chat.model.js';
-import { getDb } from '../db/connection.js';
 import { logger } from '../utils/logger.js';
 import type { Attachment } from '../validators/chat.js';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
@@ -176,15 +175,14 @@ export async function reportMessageHandler(req: Request, res: Response): Promise
 }
 
 function requireOwnedSession(sessionId: string, userId: string, res: Response): boolean {
-  const session = getDb().prepare(
-    'SELECT user_id FROM chat_sessions WHERE session_id = ?'
-  ).get(sessionId) as { user_id: string } | undefined;
-  if (!session) {
-    res.status(404).json({ error: 'Sesión no encontrada' });
+  try {
+    ChatModel.assertSessionOwnership(sessionId, userId);
+  } catch {
+    res.status(403).json({ error: 'No tienes acceso a esta sesión' });
     return false;
   }
-  if (session.user_id !== userId) {
-    res.status(403).json({ error: 'No tienes acceso a esta sesión' });
+  if (!ChatModel.sessionExists(sessionId)) {
+    res.status(404).json({ error: 'Sesión no encontrada' });
     return false;
   }
   return true;

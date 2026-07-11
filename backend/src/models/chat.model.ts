@@ -82,4 +82,11 @@ export const ChatModel = {
       throw new Error('SESSION_OWNERSHIP_VIOLATION');
     }
   },
+
+  sessionExists(sessionId: string): boolean {
+    const row = getDb().prepare(
+      'SELECT 1 FROM chat_sessions WHERE session_id = ?'
+    ).get(sessionId);
+    return !!row;
+  },
 };
