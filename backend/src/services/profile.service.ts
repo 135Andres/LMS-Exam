@@ -1,11 +1,12 @@
 import fs from 'fs';
 import path from 'path';
+import { LRUCache } from 'lru-cache';
 import { logger } from '../utils/logger.js';
 
 const PROFILES_DIR = path.resolve('data/profiles');
 const MAX_PROFILE_BYTES = 1536;
 
-const cache = new Map<string, { content: string }>();
+const cache = new LRUCache<string, string>({ max: 1000, ttl: 600000 });
 
 function profilePath(userId: string): string {
   return path.join(PROFILES_DIR, `user_${userId}.md`);
@@ -40,13 +41,13 @@ function semanticTruncate(text: string, maxBytes: number): string {
 export const ProfileService = {
   getProfile(userId: string): string | null {
     const cached = cache.get(userId);
-    if (cached) return cached.content;
+    if (cached !== undefined) return cached;
 
     const filePath = profilePath(userId);
     try {
       if (!fs.existsSync(filePath)) return null;
       const content = fs.readFileSync(filePath, 'utf-8');
-      cache.set(userId, { content });
+      cache.set(userId, content);
       return content;
     } catch (err) {
       logger.warn('Error leyendo perfil', { userId, error: (err as Error).message });
@@ -63,8 +64,7 @@ export const ProfileService = {
     }
     fs.writeFileSync(filePath, truncated, 'utf-8');
 
-    // Actualizar caché
-    cache.set(userId, { content: truncated });
+    cache.set(userId, truncated);
     logger.info('Perfil guardado', { userId, bytes: Buffer.byteLength(truncated, 'utf-8') });
   },
 
