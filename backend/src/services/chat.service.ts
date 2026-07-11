@@ -8,34 +8,16 @@ import { logger } from '../utils/logger.js';
 import { ChatPersistenceService } from './chat/chat.persistence.service.js';
 import { ChatEmbeddingService } from './chat/chat.embedding.service.js';
 import { ChatRAGService } from './chat/chat.rag.service.js';
+import { ChatProfileDetectionService, isProfileEditIntent } from './chat/chat.profile-detection.service.js';
+
+export { isProfileEditIntent };
 
 const persistence = new ChatPersistenceService();
 const embeddingService = new ChatEmbeddingService();
 const ragService = new ChatRAGService();
+const profileDetectionService = new ChatProfileDetectionService();
 
 const TIMEOUT_MS = 30000;
-
-const PROFILE_EDIT_REGEX = /\b(?:quiero que|cambia mi|actualiza mi|prefiero que|configura mi|ajusta mi|modifica mi)\b/i;
-
-function isProfileEditIntent(message: string): boolean {
-  if (PROFILE_EDIT_REGEX.test(message)) return true;
-  return false;
-}
-export { isProfileEditIntent };
-
-const SYSTEM_PROMPT_CLASSIFIER = `Eres un clasificador de intención. Analiza si el mensaje del estudiante contiene una instrucción para CAMBIAR o AJUSTAR la forma en que el tutor IA debe comportarse (preferencias de aprendizaje, tono, profundidad, temas, etc.).
-
-Responde ÚNICAMENTE con JSON, sin markdown ni explicaciones extra:
-
-- Si el mensaje SÍ expresa una preferencia o cambio: {"update_profile": true, "change": "descripción clara del cambio que pide"}
-- Si el mensaje NO expresa una preferencia (es una pregunta normal, saludo, ejercicio, etc.): {"update_profile": false}
-
-Ejemplos:
-Mensaje: "explícame qué es una derivada" → {"update_profile": false}
-Mensaje: "cambia tu forma de explicar, hazlo más sencillo" → {"update_profile": true, "change": "Prefiere explicaciones más sencillas"}
-Mensaje: "ahora vamos a estudiar química orgánica" → {"update_profile": true, "change": "Cambiando enfoque a química orgánica"}
-Mensaje: "evita usar ejemplos de física" → {"update_profile": true, "change": "No usar ejemplos de física"}
-Mensaje: "hola" → {"update_profile": false}`;
 
 interface Attachment {
   type: 'image' | 'audio' | 'file';
@@ -57,7 +39,6 @@ function resolveModel(modelId?: string) {
 function buildSystemPrompt(modelLabel: string, ragContext: string, userId: string): string {
   let prompt = SYSTEM_PROMPT_TUTOR.replace(/\{MODEL_NAME\}/g, modelLabel);
 
-  // Inyectar perfil del estudiante si existe
   const profile = ProfileService.getProfile(userId);
   if (profile) {
     prompt += `\n\n--- Perfil del estudiante ---\n${profile}\n---`;
@@ -87,40 +68,6 @@ export function buildContent(message: string, attachments?: Attachment[]): Array
   return content;
 }
 
-// Fase 4: clasificador de edición de perfil
-async function detectProfileEdit(message: string, userId: string): Promise<string | null> {
-  if (!isProfileEditIntent(message)) return null;
-
-  try {
-    const result = await generateFromAI('nvidia', SYSTEM_PROMPT_CLASSIFIER, message, {
-      type: 'json_object',
-      json_schema: {
-        type: 'object',
-        properties: {
-          update_profile: { type: 'boolean' },
-          change: { type: 'string' },
-        },
-        required: ['update_profile'],
-      },
-    }, { model: config.models.chat, temperature: 0.1, max_tokens: 150 });
-
-    const parsed = JSON.parse(result.content) as { update_profile: boolean; change?: string };
-    if (parsed.update_profile && parsed.change) {
-      logger.info('Perfil actualizado desde chat', { userId, change: parsed.change });
-      ProfileService.appendToProfile(userId, parsed.change);
-      ProfileService.invalidateCache(userId);
-      return parsed.change;
-    }
-    logger.debug('ProfileEdit: clasificador descartó (regex pasó pero IA dice no)', {
-      message_preview: message.slice(0, 50)
-    });
-  } catch (err) {
-    logger.warn('Error en clasificador de perfil', { error: (err as Error).message });
-  }
-
-  return null;
-}
-
 export async function sendChatMessageStream(
   message: string,
   modelId: string | undefined,
@@ -144,7 +91,7 @@ export async function sendChatMessageStream(
   const ragContext = queryVector ? await ragService.buildContext(userId, userMsgId, queryVector) : '';
 
   // Paso 4: detectar edición de perfil desde el chat (fire-and-forget, no bloquea stream)
-  detectProfileEdit(message, userId).catch(err =>
+  profileDetectionService.detectAndApply(message, userId).catch(err =>
     logger.warn('Profile detection async failed', { error: (err as Error).message })
   );
 
@@ -217,7 +164,7 @@ export async function sendChatMessage(
   const ragContext = queryVector ? await ragService.buildContext(userId, userMsgId, queryVector) : '';
 
   // Paso 4: detectar edición de perfil desde el chat (fire-and-forget, no bloquea)
-  detectProfileEdit(message, userId).catch(err =>
+  profileDetectionService.detectAndApply(message, userId).catch(err =>
     logger.warn('Profile detection async failed', { error: (err as Error).message })
   );
 
