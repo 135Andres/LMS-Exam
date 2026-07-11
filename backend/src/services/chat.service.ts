@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { generateFromAI } from './ai/index.js';
 import { callNvidiaStream, parseNvidiaStream } from './ai/nvidia.js';
-import { config, modelRegistry } from '../config/index.js';
+import { config } from '../config/index.js';
 import { SYSTEM_PROMPT_TUTOR } from '../prompts/system.js';
 import { ProfileService } from './profile.service.js';
 import { logger } from '../utils/logger.js';
@@ -9,6 +9,7 @@ import { ChatPersistenceService } from './chat/chat.persistence.service.js';
 import { ChatEmbeddingService } from './chat/chat.embedding.service.js';
 import { ChatRAGService } from './chat/chat.rag.service.js';
 import { ChatProfileDetectionService, isProfileEditIntent } from './chat/chat.profile-detection.service.js';
+import { ChatModelRouter } from './chat/chat.model-router.js';
 
 export { isProfileEditIntent };
 
@@ -16,6 +17,7 @@ const persistence = new ChatPersistenceService();
 const embeddingService = new ChatEmbeddingService();
 const ragService = new ChatRAGService();
 const profileDetectionService = new ChatProfileDetectionService();
+const modelRouter = new ChatModelRouter();
 
 const TIMEOUT_MS = 30000;
 
@@ -23,17 +25,6 @@ interface Attachment {
   type: 'image' | 'audio' | 'file';
   mime: string;
   data: string;
-}
-
-function resolveModel(modelId?: string) {
-  const entry = modelId && modelRegistry[modelId] ? modelRegistry[modelId] : null;
-  return {
-    model: entry?.model || config.models.chat,
-    apiKey: entry?.apiKey,
-    baseUrl: entry?.baseUrl,
-    label: entry?.label || entry?.model || config.models.chat,
-    multimodal: !!entry?.multimodal,
-  };
 }
 
 function buildSystemPrompt(modelLabel: string, ragContext: string, userId: string): string {
@@ -68,6 +59,14 @@ export function buildContent(message: string, attachments?: Attachment[]): Array
   return content;
 }
 
+function resolveModel(modelId?: string) {
+  return modelRouter.resolve(modelId);
+}
+
+function validateAttachments(resolved: ReturnType<typeof resolveModel>, attachments?: Attachment[]) {
+  modelRouter.validateMultimodal(resolved, attachments);
+}
+
 export async function sendChatMessageStream(
   message: string,
   modelId: string | undefined,
@@ -76,10 +75,7 @@ export async function sendChatMessageStream(
   sessionId: string,
 ): Promise<AsyncGenerator<{ type: string; content: string }>> {
   const resolved = resolveModel(modelId);
-
-  if (attachments && attachments.length > 0 && !resolved.multimodal) {
-    throw new Error(`El modelo **${resolved.label}** no soporta archivos adjuntos.`);
-  }
+  validateAttachments(resolved, attachments);
 
   // Paso 1-2: guardar mensaje + encolar outbox
   const { msgId: userMsgId, outboxId } = persistence.saveUserMessageWithOutbox(userId, sessionId, message);
@@ -142,10 +138,7 @@ export async function sendChatMessage(
   sessionId: string,
 ): Promise<{ response: string }> {
   const resolved = resolveModel(modelId);
-
-  if (attachments && attachments.length > 0 && !resolved.multimodal) {
-    throw new Error(`El modelo **${resolved.label}** no soporta archivos adjuntos.`);
-  }
+  validateAttachments(resolved, attachments);
 
   logger.info('Enviando mensaje al tutor IA', {
     messageLength: message.length,
