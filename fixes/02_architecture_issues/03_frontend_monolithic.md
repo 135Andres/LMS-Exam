@@ -1,6 +1,41 @@
 # ARQUITECTURA #3: Frontend Monolítico (welcome.js 2059+ líneas)
 
-## ESTADO
+---
+
+## AUDITORÍA (2026-07-12)
+
+**VEREDICTO: ⚠️ PARCIAL**
+
+| Ítem del plan | Estado | Ubicación / Evidencia |
+|---|---|---|
+| `core/state.js` (estado reactivo minimal) | ✅ COMPLETO | `public/js/lib/state.js` |
+| `core/api.js` (fetch wrapper con auth) | ❌ NO IMPLEMENTADO | no existe |
+| `core/events.js` (event bus) | ❌ NO IMPLEMENTADO | no existe |
+| `core/dom.js` / `shared/utils/dom.js` (escapeHtml, svgIcon, formatTime) | ✅ COMPLETO | `public/js/lib/utils.js` |
+| `features/chat/chat.service.js` (API calls) | ❌ NO IMPLEMENTADO | solo `features/sidebar.js`, no `chat.service.js` |
+| `features/chat/chat.ui.js` (message rendering) | ❌ NO IMPLEMENTADO | no existe |
+| `features/chat/chat.sidebar.js` (sessions, archive) | ✅ COMPLETO | `public/js/features/sidebar.js` |
+| `features/chat/chat.input.js` | ❌ NO IMPLEMENTADO | no existe |
+| `features/chat/chat.context-panel.js` | ❌ NO IMPLEMENTADO | no existe |
+| `features/onboarding/` | ❌ NO IMPLEMENTADO | no existe |
+| `features/models/` | ❌ NO IMPLEMENTADO | no existe |
+| `features/hero/hero.animation.js` | ❌ NO IMPLEMENTADO | no existe |
+| `features/katex/katex.renderer.js` | ❌ NO IMPLEMENTADO | no existe |
+| `shared/utils/stream.js` (SSE parsing) | ❌ NO IMPLEMENTADO | no existe |
+| `shared/components/Modal.js, Toast.js, Lightbox.js` | ❌ NO IMPLEMENTADO | no existe |
+| `main.js` (bootstrap entry point) | ❌ NO IMPLEMENTADO | no existe |
+| `welcome.js` actualizado para importar módulos | ❌ NO IMPLEMENTADO | `welcome.html` carga `welcome.js` como script normal (no `type="module"`) |
+| Eliminar dead code `sendToChatAPI` | ❌ NO IMPLEMENTADO | no verificado — `welcome.js` no modificado |
+| Eliminar `fetchLinkPreview` stub | ❌ NO IMPLEMENTADO | no verificado |
+
+**Resumen:**
+- ✅ 3 ítems completos (state.js, utils.js, sidebar.js — módulos ES creados pero aislados)
+- ❌ 16 ítems no implementados
+- ⚠️ PARCIAL — solo módulos ES base creados (`lib/state.js`, `lib/utils.js`, `features/sidebar.js`), NO integrados en `welcome.html`
+
+---
+
+## ESTADO (histórico)
 Bug confirmado en código (`public/js/welcome.js` = 2059 líneas)
 
 ## OBJETIVO ESPECÍFICO

@@ -1,6 +1,41 @@
 # ARQUITECTURA #2: Sin Tests Automatizados
 
-## ESTADO
+---
+
+## AUDITORÍA (2026-07-12)
+
+**VEREDICTO: ⚠️ PARCIAL**
+
+| Ítem del plan | Estado | Ubicación / Evidencia |
+|---|---|---|
+| Instalar vitest + @vitest/coverage-v8 + supertest + @types/supertest | ✅ COMPLETO | `backend/package.json:35,37,40,33` — todas instaladas |
+| `vitest.config.ts` con environment node + setupFiles | ✅ COMPLETO | `backend/vitest.config.ts:1-25` |
+| Coverage thresholds `lines:80, functions:80, branches:70, statements:80` | ❌ NO IMPLEMENTADO | `backend/vitest.config.ts` — sección `thresholds` ausente |
+| `test/setup.ts` DB en memoria + vi.mock + resetDb | ✅ COMPLETO | `backend/test/setup.ts` |
+| Tests unitarios `vector.test.ts` (cosine + findTopK) | ✅ COMPLETO | `backend/src/utils/vector.test.ts` (10 tests) |
+| Tests `chat.profile-detection.test.ts` (regex + whitelist) | ✅ COMPLETO | `backend/src/services/chat.profile-detection.test.ts` (18 tests) |
+| Tests `embedding.model.test.ts` (roundtrip DB) | ✅ COMPLETO | `backend/src/models/embedding.model.test.ts` (3 tests) |
+| Tests `embedding-outbox.model.test.ts` (enqueue/markFailed) | ✅ COMPLETO | `backend/src/models/embedding-outbox.model.test.ts` (6 tests) |
+| Tests `chat.model.test.ts` | ✅ COMPLETO | `backend/src/models/chat.model.test.ts` (8 tests) |
+| Tests `chat.service.test.ts` (fachada) | ✅ COMPLETO | `backend/src/services/chat.service.test.ts` (6 tests) |
+| Tests `chat.validator.ts` | ✅ COMPLETO | `backend/src/validators/chat.test.ts` (13 tests) |
+| Tests integración `chat.routes.test.ts` con supertest | ❌ NO IMPLEMENTADO | `backend/test/integration/` no existe; supertest instalado pero no usado |
+| CI/CD gate workflow `.github/workflows/test.yml` | ❌ NO IMPLEMENTADO | `.github/` no existe en el repo |
+| Scripts `test`, `test:watch`, `test:coverage`, `typecheck` en package.json | ✅ COMPLETO | `backend/package.json:19-22` |
+| Script `test:ui` (vitest --ui) | ❌ NO IMPLEMENTADO | no presente en package.json |
+| Codecov upload | ❌ NO IMPLEMENTADO | sin workflow CI |
+| PR required checks | ❌ NO IMPLEMENTADO | sin workflow CI |
+| Coverage real ≥80% | ❌ NO IMPLEMENTADO | Stmts 29.18%, Branch 16.17%, Funcs 40.5%, Lines 29.62% (medido 2026-07-12) |
+| Total: 64 tests / 7 suites pasando | ✅ COMPLETO | verificado |
+
+**Resumen:**
+- ✅ 10 ítems completos
+- ❌ 7 ítems no implementados (thresholds, tests integración, CI/CD completo, coverage real, test:ui, codecov, PR checks)
+- ⚠️ PARCIAL — infraestructura de tests base lista, cobertura insuficiente y sin gate CI/CD
+
+---
+
+## ESTADO (histórico)
 Bug confirmado en código (`package.json:6-8` — script placeholder)
 
 ## OBJETIVO ESPECÍFICO

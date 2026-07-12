@@ -1,5 +1,39 @@
 # KNOWLEDGE BASE #3: RAG Híbrido (Personal + Colectivo)
 
+---
+
+## AUDITORÍA (2026-07-12)
+
+**VEREDICTO: ⚠️ PARCIAL**
+
+| Sub-ítem del plan | Estado | Ubicación / Evidencia |
+|---|---|---|
+| `HybridRAGService` clase con `buildContext()` | ✅ COMPLETO (en archivo) | `backend/src/services/hybrid-rag.service.ts:44` |
+| Pesos 0.7/0.3 configurables vía `HybridRAGOptions` | ✅ COMPLETO (en archivo) | `backend/src/services/hybrid-rag.service.ts:33-42` (`DEFAULTS.personalWeight:0.7`, `collectiveWeight:0.3`) |
+| Búsqueda paralela `Promise.all([searchPersonal, searchCollective])` | ✅ COMPLETO (en archivo) | `backend/src/services/hybrid-rag.service.ts:50-53` |
+| Filtros por umbrales `minPersonalScore` / `minCollectiveScore` | ✅ COMPLETO (en archivo) | `backend/src/services/hybrid-rag.service.ts:55-56` |
+| Merge ponderado `finalScore = score * weight` | ✅ COMPLETO (en archivo) | `backend/src/services/hybrid-rag.service.ts:58-61` |
+| TopK final (`finalTopK` configurable, default 5) | ✅ COMPLETO (en archivo) | `backend/src/services/hybrid-rag.service.ts:64` |
+| `formatContext` con badges (Personal/Colectivo) | ✅ COMPLETO (en archivo) | `backend/src/services/hybrid-rag.service.ts:108-119` |
+| `detectSubject(query)` keyword-based | ✅ COMPLETO (en archivo) | `backend/src/services/hybrid-rag.service.ts:121-137` (7 materias) |
+| `hybridRAG` singleton exportado | ✅ COMPLETO (en archivo) | `backend/src/services/hybrid-rag.service.ts:140` |
+| Cache de resultados (plan menciona implícitamente "cache 5 min") | ❌ NO IMPLEMENTADO | sin cache en `hybrid-rag.service.ts` |
+| Pesos configurables por env (`RAG_PERSONAL_WEIGHT`, etc.) en `buildHybridRagContext` | ❌ NO IMPLEMENTADO | plan muestra `parseFloat(process.env.RAG_PERSONAL_WEIGHT \|\| '0.7')` en integración que no existe |
+| Tabla `user_rag_preferences` (futuro) | ❌ NO IMPLEMENTADO | plan marcado como "Futuro" — no aplica |
+| Métricas para ajuste de pesos (latencia, satisfacción, etc.) | ❌ NO IMPLEMENTADO | sin telemetría |
+| **INTEGRACIÓN EN CHAT**: importar `hybridRAG` desde `chat.streaming.service.ts` o `chat.service.ts` | ❌ NO IMPLEMENTADO | grep `hybridRAG\|HybridRAGService\|hybrid-rag` en `backend/src/` → solo auto-referencias en `hybrid-rag.service.ts`. **Cero imports externos.** Servicio es código muerto. |
+| `buildHybridRagContext(message, userId, excludeMsgId)` reemplazando `buildRagContext` actual | ❌ NO IMPLEMENTADO | `backend/src/services/chat/chat.rag.service.ts` sigue usando RAG personal únicamente (`EmbeddingModel.getUserEmbeddings` + `findTopK`) |
+| `KnowledgeEmbeddingModel.searchSimilar` con sqlite-vec virtual table | ⚠️ PARCIAL | existe `searchSimilar` (`backend/src/models/knowledge-embedding.model.ts:33`) pero usa in-memory `findTopK`, no virtual table `vec_knowledge_embeddings` (no existe) |
+| `searchSimilarFallback` (fallback sin sqlite-vec) | ✅ COMPLETO (en archivo) | la implementación actual ES el fallback (in-memory findTopK) |
+
+**Resumen:**
+- ✅ 10 sub-ítems completos **dentro del archivo del servicio**
+- ❌ 5 sub-ítems no implementados (cache, env config, user prefs, métricas, integración en chat)
+- ⚠️ 1 sub-ítem parcial (searchSimilar in-memory en vez de virtual table)
+- ⚠️ PARCIAL — servicio completamente implementado internamente, **pero NUNCA integrado en el flujo de chat real → código muerto**. El chat sigue usando RAG personal solo (`ChatRAGService` sin componente colectivo). Ver `BUGS_ACTUALES.md`.
+
+---
+
 ## OBJETIVO ESPECÍFICO
 Combinar embeddings personales (historial usuario) + colectivos (KB verificada) en contexto RAG con pesos configurables.
 

@@ -1,5 +1,42 @@
 # CONOCIMIENTO COLECTIVO #1: Esquema DB Completo
 
+---
+
+## AUDITORÍA (2026-07-12)
+
+**VEREDICTO: ⚠️ PARCIAL**
+
+| Ítem del plan | Estado | Ubicación / Evidencia |
+|---|---|---|
+| `knowledge_base` tabla con todas las columnas (incluido `status`, `content_hash`, `view_count`) | ✅ COMPLETO | `backend/src/db/migrate.ts:162-183` |
+| `knowledge_embeddings` tabla física (BLOB) | ✅ COMPLETO | `backend/src/db/migrate.ts:191-198` |
+| `vec_knowledge_embeddings` virtual table `vec0` (sqlite-vec) | ❌ NO IMPLEMENTADO | no existe — se usa `knowledge_embeddings` (BLOB) con búsqueda in-memory vía `findTopK` |
+| Trigger `sync_vec_knowledge_after_insert` | ❌ NO IMPLEMENTADO | no existe — no se usa virtual table |
+| Trigger `sync_vec_knowledge_after_delete` | ❌ NO IMPLEMENTADO | no existe |
+| `knowledge_contributions` tabla | ✅ COMPLETO | `backend/src/db/migrate.ts:212-219` (`contribution_type` incluye `'verified'` además de plan) |
+| `knowledge_votes` tabla | ✅ COMPLETO | `backend/src/db/migrate.ts:201-210` con `UNIQUE(knowledge_id, user_id)` |
+| `user_kb_stats` tabla | ✅ COMPLETO | `backend/src/db/migrate.ts:223-235` (todas las columnas del plan) |
+| `knowledge_notifications` tabla (plan no la menciona pero se creó) | ✅ COMPLETO (extra) | `backend/src/db/migrate.ts:237-246` |
+| `idx_kb_subject_topic`, `idx_kb_verified`, `idx_kb_source_user`, `idx_kb_created`, `idx_kb_content_hash` | ✅ COMPLETO | `backend/src/db/migrate.ts:184-188` (además `idx_kb_status:189`) |
+| Trigger `update_kb_votes_after_insert` | ✅ COMPLETO | `backend/src/db/migrate.ts:249-256` |
+| Trigger `update_kb_votes_after_delete` | ✅ COMPLETO | `backend/src/db/migrate.ts:258-265` |
+| Trigger `update_user_kb_stats` | ✅ COMPLETO | `backend/src/db/migrate.ts:268-286` (niveles 1-7 como en plan) |
+| Trigger `increment_kb_view` (vía tabla `knowledge_views`) | ❌ NO IMPLEMENTADO | no existe trigger ni tabla `knowledge_views` — pero `KnowledgeModel.incrementView()` (`backend/src/models/knowledge.model.ts:157`) hace el `UPDATE view_count+1` imperativo desde la ruta |
+| Vista `v_knowledge_public` (items verificados + populares) | ❌ NO IMPLEMENTADO | no existe — pero `KnowledgeModel.search()` (`backend/src/models/knowledge.model.ts:89-107`) hace el mismo SELECT ordenado por `net_score` |
+| Vista `v_knowledge_pending` (admin) | ❌ NO IMPLEMENTADO | no existe — pero `KnowledgeModel.getPendingReview()` hace el mismo SELECT |
+| Vista `v_user_drafts` | ❌ NO IMPLEMENTADO | no existe — pero `KnowledgeModel.getDraftsByUser()` hace el SELECT equivalente |
+| Migración one-time chat_logs → knowledge_base | ❌ NO IMPLEMENTADO | no existe script de backfill |
+| Tipos TypeScript `KnowledgeBaseItem`, `KnowledgeSearchParams` | ⚠️ PARCIAL | interfaces existen en `backend/src/types/db.ts` (no en `types/knowledge.ts` como pedía el plan) |
+
+**Resumen:**
+- ✅ 9 ítems completos (tablas + índices + 3 triggers + modelo user_kb_stats + notifications extra)
+- ❌ 7 ítems no implementados (vec_knowledge virtual + 2 triggers sync + increment_kb_view trigger + 3 vistas + backfill script)
+- ⚠️ 1 ítem parcial (tipos TS en archivo distinto)
+- Multiplataforma alternativa: `getVecCandidates()` en `backend/src/db/connection.ts` busca `.dll/.dylib/.so` — sqlite-vec es opt-in, fallback a in-memory funciona
+- ⚠️ PARCIAL — schema DB principal COMPLETO, sqlite-vec virtual table y vistas NO implementadas pero funcionalmente cubiertas por queries imperativos en models
+
+---
+
 ## Tablas Principales
 
 ### knowledge_base

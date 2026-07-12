@@ -1,6 +1,44 @@
 # Plan de Acción Consolidado
 
-## Estado de Implementación
+---
+
+## AUDITORÍA (2026-07-12)
+
+Este plan fue consolidado tras la implementación. El estado reportado en la versión original era **optimista** — varios ítems marcados como COMPLETADO eran en realidad PARCIAL o tenían código muerto. Esta sección corrige el estado real basado en verificación contra código.
+
+### Correcciones al estado original
+
+| Ítem | Estado original | Estado real (2026-07-12) | Evidencia |
+|---|---|---|---|
+| 02_tests | COMPLETADO (63 tests) | ⚠️ PARCIAL | 64 tests pasan, pero coverage 29% (meta 80%), sin thresholds en vitest.config, sin CI/CD, sin tests de integración. Ver `02_architecture_issues/02_no_tests.md` |
+| 03_frontend | PARCIAL documentado | ⚠️ PARCIAL | sin cambios — módulos ES creados pero NO integrados en welcome.html |
+| 05_cron | COMPLETADO | ✅ COMPLETADO | confirmado — scheduler.ts + lock.ts + cron-entry.ts + server.ts integran |
+| 07_9router | COMPLETADO | ⚠️ PARCIAL | backend funcional, pero `nvidia.ts` es código muerto sin eliminar, sin tests de nineRouter, sin `model.service.js` frontend. Ver `02_architecture_issues/07_nine_router_migration.md` |
+| KB#1 schema | COMPLETADO | ⚠️ PARCIAL | 6 tablas creadas + triggers + índices, pero sin virtual table vec_knowledge_embeddings, sin vistas v_knowledge_*, sin backfill script. Ver `03_knowledge_base/01_database_schema.md` |
+| KB#2 contribution | COMPLETADO | ⚠️ PARCIAL | servicio de detección existe pero **código muerto** — nadie lo llama desde chat. Frontend toast/modal no implementado. Ver `03_knowledge_base/02_contribution_flow.md` |
+| KB#3 hybrid RAG | COMPLETADO | ⚠️ PARCIAL | HybridRAGService implementado internamente pero **código muerto** — cero imports externos. Chat sigue usando RAG personal solo. Ver `03_knowledge_base/03_hybrid_rag.md` |
+| KB#4 gamification | COMPLETADO | ⚠️ PARCIAL | backend base (puntos +10/+2/+50, badge seed, leaderboard), pero solo 1/10 badges, sin config/badges.ts, sin endpoints feature/edit, notificaciones solo 4/8 tipos, frontend ausente. Ver `03_knowledge_base/04_gamification_moderation.md` |
+| Bugs post-impl (12) | 8 fixeados | 10 fixeados | BUG-1,2,4,5,6,7,11,12 corregidos + BUG-3,9 falsos positivos. BUG-8 y BUG-10 no corregidos (severidad baja). Ver `04_action_plan/BUGS_POST_IMPLEMENTACION.md` |
+
+**Resumen corregido:**
+- ✅ COMPLETO: 01_chat_service_god_class, 05_cron_jobs, 05_deprecate_dual_write_plan, BUGS_POST_IMPLEMENTACION (10/12 + 2 FP)
+- ⚠️ PARCIAL: 02_no_tests, 03_frontend, 07_9router, KB#1, KB#2, KB#3, KB#4 (8 items)
+- ❌ NO IMPLEMENTADO: ninguno como categoría entera (sub-items específicos son NO IMPLEMENTADO dentro de los PARCIAL)
+- Ver `BUGS_ACTUALES.md` para bugs abiertos confirmados tras esta auditoría
+
+### Bugs reportados en esta auditoría
+Ver `fixes/BUGS_ACTUALES.md` (nuevo archivo creado en esta auditoría) para los bugs reales encontrados:
+- HybridRAGService código muerto
+- KnowledgeDetectionService código muerto
+- Frontend KB no integrado
+- nvidia.ts código muerto
+- Coverage real 29% vs meta 80%
+- Sin CI/CD
+- Aclaración sobre embeddings.ts (plan erróneo, no bug)
+
+---
+
+## Estado de Implementación (histórico — ver correcciones arriba)
 
 ### `01_critical_errors` — 10 de 10 COMPLETADOS (carpeta eliminada)
 

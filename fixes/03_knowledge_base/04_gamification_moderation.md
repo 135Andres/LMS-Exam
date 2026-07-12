@@ -1,5 +1,51 @@
 # KNOWLEDGE BASE #4: Gamificación y Moderación
 
+---
+
+## AUDITORÍA (2026-07-12)
+
+**VEREDICTO: ⚠️ PARCIAL**
+
+| Ítem del plan | Estado | Ubicación / Evidencia |
+|---|---|---|
+| Sistema de puntos (acciones y recompensas) | ⚠️ PARCIAL | ver desglose abajo |
+| Acción: Crear contribución publicada +10 | ✅ COMPLETO | `backend/src/routes/knowledge.routes.ts:66-71` (+10 pts contribution record) |
+| Acción: Recibir upvote +2 | ✅ COMPLETO | `backend/src/routes/knowledge.routes.ts:118-123` (+2 pts por upvote) |
+| Acción: Contribución verificada +50 | ✅ COMPLETO | `backend/src/routes/knowledge.routes.ts:173-178` (+50 pts for verify) |
+| Acción: Contribución alcanza 10 upvotes +20 | ❌ NO IMPLEMENTADO | sin hook/lógica para otorgar +20 cuando upvotes net ≥ 10 |
+| Acción: 100 vistas +15 | ❌ NO IMPLEMENTADO | `userKbStatsModel.incrementViews` existe pero no otorga puntos por milestone 100 |
+| Acción: Reportar contenido inválido +5 | ❌ NO IMPLEMENTADO | no existe endpoint de report |
+| Acción: Editar y mejorar contribución ajena +8 | ❌ NO IMPLEMENTADO | no existe endpoint de edit |
+| Acción: Completar onboarding KB +5 | ❌ NO IMPLEMENTADO | no existe |
+| Niveles 1-7 (Novato → Leyenda) via trigger SQL | ✅ COMPLETO | `backend/src/db/migrate.ts:275-283` (CASE con umbrales 50/150/350/700/1300/2500) |
+| Tabla `user_kb_stats` (materializada) | ✅ COMPLETO | `backend/src/db/migrate.ts:223-235` |
+| Trigger `update_user_kb_stats` después INSERT en `knowledge_contributions` | ✅ COMPLETO | `backend/src/db/migrate.ts:268-286` |
+| Badges: definición centralizada en `config/badges.ts` | ❌ NO IMPLEMENTADO | `backend/src/config/badges.ts` no existe |
+| Badges: 10 badges del plan (`seed`, `verifier`, `star`, `diamond`, `lighthouse`, `guardian`, `editor`, `scholar`, `prolific`, `legend`) | ⚠️ PARCIAL | solo `seed` implementado: `backend/src/routes/knowledge.routes.ts:75` (`userKbStatsModel.addBadge(user.id, 'seed')` en primera contribución). Los otros 9 badges no se otorgan en ninguna ruta. Tabla `user_kb_stats.badges` puede almacenarlos pero nadie los asigna. |
+| `userKbStatsModel.addBadge(userId, badgeId)` | ✅ COMPLETO | `backend/src/models/user-kb-stats.model.ts:38-44` |
+| `userKbStatsModel.getLeaderboard(limit)` | ✅ COMPLETO | `backend/src/models/user-kb-stats.model.ts:60-68` |
+| Vista `v_kb_moderation_queue` (cola de revisión admin) | ❌ NO IMPLEMENTADO | no existe vista — pero `KnowledgeModel.getPendingReview()` hace SELECT equivalente |
+| Acción admin `verify` | ✅ COMPLETO | `backend/src/routes/knowledge.routes.ts:165-188` (+50 pts + notificación) |
+| Acción admin `reject` | ✅ COMPLETO | `backend/src/routes/knowledge.routes.ts:190-207` (+ notificación con reason) |
+| Acción admin `feature` (destacar) | ❌ NO IMPLEMENTADO | no existe endpoint `/admin/:id/feature` ni columna `is_featured` en schema |
+| Acción admin `edit` (admin edita directamente) | ❌ NO IMPLEMENTADO | no existe endpoint `/admin/:id/edit` |
+| Acción admin `delete` | ✅ COMPLETO (extra) | `backend/src/routes/knowledge.routes.ts:209-214` (no estaba en plan pero útil) |
+| Ruta `GET /api/knowledge/leaderboard` | ✅ COMPLETO | `backend/src/routes/knowledge.routes.ts:130-134` (sin filtro `period` week/month) |
+| Filtro `period=week\|month\|all` en leaderboard | ❌ NO IMPLEMENTADO | ruta solo aceptanta `limit`, sin filter de fecha |
+| Ruta `GET /api/knowledge/stats` | ✅ COMPLETO (extra) | `backend/src/routes/knowledge.routes.ts:136-140` |
+| Notificaciones (8 tipos KB del plan: suggested, published, verified, rejected, upvoted, featured, badge_earned, level_up) | ⚠️ PARCIAL | tabla `knowledge_notifications` existe + `knowledgeNotificationModel.queue()`. Solo 4 tipos usados en rutas: `kb_published`, `kb_verified`, `kb_rejected`, `badge_earned`. Ausentes: `kb_suggested`, `kb_upvoted`, `kb_featured`, `kb_level_up`. |
+| Frontend perfil KB (`features/knowledge/kb-profile.js`) | ❌ NO IMPLEMENTADO | no existe |
+| Frontend gamification (renderizar nivel, badges, XP bar) | ❌ NO IMPLEMENTADO | no existe |
+| Frontend integrado en `welcome.html` | ❌ NO IMPLEMENTADO | no referencia scripts KB |
+
+**Resumen:**
+- ✅ 11 ítems completos (+10 contribute, +2 upvote, +50 verify, niveles 1-7, tabla user_kb_stats, trigger update_user_kb_stats, addBadge, getLeaderboard, admin verify/reject/delete, ruta leaderboard/stats, notificaciones parciales)
+- ⚠️ 2 ítems parciales (badges solo seed implementado, notificaciones solo 4/8 tipos)
+- ❌ 11 ítems no implementados (puntos 100vistas/+20 upvote/feature/edit/onboarding, config/badges.ts, vista v_kb_moderation_queue, admin feature/edit, period filter, frontend perfil/gamification/HTML integration)
+- ⚠️ PARCIAL — backend gamificación base funciona (puntos por contribute/upvote/verify + badge seed + leaderboard), moderation queue subutilizada (verificar/reject/delete sí, feature/edit no), frontend completamente ausente
+
+---
+
 ## OBJETIVO ESPECÍFICO
 Sistema de puntos, badges, leaderboard y cola de moderación para calidad de Knowledge Base.
 

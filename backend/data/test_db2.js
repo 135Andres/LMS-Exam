@@ -1,0 +1,11 @@
+import Database from 'better-sqlite3'; 
+const db = new Database('data/test2.sqlite'); 
+db.exec('CREATE TABLE users (id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, username TEXT UNIQUE, password_hash TEXT, role TEXT, created_at TEXT, exams_generated INTEGER, total_api_cost REAL);'); 
+db.exec('CREATE TABLE chat_logs (id TEXT PRIMARY KEY, user_id TEXT, session_id TEXT, role TEXT, content TEXT);'); 
+db.exec('CREATE TABLE chat_embeddings (id TEXT PRIMARY KEY, message_id TEXT, user_id TEXT, vector_text TEXT, model TEXT, dimensions INTEGER, created_at TEXT);'); 
+db.exec('CREATE INDEX idx_chat_embeddings_msg ON chat_embeddings(message_id);'); 
+db.exec("INSERT INTO users (id, email) VALUES ('u1', 'test@test.com');"); 
+db.exec("INSERT INTO chat_logs (id, user_id, session_id, role, content) VALUES ('m1', 'u1', 's1', 'user', 'test');"); 
+db.exec("INSERT INTO chat_embeddings (id, message_id, user_id, vector_text, model, dimensions, created_at) VALUES ('e1', 'm1', 'u1', '[]', 'model', 10, '2023-01-01');"); 
+db.exec("INSERT INTO chat_embeddings (id, message_id, user_id, vector_text, model, dimensions, created_at) VALUES ('e2', 'm1', 'u1', '[]', 'model', 10, '2023-01-02');"); 
+console.log('test db seeded');

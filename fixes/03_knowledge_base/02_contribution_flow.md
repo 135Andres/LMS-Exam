@@ -1,5 +1,37 @@
 # KNOWLEDGE BASE #2: Flujo de Contribución Automático
 
+---
+
+## AUDITORÍA (2026-07-12)
+
+**VEREDICTO: ⚠️ PARCIAL**
+
+| Ítem del plan | Estado | Ubicación / Evidencia |
+|---|---|---|
+| `knowledge-detection.service.ts` con `DETECTION_RULES` (qa_pair, explanation, resource_share) | ✅ COMPLETO | `backend/src/services/knowledge-detection.service.ts:1` — reglas + triggers + antiTriggers |
+| `detectKnowledgeOpportunity(messages)` heurística | ✅ COMPLETO | `backend/src/services/knowledge-detection.service.ts:65` |
+| `detectAndSuggestKnowledge(userId, sessionId, userMsgId, aiMsgId)` | ✅ COMPLETO | `backend/src/services/knowledge-detection.service.ts:94` |
+| Integración en `chat.streaming.service.ts` (llamada fire-and-forget tras guardar respuesta IA) | ❌ NO IMPLEMENTADO | grep `detectAndSuggestKnowledge\|knowledge-detection` en `chat.streaming.service.ts` → 0 resultados. Servicio existe pero **nadie lo llama** desde el flujo de chat. Código muerto. Ver `BUGS_ACTUALES.md`. |
+| `KnowledgeModel.createDraft()` con `status: 'draft'`, `tags`, `message_refs` | ⚠️ PARCIAL | `backend/src/models/knowledge.model.ts:56-64` — `createDraft` no recibe `message_refs`, solo `id/content/summary/subject/topic/tags/contentHash/status` |
+| Notificación al usuario via WebSocket/SSE/NotificationService | ⚠️ PARCIAL | `knowledgeNotificationModel.queue()` existe y se usa en rutas, pero `detectAndSuggestKnowledge` no lo llama — función existe pero flujo automático conectado a `createDraft` |
+| Ruta `GET /api/knowledge/suggestions` | ✅ COMPLETO | `backend/src/routes/knowledge.routes.ts:40` |
+| Ruta `POST /api/knowledge/contribute` (publicar draft + embedding + +10 pts + badge seed) | ✅ COMPLETO | `backend/src/routes/knowledge.routes.ts:46-92` |
+| Ruta `POST /api/knowledge/discard` | ✅ COMPLETO | `backend/src/routes/knowledge.routes.ts:94-100` |
+| Frontend Toast no intrusivo (`knowledge-toast.js`) | ❌ NO IMPLEMENTADO | `public/js/features/knowledge-toast.js` no existe |
+| Frontend Modal de revisión (`openKnowledgeReviewModal`) | ❌ NO IMPLEMENTADO | no existe |
+| Frontend `features/knowledge/` integrado en `welcome.html` | ❌ NO IMPLEMENTADO | `welcome.html` no referencia `knowledge.js` ni `knowledge-ui.js` |
+| Modelo de datos `status: draft/pending_review/published/rejected` | ✅ COMPLETO | `backend/src/db/migrate.ts:180` (CHECK constraint) |
+| Vista `v_user_drafts` | ❌ NO IMPLEMENTADO | ya marcado en `01_database_schema.md` |
+| Gamificación: `GamificationService.awardPoints` centralizado | ⚠️ PARCIAL | no existe clase centralizada — puntos otorgados ad-hoc en rutas (+10 contribute, +50 verify, +2 vote) |
+
+**Resumen:**
+- ✅ 5 ítems completos (servicio de detección, ruta suggestions, ruta contribute, ruta discard, modelo de datos)
+- ⚠️ 3 ítems parciales (createDraft sin message_refs, notificaciones desde detección no conectada, gamificación ad-hoc)
+- ❌ 6 ítems no implementados (integración en flujo chat, toast, modal, integración HTML, vista v_user_drafts, GamificationService)
+- ⚠️ PARCIAL — **heurísticas y detección implementadas pero código muerto** (nadie las llama desde chat), frontend ausente
+
+---
+
 ## OBJETIVO ESPECÍFICO
 Detectar interacciones valiosas en chat y sugerir guardado a Knowledge Base con 1-click.
 

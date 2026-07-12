@@ -1,6 +1,35 @@
 # ARQUITECTURA #7: Migración a 9router como Gateway Unificado de IA
 
-## ESTADO
+---
+
+## AUDITORÍA (2026-07-12)
+
+**VEREDICTO: ⚠️ PARCIAL**
+
+| Ítem del plan | Estado | Ubicación / Evidencia |
+|---|---|---|
+| FASE 1: `nineRouter.ts` cliente unificado (`callNineRouter`, `callNineRouterStream`, `parseNineRouterStream`, `fetchAvailableModels`) | ✅ COMPLETO | `backend/src/services/ai/nineRouter.ts:70,96,144,44` |
+| FASE 1: `generateEmbedding` en nineRouter | ❌ NO IMPLEMENTADO en nineRouter | está en `services/ai/embeddings.ts` (NVIDIA directa) |
+| FASE 2: `ai/index.ts` simplificado a proveedor único `nineRouter` | ✅ COMPLETO | `backend/src/services/ai/index.ts:1,34` — usa `callNineRouter` |
+| FASE 3: `resolveModel()` async con `fetchAvailableModels()` (cache 5 min) | ✅ COMPLETO | `backend/src/services/chat/chat.model-router.ts` + `/models` endpoint |
+| FASE 4: `/models` endpoint dinámico | ✅ COMPLETO | cache 5 min, fallback estático |
+| FASE 5: Tests unitarios `callNineRouter`, `generateEmbedding`, `fetchAvailableModels` | ❌ NO IMPLEMENTADO | sin tests para nineRouter.ts |
+| Eliminar `nvidia.ts` | ❌ NO IMPLEMENTADO | `backend/src/services/ai/nvidia.ts` existe (5252 bytes) pero NO importado → código muerto |
+| Eliminar `embeddings.ts` | ❌ NO IMPLEMENTADO (plan erróneo) | `backend/src/services/ai/embeddings.ts` sigue activo, importado por `knowledge.routes.ts:13` y `chat.embedding.service.ts:2` y `embedding-worker.ts` y `knowledge-detection.service.ts` — el plan original decía "ELIMINAR embeddings.ts" pero el código 9router.ts no incluye `generateEmbedding`; embeddings van directo a NVIDIA API. **El plan estaba mal**, no el código. Ver `BUGS_ACTUALES.md` para aclaración. |
+| Eliminar `zenmux` config | ✅ COMPLETO | `backend/src/config/index.ts` — `zenmux` ausente |
+| `modelRegistry` hardcodeado → dinámico | ✅ COMPLETO | `backend/src/config/index.ts` — `modelRegistry` objeto vacío `{}` |
+| Frontend `model.service.js` con cache | ❌ NO IMPLEMENTADO | `public/js/features/models/model.service.js` no existe |
+| Plan almacenado `planes/PLAN_MIGRACION_9ROUTER.md` (748 líneas) | ❌ NO IMPLEMENTADO | `planes/` no existe en el repo |
+
+**Resumen:**
+- ✅ 6 ítems completos
+- ❌ 5 ítems no implementados (niveRouter.generateEmbedding, tests, nvidia.ts cleanup, frontend model.service, plan doc)
+- ⚠️ `embeddings.ts` "no eliminado" — plan erróneo, no bug
+- ⚠️ PARCIAL — migración backend funcional, deuda técnica: `nvidia.ts` muerto, sin tests
+
+---
+
+## ESTADO (histórico)
 Plan definido en `planes/PLAN_MIGRACION_9ROUTER.md` (748 líneas), sin implementar. Los 10 errores críticos de `01_critical_errors` ya están resueltos.
 
 ## OBJETIVO ESPECÍFICO

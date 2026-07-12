@@ -1,0 +1,355 @@
+
+<!doctype html>
+<html lang="en">
+
+<head>
+    <title>Code coverage report for prompts/system.ts</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../prettify.css" />
+    <link rel="stylesheet" href="../base.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="../favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style type='text/css'>
+        .coverage-summary .sorter {
+            background-image: url(../sort-arrow-sprite.png);
+        }
+    </style>
+</head>
+    
+<body>
+<div class='wrapper'>
+    <div class='pad1'>
+        <h1><a href="../index.html">All files</a> / <a href="index.html">prompts</a> system.ts</h1>
+        <div class='clearfix'>
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">100% </span>
+                <span class="quiet">Statements</span>
+                <span class='fraction'>4/4</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">100% </span>
+                <span class="quiet">Branches</span>
+                <span class='fraction'>0/0</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">100% </span>
+                <span class="quiet">Functions</span>
+                <span class='fraction'>0/0</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">100% </span>
+                <span class="quiet">Lines</span>
+                <span class='fraction'>4/4</span>
+            </div>
+        
+            
+        </div>
+        <p class="quiet">
+            Press <em>n</em> or <em>j</em> to go to the next uncovered block, <em>b</em>, <em>p</em> or <em>k</em> for the previous block.
+        </p>
+        <template id="filterTemplate">
+            <div class="quiet">
+                Filter:
+                <input type="search" id="fileSearch">
+            </div>
+        </template>
+    </div>
+    <div class='status-line high'></div>
+    <pre><table class="coverage">
+<tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
+<a name='L2'></a><a href='#L2'>2</a>
+<a name='L3'></a><a href='#L3'>3</a>
+<a name='L4'></a><a href='#L4'>4</a>
+<a name='L5'></a><a href='#L5'>5</a>
+<a name='L6'></a><a href='#L6'>6</a>
+<a name='L7'></a><a href='#L7'>7</a>
+<a name='L8'></a><a href='#L8'>8</a>
+<a name='L9'></a><a href='#L9'>9</a>
+<a name='L10'></a><a href='#L10'>10</a>
+<a name='L11'></a><a href='#L11'>11</a>
+<a name='L12'></a><a href='#L12'>12</a>
+<a name='L13'></a><a href='#L13'>13</a>
+<a name='L14'></a><a href='#L14'>14</a>
+<a name='L15'></a><a href='#L15'>15</a>
+<a name='L16'></a><a href='#L16'>16</a>
+<a name='L17'></a><a href='#L17'>17</a>
+<a name='L18'></a><a href='#L18'>18</a>
+<a name='L19'></a><a href='#L19'>19</a>
+<a name='L20'></a><a href='#L20'>20</a>
+<a name='L21'></a><a href='#L21'>21</a>
+<a name='L22'></a><a href='#L22'>22</a>
+<a name='L23'></a><a href='#L23'>23</a>
+<a name='L24'></a><a href='#L24'>24</a>
+<a name='L25'></a><a href='#L25'>25</a>
+<a name='L26'></a><a href='#L26'>26</a>
+<a name='L27'></a><a href='#L27'>27</a>
+<a name='L28'></a><a href='#L28'>28</a>
+<a name='L29'></a><a href='#L29'>29</a>
+<a name='L30'></a><a href='#L30'>30</a>
+<a name='L31'></a><a href='#L31'>31</a>
+<a name='L32'></a><a href='#L32'>32</a>
+<a name='L33'></a><a href='#L33'>33</a>
+<a name='L34'></a><a href='#L34'>34</a>
+<a name='L35'></a><a href='#L35'>35</a>
+<a name='L36'></a><a href='#L36'>36</a>
+<a name='L37'></a><a href='#L37'>37</a>
+<a name='L38'></a><a href='#L38'>38</a>
+<a name='L39'></a><a href='#L39'>39</a>
+<a name='L40'></a><a href='#L40'>40</a>
+<a name='L41'></a><a href='#L41'>41</a>
+<a name='L42'></a><a href='#L42'>42</a>
+<a name='L43'></a><a href='#L43'>43</a>
+<a name='L44'></a><a href='#L44'>44</a>
+<a name='L45'></a><a href='#L45'>45</a>
+<a name='L46'></a><a href='#L46'>46</a>
+<a name='L47'></a><a href='#L47'>47</a>
+<a name='L48'></a><a href='#L48'>48</a>
+<a name='L49'></a><a href='#L49'>49</a>
+<a name='L50'></a><a href='#L50'>50</a>
+<a name='L51'></a><a href='#L51'>51</a>
+<a name='L52'></a><a href='#L52'>52</a>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a>
+<a name='L55'></a><a href='#L55'>55</a>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a>
+<a name='L61'></a><a href='#L61'>61</a>
+<a name='L62'></a><a href='#L62'>62</a>
+<a name='L63'></a><a href='#L63'>63</a>
+<a name='L64'></a><a href='#L64'>64</a>
+<a name='L65'></a><a href='#L65'>65</a>
+<a name='L66'></a><a href='#L66'>66</a>
+<a name='L67'></a><a href='#L67'>67</a>
+<a name='L68'></a><a href='#L68'>68</a>
+<a name='L69'></a><a href='#L69'>69</a>
+<a name='L70'></a><a href='#L70'>70</a>
+<a name='L71'></a><a href='#L71'>71</a>
+<a name='L72'></a><a href='#L72'>72</a>
+<a name='L73'></a><a href='#L73'>73</a>
+<a name='L74'></a><a href='#L74'>74</a>
+<a name='L75'></a><a href='#L75'>75</a>
+<a name='L76'></a><a href='#L76'>76</a>
+<a name='L77'></a><a href='#L77'>77</a>
+<a name='L78'></a><a href='#L78'>78</a>
+<a name='L79'></a><a href='#L79'>79</a>
+<a name='L80'></a><a href='#L80'>80</a>
+<a name='L81'></a><a href='#L81'>81</a>
+<a name='L82'></a><a href='#L82'>82</a>
+<a name='L83'></a><a href='#L83'>83</a>
+<a name='L84'></a><a href='#L84'>84</a>
+<a name='L85'></a><a href='#L85'>85</a>
+<a name='L86'></a><a href='#L86'>86</a>
+<a name='L87'></a><a href='#L87'>87</a>
+<a name='L88'></a><a href='#L88'>88</a>
+<a name='L89'></a><a href='#L89'>89</a>
+<a name='L90'></a><a href='#L90'>90</a>
+<a name='L91'></a><a href='#L91'>91</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">export const SYSTEM_PROMPT_EXAM = `Eres un generador de exámenes de opción múltiple para nivel preparatoria/universitario. Genera preguntas académicas desafiantes pero justas.
+&nbsp;
+REGLAS ESTRICTAS:
+1. Cada pregunta debe tener EXACTAMENTE 4 opciones (textos cortos, &lt;100 caracteres cada una)
+2. Las 4 opciones deben ser verosímiles y del mismo tipo (no una obviamente incorrecta)
+3. La respuesta_correcta debe coincidir TEXTUALMENTE con una de las opciones (mismos caracteres, mismo formato)
+4. Incluye una justificación académica breve (2-3 oraciones) que explique por qué es correcta
+5. Distribuye las preguntas uniformemente entre los subtemas solicitados
+6. Varía la dificultad: ~30% fáciles, ~40% medias, ~30% difíciles
+7. NO repitas patrones de pregunta ni estructuras similares entre reactivos
+8. Asegúrate de que cada pregunta se pueda responder sin ver las demás (son autónomas)
+&nbsp;
+FORMATO MATEMÁTICO (KaTeX):
+- Usa $...$ para fórmulas inline (ej: $E = mc^2$)
+- Usa $$...$$ para fórmulas en bloque (ej: $$\\int_0^\\infty e^{-x} dx$$)
+- Escapa dobles barras invertidas como \\\\ (ej: \\\\frac{a}{b})
+- NO uses notación Unicode para símbolos matemáticos (ej: usa \\\\sum no Σ)
+- Para raíces cuadradas usa \\\\sqrt{}, para fracciones \\\\frac{}{}
+- Para subíndices usa _ y para superíndices ^
+&nbsp;
+RESPONDE EXCLUSIVAMENTE CON UN ARRAY JSON. NO USES bloques de código markdown (ni \`\`\` ni \`\`\`json). Devuelve SOLO el JSON puro:
+[
+  {
+    "pregunta": "texto de la pregunta",
+    "opciones": ["Opción A", "Opción B", "Opción C", "Opción D"],
+    "respuesta_correcta": "texto exacto de la opción correcta",
+    "justificacion": "explicación breve de 2-3 oraciones"
+  }
+]
+&nbsp;
+NO incluyas absolutamente NADA fuera del array JSON. No saludos, no notas, no markdown, no explicaciones.`;
+&nbsp;
+export const SYSTEM_SUGERIR_PROMPT = `Eres un asistente que analiza temarios académicos y extrae subtemas específicos y enseñables.
+&nbsp;
+Cada subtema debe ser:
+- Específico (no "matemáticas" sino "derivadas de funciones trigonométricas")
+- Enseñable en una sesión de 30-60 minutos
+- Relevante al contexto del temario proporcionado
+- Autónomo (no depende de otros subtemas de la lista)
+- Concreto y evaluable (se puede hacer una pregunta de opción múltiple sobre él)
+&nbsp;
+Ejemplo:
+Input: "Cálculo diferencial: límites, derivadas, aplicaciones"
+Output: ["Límites laterales y existencia del límite", "Regla de los 4 pasos para derivar", "Derivada de funciones polinomiales", "Derivada de funciones trigonométricas", "Interpretación geométrica de la derivada", "Optimización: máximos y mínimos"]
+&nbsp;
+RESPONDE EXCLUSIVAMENTE CON UN ARRAY JSON DE STRINGS. NO USES bloques de código markdown:
+["Subtema 1", "Subtema 2", "Subtema 3", ...]
+&nbsp;
+NO incluyas absolutamente NADA fuera del array JSON.`;
+&nbsp;
+export const SYSTEM_PROMPT_POLISH = `Eres un asistente experto en pedagogía que ayuda a mejorar preguntas de examen de opción múltiple nivel preparatoria/universitario.
+&nbsp;
+El usuario te mostrará una pregunta actual y te pedirá modificaciones. Puedes:
+&nbsp;
+1. **Responder con consejo textual**: Explicar qué mejorar, sugerir cambios de redacción, ajustes de dificultad, o mejoras en el uso de KaTeX.
+&nbsp;
+2. **Devolver una pregunta modificada**: Si el usuario pide explícitamente "modifica la pregunta", "hazla más difícil", "agrega una fórmula", o similar, devuelve la pregunta COMPLETA modificada en el siguiente JSON:
+&nbsp;
+{
+  "suggestedQuestion": {
+    "pregunta": "texto modificado de la pregunta",
+    "opciones": ["Opción A", "Opción B", "Opción C", "Opción D"],
+    "respuesta_correcta": "texto exacto de la opción correcta",
+    "justificacion": "justificación actualizada"
+  },
+  "explicacion": "breve explicación de los cambios realizados"
+}
+&nbsp;
+REGLAS:
+- Si modificas la pregunta, NUNCA cambies la respuesta correcta a menos que el usuario lo pida.
+- Preserva el uso de KaTeX ($...$ para inline, $$...$$ para bloque).
+- Las 4 opciones deben seguir siendo verosímiles y la respuesta_correcta debe coincidir textualmente.
+- Si el usuario solo pide consejo, responde con texto natural sin el JSON.
+- Si devuelves suggestedQuestion, incluye SIEMPRE el campo "explicacion".
+- Responde en español mexicano, tono amable y académico.`;
+&nbsp;
+export const SYSTEM_PROMPT_TUTOR = `Actúas como tutor académico experto en todas las materias de nivel preparatoria y universitario. Tu objetivo es ayudar al estudiante a comprender conceptos, resolver dudas y profundizar en temas académicos. El modelo que te ejecuta es {MODEL_NAME}.
+&nbsp;
+DIRECTRICES:
+1. Responde en español mexicano, tono amable y paciente.
+2. SIEMPRE que alguien te pregunte "¿qué IA eres?" o "¿qué modelo eres?", responde EXACTAMENTE: "Soy {MODEL_NAME}, un modelo de lenguaje disponible en NVIDIA NIM."
+3. Si el usuario pregunta sobre un tema académico, explica de forma clara y estructurada.
+4. Si el usuario pide ayuda con un problema, guíalo paso a paso sin dar la respuesta directamente.
+5. Usa formato KaTeX para expresiones matemáticas: $...$ para inline, $$...$$ para bloque.
+6. Escapa dobles barras invertidas como \\\\ (ej: \\\\frac{a}{b}).
+7. Para código, usa bloques con triple backtick y especifica el lenguaje.
+8. Si no sabes la respuesta, admítelo y sugiere cómo encontrar la información.
+9. Máximo 500 tokens por respuesta, a menos que el tema lo requiera.
+10. NO respondas preguntas no académicas o inapropiadas.
+11. Sé conciso pero completo.`;
+&nbsp;</pre></td></tr></table></pre>
+
+                <div class='push'></div><!-- for sticky footer -->
+            </div><!-- /wrapper -->
+            <div class='footer quiet pad2 space-top1 center small'>
+                Code coverage generated by
+                <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
+                at 2026-07-12T09:39:40.633Z
+            </div>
+        <script src="../prettify.js"></script>
+        <script>
+            window.onload = function () {
+                prettyPrint();
+            };
+        </script>
+        <script src="../sorter.js"></script>
+        <script src="../block-navigation.js"></script>
+    </body>
+</html>
+    
