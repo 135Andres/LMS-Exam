@@ -12,6 +12,7 @@ import examRoutes from './src/routes/exam.routes.js';
 import adminRoutes from './src/routes/admin.routes.js';
 import chatRoutes from './src/routes/chat.routes.js';
 import userRoutes from './src/routes/user.routes.js';
+import knowledgeRoutes from './src/routes/knowledge.routes.js';
 import { startScheduler, stopScheduler } from './src/workers/scheduler.js';
 import { startEmbeddingWorker, stopEmbeddingWorker, processEmbeddingOutbox } from './src/workers/embedding-worker.js';
 
@@ -93,6 +94,7 @@ app.use('/api/exams', examRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/user', userRoutes);
+app.use('/api/knowledge', knowledgeRoutes);
 
 app.get('/api/status', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

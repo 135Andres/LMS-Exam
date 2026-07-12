@@ -1,0 +1,140 @@
+import { findTopK } from '../utils/vector.js';
+import { EmbeddingModel } from '../models/embedding.model.js';
+import { KnowledgeEmbeddingModel } from '../models/knowledge-embedding.model.js';
+
+interface SearchResult {
+  content: string;
+  score: number;
+  source: 'personal' | 'collective';
+  metadata: {
+    id: string;
+    subject?: string;
+    topic?: string;
+    created_at?: string;
+    upvotes?: number;
+  };
+  finalScore: number;
+}
+
+interface HybridRAGOptions {
+  userId: string;
+  queryVector: number[];
+  subject?: string;
+  personalWeight?: number;
+  collectiveWeight?: number;
+  personalLimit?: number;
+  collectiveLimit?: number;
+  finalTopK?: number;
+  minPersonalScore?: number;
+  minCollectiveScore?: number;
+  verifiedOnly?: boolean;
+}
+
+const DEFAULTS = {
+  personalWeight: 0.7,
+  collectiveWeight: 0.3,
+  personalLimit: 50,
+  collectiveLimit: 50,
+  finalTopK: 5,
+  minPersonalScore: 0.25,
+  minCollectiveScore: 0.35,
+  verifiedOnly: true,
+};
+
+export class HybridRAGService {
+  async buildContext(options: HybridRAGOptions): Promise<string> {
+    const opts = { ...DEFAULTS, ...options };
+
+    if (opts.queryVector.length === 0) return '';
+
+    const [personalResults, collectiveResults] = await Promise.all([
+      this.searchPersonal(opts as Required<HybridRAGOptions>),
+      this.searchCollective(opts as Required<HybridRAGOptions>),
+    ]);
+
+    const filteredPersonal = personalResults.filter(r => r.score >= opts.minPersonalScore);
+    const filteredCollective = collectiveResults.filter(r => r.score >= opts.minCollectiveScore);
+
+    const merged = [
+      ...filteredPersonal.map(r => ({ ...r, finalScore: r.score * opts.personalWeight })),
+      ...filteredCollective.map(r => ({ ...r, finalScore: r.score * opts.collectiveWeight })),
+    ];
+
+    merged.sort((a, b) => b.finalScore - a.finalScore);
+    const topK = merged.slice(0, opts.finalTopK);
+
+    if (topK.length === 0) return '';
+
+    return this.formatContext(topK);
+  }
+
+  private async searchPersonal(opts: Required<HybridRAGOptions>): Promise<SearchResult[]> {
+    const embeddings = EmbeddingModel.getUserEmbeddings(opts.userId, opts.personalLimit);
+    if (embeddings.length < 2) return [];
+
+    const topK = findTopK(opts.queryVector, embeddings as any, opts.finalTopK * 2, opts.minPersonalScore);
+    return topK.map(item => ({
+      content: item.content,
+      score: item.score,
+      source: 'personal' as const,
+      metadata: { id: (item as any).messageId || '' },
+      finalScore: 0,
+    }));
+  }
+
+  private async searchCollective(opts: Required<HybridRAGOptions>): Promise<SearchResult[]> {
+    const results = KnowledgeEmbeddingModel.searchSimilar(opts.queryVector, {
+      subject: opts.subject,
+      minScore: opts.minCollectiveScore,
+      limit: opts.collectiveLimit,
+      verifiedOnly: opts.verifiedOnly,
+    });
+
+    return results.map(item => ({
+      content: item.content,
+      score: item.score,
+      source: 'collective' as const,
+      metadata: {
+        id: item.knowledge_id,
+        subject: item.subject,
+        topic: item.topic || undefined,
+        upvotes: item.upvotes,
+        created_at: item.created_at,
+      },
+      finalScore: 0,
+    }));
+  }
+
+  private formatContext(results: SearchResult[]): string {
+    const parts = results.map((item, i) => {
+      const badge = item.source === 'personal' ? 'Tu historial' : 'Conocimiento colectivo';
+      const meta = item.metadata;
+      let metaStr = '';
+      if (meta.subject) metaStr += ` | Materia: ${meta.subject}`;
+      if (meta.topic) metaStr += ` | Tema: ${meta.topic}`;
+      if (meta.upvotes !== undefined) metaStr += ` | Upvotes: ${meta.upvotes}`;
+      return `[Contexto ${i + 1}] (${badge}, relevancia: ${(item.finalScore * 100).toFixed(0)}%${metaStr})\n${item.content}`;
+    });
+    return `\n\n--- Contexto Hibrido (Personal + Colectivo) ---\n${parts.join('\n\n')}\n---`;
+  }
+
+  static detectSubject(query: string): string | undefined {
+    const subjects: Record<string, string[]> = {
+      matematicas: ['derivada', 'integral', 'limite', 'ecuacion', 'funcion', 'matriz', 'vector', 'probabilidad', 'estadistica', 'geometria', 'trigonometria', 'calculo', 'algebra'],
+      fisica: ['fuerza', 'energia', 'velocidad', 'aceleracion', 'newton', 'cinematica', 'dinamica', 'termodinamica', 'electricidad', 'magnetismo', 'optica', 'ondas'],
+      quimica: ['molecula', 'atomo', 'reaccion', 'enlace', 'acido', 'base', 'ph', 'estequiometria', 'tabla periodica', 'orbital'],
+      biologia: ['celula', 'adn', 'gen', 'proteina', 'evolucion', 'ecosistema', 'fotosintesis', 'mitosis', 'meiosis'],
+      historia: ['guerra', 'revolucion', 'imperio', 'siglo', 'tratado', 'independencia', 'constitucion'],
+      lenguaje: ['sintaxis', 'gramatica', 'verbo', 'sustantivo', 'adjetivo', 'oracion', 'texto', 'lectura', 'escritura'],
+      informatica: ['algoritmo', 'codigo', 'programa', 'variable', 'bucle', 'array', 'objeto', 'clase', 'api', 'base de datos'],
+    };
+
+    const lower = query.toLowerCase();
+    for (const [subject, keywords] of Object.entries(subjects)) {
+      if (keywords.some(k => lower.includes(k))) return subject;
+    }
+    return undefined;
+  }
+}
+
+export const hybridRAG = new HybridRAGService();

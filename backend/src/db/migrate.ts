@@ -157,6 +157,133 @@ CREATE TABLE IF NOT EXISTS embedding_outbox (
 );
 CREATE INDEX IF NOT EXISTS idx_outbox_status_retry ON embedding_outbox(status, next_retry_at);
 CREATE INDEX IF NOT EXISTS idx_outbox_message ON embedding_outbox(message_id);
+
+-- ── Fase 3: Knowledge Base ──
+CREATE TABLE IF NOT EXISTS knowledge_base (
+  id TEXT PRIMARY KEY,
+  content TEXT NOT NULL,
+  summary TEXT,
+  subject TEXT NOT NULL,
+  topic TEXT,
+  difficulty TEXT CHECK(difficulty IN ('basico','intermedio','avanzado')) DEFAULT 'intermedio',
+  source_type TEXT CHECK(source_type IN ('user_qa','user_explanation','verified_content','imported')) DEFAULT 'user_qa',
+  source_user_id TEXT REFERENCES users(id),
+  is_verified INTEGER DEFAULT 0,
+  verified_by TEXT REFERENCES users(id),
+  verified_at TEXT,
+  upvotes INTEGER DEFAULT 0,
+  downvotes INTEGER DEFAULT 0,
+  view_count INTEGER DEFAULT 0,
+  tags TEXT DEFAULT '[]',
+  language TEXT DEFAULT 'es',
+  content_hash TEXT NOT NULL,
+  status TEXT DEFAULT 'published' CHECK(status IN ('draft','pending_review','published','rejected')),
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_kb_subject_topic ON knowledge_base(subject, topic);
+CREATE INDEX IF NOT EXISTS idx_kb_verified ON knowledge_base(is_verified);
+CREATE INDEX IF NOT EXISTS idx_kb_source_user ON knowledge_base(source_user_id);
+CREATE INDEX IF NOT EXISTS idx_kb_created ON knowledge_base(created_at);
+CREATE INDEX IF NOT EXISTS idx_kb_content_hash ON knowledge_base(content_hash);
+CREATE INDEX IF NOT EXISTS idx_kb_status ON knowledge_base(status);
+
+CREATE TABLE IF NOT EXISTS knowledge_embeddings (
+  id TEXT PRIMARY KEY,
+  knowledge_id TEXT NOT NULL REFERENCES knowledge_base(id) ON DELETE CASCADE,
+  embedding BLOB NOT NULL,
+  model TEXT NOT NULL,
+  dimensions INTEGER NOT NULL,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_kemb_knowledge ON knowledge_embeddings(knowledge_id);
+
+CREATE TABLE IF NOT EXISTS knowledge_votes (
+  id TEXT PRIMARY KEY,
+  knowledge_id TEXT NOT NULL REFERENCES knowledge_base(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL REFERENCES users(id),
+  vote_type INTEGER CHECK(vote_type IN (1, -1)),
+  created_at TEXT DEFAULT (datetime('now')),
+  UNIQUE(knowledge_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_kv_knowledge ON knowledge_votes(knowledge_id);
+CREATE INDEX IF NOT EXISTS idx_kv_user ON knowledge_votes(user_id);
+
+CREATE TABLE IF NOT EXISTS knowledge_contributions (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id),
+  knowledge_id TEXT NOT NULL REFERENCES knowledge_base(id),
+  contribution_type TEXT CHECK(contribution_type IN ('created','edited','upvoted','reported','verified')),
+  points INTEGER DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_kc_user ON knowledge_contributions(user_id);
+CREATE INDEX IF NOT EXISTS idx_kc_knowledge ON knowledge_contributions(knowledge_id);
+
+CREATE TABLE IF NOT EXISTS user_kb_stats (
+  user_id TEXT PRIMARY KEY REFERENCES users(id),
+  total_points INTEGER DEFAULT 0,
+  level INTEGER DEFAULT 1,
+  contributions_count INTEGER DEFAULT 0,
+  verified_count INTEGER DEFAULT 0,
+  total_upvotes_received INTEGER DEFAULT 0,
+  total_views INTEGER DEFAULT 0,
+  reports_valid INTEGER DEFAULT 0,
+  edits_accepted INTEGER DEFAULT 0,
+  badges TEXT DEFAULT '[]',
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS knowledge_notifications (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id),
+  type TEXT NOT NULL,
+  knowledge_id TEXT REFERENCES knowledge_base(id),
+  data TEXT,
+  read INTEGER DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_kn_user_read ON knowledge_notifications(user_id, read);
+
+-- Triggers para contadores de votos
+CREATE TRIGGER IF NOT EXISTS update_kb_votes_after_insert
+AFTER INSERT ON knowledge_votes
+BEGIN
+  UPDATE knowledge_base SET
+    upvotes = upvotes + (CASE WHEN new.vote_type = 1 THEN 1 ELSE 0 END),
+    downvotes = downvotes + (CASE WHEN new.vote_type = -1 THEN 1 ELSE 0 END)
+  WHERE id = new.knowledge_id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS update_kb_votes_after_delete
+AFTER DELETE ON knowledge_votes
+BEGIN
+  UPDATE knowledge_base SET
+    upvotes = upvotes - (CASE WHEN old.vote_type = 1 THEN 1 ELSE 0 END),
+    downvotes = downvotes - (CASE WHEN old.vote_type = -1 THEN 1 ELSE 0 END)
+  WHERE id = old.knowledge_id;
+END;
+
+-- Trigger para stats de contribuciones
+CREATE TRIGGER IF NOT EXISTS update_user_kb_stats
+AFTER INSERT ON knowledge_contributions
+BEGIN
+  UPDATE user_kb_stats SET
+    total_points = total_points + new.points,
+    contributions_count = contributions_count + (CASE WHEN new.contribution_type = 'created' THEN 1 ELSE 0 END),
+    verified_count = verified_count + (CASE WHEN new.contribution_type = 'verified' THEN 1 ELSE 0 END),
+    level = CASE
+      WHEN total_points + new.points >= 2500 THEN 7
+      WHEN total_points + new.points >= 1300 THEN 6
+      WHEN total_points + new.points >= 700 THEN 5
+      WHEN total_points + new.points >= 350 THEN 4
+      WHEN total_points + new.points >= 150 THEN 3
+      WHEN total_points + new.points >= 50 THEN 2
+      ELSE 1
+    END,
+    updated_at = datetime('now')
+  WHERE user_id = new.user_id;
+END;
 `;
 
 function migrateUsersTable(db: Database.Database): void {
