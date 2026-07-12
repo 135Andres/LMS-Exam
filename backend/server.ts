@@ -3,7 +3,6 @@ import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
-import cron from 'node-cron';
 import { config } from './src/config/index.js';
 import { getDb } from './src/db/connection.js';
 import { errorHandler } from './src/utils/errors.js';
@@ -13,8 +12,7 @@ import examRoutes from './src/routes/exam.routes.js';
 import adminRoutes from './src/routes/admin.routes.js';
 import chatRoutes from './src/routes/chat.routes.js';
 import userRoutes from './src/routes/user.routes.js';
-import { generateDailyInsights } from './src/services/insights.service.js';
-import { updateProfileForUser } from './src/services/profile-update.service.js';
+import { startScheduler, stopScheduler } from './src/workers/scheduler.js';
 import { startEmbeddingWorker, stopEmbeddingWorker, processEmbeddingOutbox } from './src/workers/embedding-worker.js';
 
 const app = express();
@@ -114,40 +112,9 @@ app.listen(config.port, () => {
   logger.info(`Servidor iniciado en puerto ${config.port}`);
 });
 
-// Cron: generar insights cada día a las 2 AM
-cron.schedule('0 2 * * *', async () => {
-  logger.info('Cron: iniciando generación de insights diarios');
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  const date = yesterday.toISOString().slice(0, 10);
+// Cron jobs (scheduler con lock distribuido SQLite)
+startScheduler();
 
-  try {
-    const users = getDb().prepare('SELECT id FROM users').all() as Array<{ id: string }>;
-    for (const user of users) {
-      await generateDailyInsights(user.id, date);
-    }
-    logger.info('Cron: insights diarios completados', { users: users.length, date });
-  } catch (err) {
-    logger.error('Cron: error en generación de insights', { error: (err as Error).message });
-  }
-});
-
-// Cron: actualizar perfiles cada noche a las 3 AM (después de insights)
-cron.schedule('0 3 * * *', async () => {
-  logger.info('Cron: iniciando actualización de perfiles');
-  try {
-    const users = getDb().prepare('SELECT id FROM users').all() as Array<{ id: string }>;
-    let updated = 0;
-    for (const user of users) {
-      const ok = await updateProfileForUser(user.id);
-      if (ok) updated++;
-    }
-    logger.info('Cron: actualización de perfiles completada', { total: users.length, updated });
-  } catch (err) {
-    logger.error('Cron: error en actualización de perfiles', { error: (err as Error).message });
-  }
-});
-
-// Graceful shutdown para embedding worker
-process.on('SIGTERM', () => { stopEmbeddingWorker(); process.exit(0); });
-process.on('SIGINT', () => { stopEmbeddingWorker(); process.exit(0); });
+// Graceful shutdown
+process.on('SIGTERM', () => { stopScheduler(); stopEmbeddingWorker(); process.exit(0); });
+process.on('SIGINT', () => { stopScheduler(); stopEmbeddingWorker(); process.exit(0); });

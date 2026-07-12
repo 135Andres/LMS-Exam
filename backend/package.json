@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "start": "node dist/server.js",
+    "start:worker": "node dist/workers/cron-entry.js",
     "dev": "tsx watch server.ts",
+    "dev:worker": "tsx watch src/workers/cron-entry.ts",
     "dev:python": "cd ../backend-python && python -m uvicorn main:app --host 0.0.0.0 --port 3001 --reload",
     "dev:all": "concurrently -n py,node -c yellow,cyan \"npm run dev:python\" \"npm run dev\"",
     "migrate": "tsx src/db/migrate.ts",
