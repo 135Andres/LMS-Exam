@@ -1,3 +1,9 @@
+// Set dummy env vars BEFORE any import that triggers config/index.ts
+// This makes the test suite hermetic — works on clean checkout without .env
+process.env.NINE_ROUTER_API_KEY ??= 'test-dummy-key';
+process.env.NVIDIA_API_KEY_EMBEDDINGS ??= 'test-dummy-key';
+process.env.JWT_SECRET ??= 'test-jwt-secret-not-for-production';
+
 import { vi } from 'vitest';
 import Database from 'better-sqlite3';
 

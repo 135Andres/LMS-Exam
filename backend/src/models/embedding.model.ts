@@ -16,7 +16,7 @@ export const EmbeddingModel = {
 
     db.transaction(() => {
       db.prepare(
-        'INSERT INTO chat_embeddings (id, message_id, user_id, vector_text, model, dimensions) VALUES (?, ?, ?, ?, ?, ?)'
+        'INSERT OR IGNORE INTO chat_embeddings (id, message_id, user_id, vector_text, model, dimensions) VALUES (?, ?, ?, ?, ?, ?)'
       ).run(id, messageId, userId, JSON.stringify(vector), model, dimensions);
 
       db.prepare(

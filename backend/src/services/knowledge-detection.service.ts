@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { logger } from '../utils/logger.js';
 import { KnowledgeModel } from '../models/knowledge.model.js';
 
@@ -106,7 +107,7 @@ export async function detectAndSuggestKnowledge(
     const summary = pair.userMessage.content.slice(0, 180) + '...';
     const subject = detectSubject(content);
 
-    const knowledgeId = crypto.randomUUID();
+    const knowledgeId = randomUUID();
     KnowledgeModel.create({
       id: knowledgeId,
       content,

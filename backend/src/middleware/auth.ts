@@ -1,9 +1,8 @@
 import type { Request, Response, NextFunction } from 'express';
 import { v4 as uuidv4 } from 'uuid';
+import { config } from '../config/index.js';
 import { UserModel } from '../models/user.model.js';
 import { UnauthorizedError } from '../utils/errors.js';
-
-const AUTH_SERVICE_URL = 'http://localhost:3001';
 
 export async function authenticate(req: Request, _res: Response, next: NextFunction): Promise<void> {
   const sessionToken = req.cookies?.session_token as string | undefined;
@@ -13,7 +12,7 @@ export async function authenticate(req: Request, _res: Response, next: NextFunct
   }
 
   try {
-    const response = await fetch(`${AUTH_SERVICE_URL}/auth/validate`, {
+    const response = await fetch(`${config.authServiceUrl}/auth/validate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ session_token: sessionToken }),

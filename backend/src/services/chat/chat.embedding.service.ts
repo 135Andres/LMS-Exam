@@ -16,6 +16,9 @@ export class ChatEmbeddingService {
   }
 
   async generateAndSave(msgId: string, userId: string, text: string, outboxId?: string): Promise<number[] | null> {
+    // Mark as processing BEFORE generating to prevent background worker from picking it up
+    if (outboxId) EmbeddingOutboxModel.markProcessing(outboxId);
+
     const vector = await this.generate(text);
     if (vector) {
       try {
@@ -24,6 +27,9 @@ export class ChatEmbeddingService {
       } catch (err) {
         logger.warn('Error guardando embedding inline', { error: (err as Error).message });
       }
+    } else if (outboxId) {
+      // Inline generation failed — reset to pending so background worker can retry
+      EmbeddingOutboxModel.markFailed(outboxId, 'Inline embedding generation returned null');
     }
     return vector;
   }

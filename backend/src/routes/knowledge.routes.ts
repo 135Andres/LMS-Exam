@@ -1,6 +1,9 @@
+import { randomUUID } from 'node:crypto';
 import { Router } from 'express';
 import { authenticate } from '../middleware/auth.js';
 import { requireAdmin } from '../middleware/admin.js';
+import { validate } from '../middleware/validate.js';
+import { contributeSchema, discardSchema, voteSchema, notificationsReadSchema, rejectSchema } from '../validators/knowledge.js';
 import { KnowledgeModel } from '../models/knowledge.model.js';
 import { knowledgeVoteModel } from '../models/knowledge-vote.model.js';
 import { knowledgeContributionModel } from '../models/knowledge-contribution.model.js';
@@ -40,9 +43,9 @@ router.get('/suggestions', async (req, res) => {
   res.json({ suggestions: drafts });
 });
 
-router.post('/contribute', async (req, res) => {
+router.post('/contribute', validate(contributeSchema), async (req, res) => {
   const user = req.user!;
-  const { knowledgeId, tags } = req.body;
+  const { knowledgeId, tags } = req.validatedBody as { knowledgeId: string; tags?: string[] };
   const draft = KnowledgeModel.getById(knowledgeId);
   if (!draft || draft.source_user_id !== user.id || draft.status !== 'draft') {
     return res.status(404).json({ error: 'Borrador no encontrado' });
@@ -53,7 +56,7 @@ router.post('/contribute', async (req, res) => {
   try {
     const vector = await generateEmbedding(draft.content);
     KnowledgeEmbeddingModel.save(
-      crypto.randomUUID(), knowledgeId,
+      randomUUID(), knowledgeId,
       new Float32Array(vector), 'nvidia/nv-embed-v1', vector.length
     );
   } catch (err) {
@@ -88,24 +91,27 @@ router.post('/contribute', async (req, res) => {
   res.json({ success: true, knowledge: KnowledgeModel.getById(knowledgeId) });
 });
 
-router.post('/discard', async (req, res) => {
+router.post('/discard', validate(discardSchema), async (req, res) => {
   const user = req.user!;
-  const deleted = KnowledgeModel.deleteDraft(req.body.knowledgeId, user.id);
+  const { knowledgeId } = req.validatedBody as { knowledgeId: string };
+  const deleted = KnowledgeModel.deleteDraft(knowledgeId, user.id);
   if (!deleted) return res.status(404).json({ error: 'No encontrado' });
   res.json({ success: true });
 });
 
-router.post('/vote', async (req, res) => {
+router.post('/vote', validate(voteSchema), async (req, res) => {
   const user = req.user!;
-  const { knowledgeId, voteType } = req.body;
-  if (voteType !== 1 && voteType !== -1) {
-    return res.status(400).json({ error: 'voteType debe ser 1 o -1' });
-  }
+  const { knowledgeId, voteType } = req.validatedBody as { knowledgeId: string; voteType: 1 | -1 };
 
   const item = KnowledgeModel.getById(knowledgeId);
   if (!item) return res.status(404).json({ error: 'No encontrado' });
 
-  knowledgeVoteModel.vote(knowledgeId, user.id, voteType as 1 | -1);
+  // Block self-voting
+  if (item.source_user_id === user.id) {
+    return res.status(400).json({ error: 'No puedes votar tu propia contribución' });
+  }
+
+  knowledgeVoteModel.vote(knowledgeId, user.id, voteType);
   const counts = knowledgeVoteModel.countByKnowledge(knowledgeId);
 
   if (voteType === 1 && item.source_user_id && item.source_user_id !== user.id) {
@@ -139,12 +145,13 @@ router.get('/notifications', async (req, res) => {
   res.json({ notifications });
 });
 
-router.post('/notifications/read', async (req, res) => {
+router.post('/notifications/read', validate(notificationsReadSchema), async (req, res) => {
   const user = req.user!;
-  if (req.body.all) {
+  const { all, id } = req.validatedBody as { all?: boolean; id?: string };
+  if (all) {
     knowledgeNotificationModel.markAllRead(user.id);
-  } else if (req.body.id) {
-    knowledgeNotificationModel.markRead(req.body.id as string);
+  } else if (id) {
+    knowledgeNotificationModel.markRead(id, user.id);
   }
   res.json({ success: true });
 });
@@ -180,18 +187,19 @@ router.post('/admin/:id/verify', authenticate, requireAdmin, async (req, res) =>
   res.json({ success: true, item: KnowledgeModel.getById(item.id) });
 });
 
-router.post('/admin/:id/reject', authenticate, requireAdmin, async (req, res) => {
+router.post('/admin/:id/reject', authenticate, requireAdmin, validate(rejectSchema), async (req, res) => {
   const item = KnowledgeModel.getById(req.params.id as string);
   if (!item) return res.status(404).json({ error: 'No encontrado' });
   
   KnowledgeModel.reject(item.id);
   
   if (item.source_user_id) {
+    const { reason } = req.validatedBody as { reason?: string };
     knowledgeNotificationModel.queue({
       userId: item.source_user_id,
       type: 'kb_rejected',
       knowledgeId: item.id,
-      data: { reason: (req.body.reason as string) || 'No cumple estándares de calidad' },
+      data: { reason: reason || 'No cumple estándares de calidad' },
     });
   }
   

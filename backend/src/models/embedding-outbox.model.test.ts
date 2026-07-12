@@ -64,4 +64,16 @@ describe('EmbeddingOutboxModel', () => {
     EmbeddingOutboxModel.enqueue('o6', MSG_ID, USER_ID, 'p2', 'user');
     expect(EmbeddingOutboxModel.countPending()).toBeGreaterThanOrEqual(2);
   });
+
+  it('markProcessing prevents getPending from returning the item (race condition guard)', () => {
+    EmbeddingOutboxModel.enqueue('race1', MSG_ID, USER_ID, 'inline text', 'user');
+
+    // Simulate inline path: mark processing before generating
+    EmbeddingOutboxModel.markProcessing('race1');
+
+    // Background worker should NOT pick this up
+    const pending = EmbeddingOutboxModel.getPending(10);
+    const ids = pending.map(p => p.id);
+    expect(ids).not.toContain('race1');
+  });
 });

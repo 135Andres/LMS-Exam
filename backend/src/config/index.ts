@@ -51,6 +51,8 @@ export const config = {
     origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
   },
 
+  authServiceUrl: process.env.AUTH_SERVICE_URL || 'http://localhost:3001',
+
   smtp: {
     host: process.env.SMTP_HOST || 'smtp.gmail.com',
     port: parseInt(process.env.SMTP_PORT || '587', 10),

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { getDb } from '../db/connection.js';
 import { KnowledgeModel } from './knowledge.model.js';
 
@@ -15,7 +16,7 @@ export const knowledgeVoteModel = {
         db.prepare('UPDATE knowledge_votes SET vote_type = ? WHERE id = ?').run(voteType, existing.id);
       }
     } else {
-      const id = crypto.randomUUID();
+      const id = randomUUID();
       db.prepare(
         'INSERT INTO knowledge_votes (id, knowledge_id, user_id, vote_type) VALUES (?, ?, ?, ?)'
       ).run(id, knowledgeId, userId, voteType);

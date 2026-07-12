@@ -1,8 +1,9 @@
+import { randomUUID } from 'node:crypto';
 import { getDb } from '../db/connection.js';
 
 export const knowledgeNotificationModel = {
   queue(data: { userId: string; type: string; knowledgeId?: string; data?: any }): void {
-    const id = crypto.randomUUID();
+    const id = randomUUID();
     getDb().prepare(`
       INSERT INTO knowledge_notifications (id, user_id, type, knowledge_id, data)
       VALUES (?, ?, ?, ?, ?)
@@ -15,8 +16,8 @@ export const knowledgeNotificationModel = {
     ).all(userId) as any[];
   },
 
-  markRead(id: string): void {
-    getDb().prepare('UPDATE knowledge_notifications SET read = 1 WHERE id = ?').run(id);
+  markRead(id: string, userId: string): void {
+    getDb().prepare('UPDATE knowledge_notifications SET read = 1 WHERE id = ? AND user_id = ?').run(id, userId);
   },
 
   markAllRead(userId: string): void {

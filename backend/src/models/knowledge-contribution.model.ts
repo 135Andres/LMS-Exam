@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { getDb } from '../db/connection.js';
 
 export const knowledgeContributionModel = {
@@ -7,7 +8,7 @@ export const knowledgeContributionModel = {
     contributionType: string;
     points: number;
   }): void {
-    const id = crypto.randomUUID();
+    const id = randomUUID();
     getDb().prepare(`
       INSERT INTO knowledge_contributions (id, user_id, knowledge_id, contribution_type, points)
       VALUES (?, ?, ?, ?, ?)

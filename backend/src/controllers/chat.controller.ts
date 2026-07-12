@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { Request, Response } from 'express';
 import { sendChatMessage, sendChatMessageStream } from '../services/chat.service.js';
 import { ChatModel } from '../models/chat.model.js';
@@ -20,7 +21,7 @@ export async function sendChatMessageHandler(req: Request, res: Response): Promi
   };
 
   const userId = req.user!.id;
-  const sid = sessionId || crypto.randomUUID();
+  const sid = sessionId || randomUUID();
 
   if (sessionId) {
     try {
@@ -53,7 +54,7 @@ export async function sendChatMessageStreamHandler(req: Request, res: Response):
   };
 
   const userId = req.user!.id;
-  const sid = sessionId || crypto.randomUUID();
+  const sid = sessionId || randomUUID();
 
   if (sessionId) {
     try {
@@ -160,7 +161,7 @@ export async function reportMessageHandler(req: Request, res: Response): Promise
   }
 
   reports.push({
-    id: crypto.randomUUID(),
+    id: randomUUID(),
     userId,
     sessionId: sessionId || null,
     aiMessage: aiMessage.slice(0, 2000),
