@@ -30,14 +30,22 @@ Ver `04_action_plan/BUGS_POST_IMPLEMENTACION.md`. 8 bugs corregidos, 2 falsos po
 | 5 | Cron jobs main process | ✅ Completado | workers/scheduler.ts con lock distribuido SQLite, cron-entry.ts standalone, server.ts delega en startScheduler/stopScheduler |
 | 7 | Migracion 9router | ✅ Completado | Configurado con API key + tunnel |
 
-### `03_knowledge_base` — 0 de 4 (fase de diseño)
+### `03_knowledge_base` — 4 de 4 COMPLETADOS
 
-| # | Plan | Estado |
-|---|------|--------|
-| 1 | Database schema | ⏳ Diseño |
-| 2 | Contribution flow | ⏳ Diseño |
-| 3 | Hybrid RAG | ⏳ Diseño |
-| 4 | Gamification & moderation | ⏳ Diseño |
+| # | Plan | Estado | Notas |
+|---|------|--------|-------|
+| 1 | Database schema | ✅ Completado | 6 tablas: knowledge_base, knowledge_embeddings, knowledge_votes, knowledge_contributions, user_kb_stats, knowledge_notifications. Triggers de votos y stats automáticos |
+| 2 | Contribution flow | ✅ Completado | KnowledgeDetectionService con heurísticas regex, drafts automática, contribute/discard API |
+| 3 | Hybrid RAG | ✅ Completado | HybridRAGService merge ponderado (personal 0.7 + colectivo 0.3), findTopK reutilizado, subject detection |
+| 4 | Gamification & moderation | ✅ Completado | Puntos+10 creada/+50 verify/+2 upvote, badges, leaderboard, admin moderation (verify/reject/delete) |
+
+### Adicionales Fase 3
+
+| Goal | Estado | Notas |
+|------|--------|-------|
+| 3.7 Migración 9router | ✅ Completado (en Fase 2) | API key + tunnel, modelRegistry eliminado, /models dinámico |
+| 3.8 Deprecar dual-write | ✅ Documentado | Plan en fixes/03_knowledge_base/05_deprecate_dual_write_plan.md — Fase 1 activa, Fases 2-3 post-deploy |
+| 3.9 Fix sqlite-vec Windows | ✅ Completado | connection.ts: getVecCandidates() prueba .dll/.dylib/.so según plataforma |
 
 ---
 
@@ -56,8 +64,20 @@ Plan #6 (BLOB migration) implementado: dual-write JSON+BLOB, tabla nueva, backfi
 - **#7 (9router)** ✅ — API key + tunnel configurado, modelRegistry eliminado, /models dinámico
 - **#3 (frontend)** ✅ parcial — módulos ES creados, migración real documentada
 
-### Fase 4: `03_knowledge_base` (próximo)
-- Requiere #1 (KB schema) primero
-- #3 (hybrid RAG) da feature-value alto
-- #2 (contribution flow) depende de RAG funcionando
-- #4 (gamification) es enhancement
+### Fase 4: `03_knowledge_base` ✅ COMPLETADO
+- **#1 (KB schema)** ✅ — 6 tablas, triggers, índices
+- **#2 (contribution flow)** ✅ — KnowledgeDetectionService + drafts + contribute/discard API
+- **#3 (hybrid RAG)** ✅ — HybridRAGService merge ponderado personal+colectivo
+- **#4 (gamification)** ✅ — puntos, badges, leaderboard, admin moderation
+- **3.7 (9router)** ✅ — completado en Fase 2
+- **3.8 (deprecate dual-write)** ✅ — plan documentado
+- **3.9 (sqlite-vec Windows)** ✅ — multi-plataforma
+
+## Resumen Final
+
+- **Fase 1**: 8 bugs post-implementación corregidos ✅
+- **Fase 2**: 10/10 critical errors + 5/5 architecture issues ✅
+- **Fase 3**: 4/4 Knowledge Base + 3 adicionales ✅
+- **Tests**: 63 tests en 7 suites, todos pasando
+- **TypeScript**: tsc --noEmit limpio
+- **Commits**: 16 commits en rama Mega-fix
