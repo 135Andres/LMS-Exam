@@ -111,7 +111,7 @@ CREATE TABLE IF NOT EXISTS chat_embeddings (
   created_at TEXT DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_chat_embeddings_user_id ON chat_embeddings(user_id);
-CREATE INDEX IF NOT EXISTS idx_chat_embeddings_msg ON chat_embeddings(message_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_chat_embeddings_msg ON chat_embeddings(message_id);
 
 -- Tabla migrada: BLOB binario (Float32Array) en vez de JSON string
 -- 16KB por vector vs 40KB JSON, sin parse overhead
@@ -335,8 +335,65 @@ function addColumnIfMissing(db: Database.Database, table: string, column: string
   logger.info(`Columna añadida: ${table}.${column}`);
 }
 
+function deduplicateChatEmbeddings(db: Database.Database): void {
+  // Check if chat_embeddings table exists
+  const tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='chat_embeddings'").get();
+  if (!tableExists) return;
+
+  // Drop the old non-unique index if it exists so we can recreate it as unique
+  try {
+    db.exec("DROP INDEX IF EXISTS idx_chat_embeddings_msg");
+  } catch (err) {
+    logger.warn('No se pudo borrar el indice antiguo', { error: (err as Error).message });
+  }
+
+  // Find duplicated message_ids
+  const duplicates = db.prepare(`
+    SELECT message_id, COUNT(*) as count 
+    FROM chat_embeddings 
+    GROUP BY message_id 
+    HAVING count > 1
+  `).all() as Array<{ message_id: string; count: number }>;
+
+  if (duplicates.length === 0) return;
+
+  logger.info(`Se encontraron ${duplicates.length} message_ids duplicados en chat_embeddings. Limpiando...`);
+  
+  let deletedCount = 0;
+  
+  db.exec("BEGIN TRANSACTION");
+  try {
+    for (const dup of duplicates) {
+      // Keep only the oldest one (by created_at or id if created_at is identical)
+      const rowsToKeep = db.prepare(`
+        SELECT id FROM chat_embeddings 
+        WHERE message_id = ? 
+        ORDER BY created_at ASC, id ASC 
+        LIMIT 1
+      `).get(dup.message_id) as { id: string };
+      
+      const res = db.prepare(`
+        DELETE FROM chat_embeddings 
+        WHERE message_id = ? AND id != ?
+      `).run(dup.message_id, rowsToKeep.id);
+      
+      deletedCount += res.changes;
+    }
+    db.exec("COMMIT");
+    logger.info(`Limpieza completada: se eliminaron ${deletedCount} filas duplicadas en chat_embeddings.`);
+  } catch (err) {
+    db.exec("ROLLBACK");
+    logger.error('Error deduplicando chat_embeddings', { error: (err as Error).message });
+    throw err;
+  }
+}
+
 function migrate(): void {
   const db = getDb();
+  
+  // Deduplicate before creating the unique index to prevent constraint failures
+  deduplicateChatEmbeddings(db);
+  
   db.exec(SCHEMA);
 
   // Migrate users table to nullable columns
