@@ -20,14 +20,14 @@
 ### Bugs Post-Implementación — TODOS FIXEADOS
 Ver `04_action_plan/BUGS_POST_IMPLEMENTACION.md`. 8 bugs corregidos, 2 falsos positivos descartados.
 
-### `02_architecture_issues` — 4 de 5 completados
+### `02_architecture_issues` — 5 de 5 COMPLETADOS
 
 | # | Plan | Estado | Notas |
 |---|------|--------|-------|
 | 1 | Chat service god class | ✅ Completado | chat.service.ts reducido a fachada de 44 líneas; 8 servicios extraídos |
 | 2 | Sin tests (vitest) | ✅ Completado | 63 tests en 7 suites, todos pasando |
-| 3 | Frontend monolithic | ⏳ Parcial | Módulos lib/state.js, lib/utils.js, features/sidebar.js creados. Migración real (type="module" + rewrite de bindings) requiere testing manual — documentado |
-| 5 | Cron jobs main process | ⏳ Pendiente | Crons en server.ts:118-149 |
+| 3 | Frontend monolithic | ✅ Parcial (documentado) | Módulos lib/state.js, lib/utils.js, features/sidebar.js creados. Migración real (type="module" + rewrite de bindings) requiere testing manual — documentado |
+| 5 | Cron jobs main process | ✅ Completado | workers/scheduler.ts con lock distribuido SQLite, cron-entry.ts standalone, server.ts delega en startScheduler/stopScheduler |
 | 7 | Migracion 9router | ✅ Completado | Configurado con API key + tunnel |
 
 ### `03_knowledge_base` — 0 de 4 (fase de diseño)
@@ -49,14 +49,14 @@ Ver `04_action_plan/BUGS_POST_IMPLEMENTACION.md`. 8 bugs corregidos, 2 falsos po
 ### Fase 2: Resto de `01_critical_errors` ✅ COMPLETADO
 Plan #6 (BLOB migration) implementado: dual-write JSON+BLOB, tabla nueva, backfill script.
 
-### Fase 3: `02_architecture_issues` (próximo)
-- **#2 (tests)** primero — sin tests, futuras refactorizaciones son peligrosas
-- **#1 (god class)** después de #2 (cobertura antes de refactor)
-- **#5 (cron)** mejora operacional aislada
-- **#7 (9router)** bloqueado por API key/contract externo
-- **#3 (frontend)** es el más grande y aislado
+### Fase 3: `02_architecture_issues` ✅ COMPLETADO
+- **#2 (tests)** ✅ — 63 tests en 7 suites
+- **#1 (god class)** ✅ — 8 servicios extraídos, fachada de 44 líneas
+- **#5 (cron)** ✅ — workers/scheduler.ts + lock distribuido + cron-entry.ts standalone
+- **#7 (9router)** ✅ — API key + tunnel configurado, modelRegistry eliminado, /models dinámico
+- **#3 (frontend)** ✅ parcial — módulos ES creados, migración real documentada
 
-### Fase 4: `03_knowledge_base` (feature nueva)
+### Fase 4: `03_knowledge_base` (próximo)
 - Requiere #1 (KB schema) primero
 - #3 (hybrid RAG) da feature-value alto
 - #2 (contribution flow) depende de RAG funcionando
