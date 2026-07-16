@@ -1,5 +1,7 @@
 import { generateFromAI } from '../ai/index.js';
 import { logger } from '../../utils/logger.js';
+import { ChatModel } from '../../models/chat.model.js';
+import { detectAndSuggestKnowledge } from '../knowledge-detection.service.js';
 import type { ChatPersistenceService } from './chat.persistence.service.js';
 import type { ChatEmbeddingService } from './chat.embedding.service.js';
 import type { ChatRAGService } from './chat.rag.service.js';
@@ -40,7 +42,9 @@ export class ChatCompletionService {
 
     const queryVector = await this.embeddingService.generateAndSave(userMsgId, userId, message, outboxId);
 
-    const ragContext = queryVector ? await this.ragService.buildContext(userId, userMsgId, queryVector) : '';
+    const { context: ragContext, hadCollectiveMatch } = queryVector
+      ? await this.ragService.buildContext(userId, userMsgId, queryVector, message)
+      : { context: '', hadCollectiveMatch: false };
 
     this.profileDetectionService.detectAndApply(message, userId).catch(err =>
       logger.warn('Profile detection async failed', { error: (err as Error).message })
@@ -62,6 +66,10 @@ export class ChatCompletionService {
       );
 
       this.persistence.saveAssistantMessageWithOutbox(userId, sessionId, result.content);
+      const recentMessages = ChatModel.getSessionMessages(sessionId, 10);
+      detectAndSuggestKnowledge(userId, sessionId, recentMessages, hadCollectiveMatch).catch(
+        err => logger.warn('Knowledge detection async failed', { error: (err as Error).message })
+      );
 
       return { response: result.content };
     } catch {

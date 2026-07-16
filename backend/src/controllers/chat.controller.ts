@@ -12,11 +12,20 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const reportsDir = join(__dirname, '..', 'data');
 const reportsFile = join(reportsDir, 'reports.json');
 
+// No hay preview/fetch de enlaces (fetchLinkPreview nunca se implementó en el
+// frontend) — se le pasan las URLs a la IA como texto para que las tenga en
+// contexto, no como adjunto multimodal real.
+function appendLinks(message: string, links?: string[]): string {
+  if (!links || links.length === 0) return message;
+  return `${message}\n\nEnlaces adjuntos:\n${links.map(l => `- ${l}`).join('\n')}`;
+}
+
 export async function sendChatMessageHandler(req: Request, res: Response): Promise<void> {
-  const { message, modelId, attachments, sessionId } = req.validatedBody as {
+  const { message, modelId, attachments, links, sessionId } = req.validatedBody as {
     message: string;
     modelId?: string;
     attachments?: Attachment[];
+    links?: string[];
     sessionId?: string;
   };
 
@@ -37,19 +46,21 @@ export async function sendChatMessageHandler(req: Request, res: Response): Promi
     messageLength: message.length,
     modelId: modelId || 'default',
     attachmentsCount: attachments?.length || 0,
+    linksCount: links?.length || 0,
     sessionId: sid,
   });
 
-  const result = await sendChatMessage(message, modelId, attachments, userId, sid);
+  const result = await sendChatMessage(appendLinks(message, links), modelId, attachments, userId, sid);
 
   res.json({ response: result.response, sessionId: sid });
 }
 
 export async function sendChatMessageStreamHandler(req: Request, res: Response): Promise<void> {
-  const { message, modelId, attachments, sessionId } = req.validatedBody as {
+  const { message, modelId, attachments, links, sessionId } = req.validatedBody as {
     message: string;
     modelId?: string;
     attachments?: Attachment[];
+    links?: string[];
     sessionId?: string;
   };
 
@@ -70,6 +81,7 @@ export async function sendChatMessageStreamHandler(req: Request, res: Response):
     messageLength: message.length,
     modelId: modelId || 'default',
     attachmentsCount: attachments?.length || 0,
+    linksCount: links?.length || 0,
     sessionId: sid,
   });
 
@@ -82,7 +94,7 @@ export async function sendChatMessageStreamHandler(req: Request, res: Response):
   res.write(`data: ${JSON.stringify({ sessionId: sid })}\n\n`);
 
   try {
-    const stream = await sendChatMessageStream(message, modelId, attachments, userId, sid);
+    const stream = await sendChatMessageStream(appendLinks(message, links), modelId, attachments, userId, sid);
     for await (const chunk of stream) {
       if (chunk.type === 'reasoning') {
         res.write(`data: ${JSON.stringify({ reasoning: chunk.content })}\n\n`);

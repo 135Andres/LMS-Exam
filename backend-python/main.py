@@ -9,7 +9,6 @@ import ssl
 import threading
 from datetime import datetime, timedelta, timezone
 from email.mime.text import MIMEText
-from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Request
@@ -53,8 +52,16 @@ IP_RATE_WINDOW_HOURS = int(os.getenv("IP_RATE_WINDOW_HOURS", "1"))
 WHITELIST_REFRESH_SECONDS = 60
 CLEANUP_INTERVAL_SECONDS = 60
 
+# Cuentas exentas del rate limit por IP (uso: pruebas internas/QA).
+# El rate limit es por IP, no por cuenta — sin esto, cualquier cuenta probada
+# repetidamente desde la misma máquina se bloquea sin importar el email.
+RATE_LIMIT_EXEMPT_EMAILS = {
+    e.strip().lower()
+    for e in os.getenv("RATE_LIMIT_EXEMPT_EMAILS", "admin@lmsexam.com").split(",")
+    if e.strip()
+}
+
 SESSION_COOKIE_NAME = "session_token"
-WHITELIST_PATH = Path(__file__).parent / "whitelist.json"
 
 # ---------------------------------------------------------------------------
 # In-memory stores
@@ -238,14 +245,15 @@ class OtpVerify(BaseModel):
 @app.post("/auth/login")
 @app.post("/auth/otp-request")
 async def otp_request(body: OtpRequest, request: Request):
-    client_ip = extract_real_client_ip(request)
-    if not apply_ip_rate_limit(client_ip):
-        retry_after = IP_RATE_WINDOW_HOURS * 3600
-        raise HTTPException(
-            status_code=429,
-            detail="Demasiadas solicitudes. Intenta de nuevo más tarde.",
-            headers={"Retry-After": str(retry_after)}
-        )
+    if body.email not in RATE_LIMIT_EXEMPT_EMAILS:
+        client_ip = extract_real_client_ip(request)
+        if not apply_ip_rate_limit(client_ip):
+            retry_after = IP_RATE_WINDOW_HOURS * 3600
+            raise HTTPException(
+                status_code=429,
+                detail="Demasiadas solicitudes. Intenta de nuevo más tarde.",
+                headers={"Retry-After": str(retry_after)}
+            )
 
     asyncio.create_task(process_background_auth(body.email))
     return JSONResponse(

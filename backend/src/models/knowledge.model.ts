@@ -13,6 +13,7 @@ export interface KnowledgeBaseItem {
   source_user_id: string | null;
   is_verified: boolean;
   verified_by: string | null;
+  verified_by_ai: string | null;
   verified_at: string | null;
   upvotes: number;
   downvotes: number;
@@ -25,7 +26,7 @@ export interface KnowledgeBaseItem {
   updated_at: string;
 }
 
-function hashContent(content: string): string {
+export function hashKnowledgeContent(content: string): string {
   return crypto.createHash('sha256').update(content).digest('hex');
 }
 
@@ -50,7 +51,7 @@ export const KnowledgeModel = {
     status?: string;
   }): KnowledgeBaseItem {
     const db = getDb();
-    const contentHash = hashContent(data.content);
+    const contentHash = hashKnowledgeContent(data.content);
     const summary = data.summary || data.content.slice(0, 180) + '...';
     const tags = JSON.stringify(data.tags || []);
     const status = data.status || 'pending_review';
@@ -136,6 +137,29 @@ export const KnowledgeModel = {
       UPDATE knowledge_base SET is_verified = 1, verified_by = ?, verified_at = datetime('now'),
       status = 'published', updated_at = datetime('now') WHERE id = ?
     `).run(adminId, id);
+  },
+
+  // Aprobacion automatica del validador batch (nemotron-3-ultra vs verified_by, que es FK a users)
+  publishWithAiVerification(id: string, data: {
+    subject: string;
+    topic?: string;
+    tags?: string[];
+    difficulty?: string;
+    verifiedByAi: string;
+  }): void {
+    const item = this.getById(id);
+    if (!item) return;
+    const finalTags = JSON.stringify([...new Set([...item.tags, ...(data.tags || [])])]);
+    getDb().prepare(`
+      UPDATE knowledge_base SET
+        is_verified = 1, verified_by_ai = ?, verified_at = datetime('now'),
+        status = 'published', subject = ?, topic = ?, difficulty = ?, tags = ?,
+        updated_at = datetime('now')
+      WHERE id = ?
+    `).run(
+      data.verifiedByAi, data.subject || item.subject, data.topic || item.topic,
+      data.difficulty || item.difficulty, finalTags, id,
+    );
   },
 
   reject(id: string): void {

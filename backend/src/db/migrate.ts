@@ -414,6 +414,9 @@ function migrate(): void {
   addColumnIfMissing(db, 'users', 'onboarding_strictness', "TEXT DEFAULT ''");
   addColumnIfMissing(db, 'users', 'onboarding_status', "TEXT DEFAULT 'pending'");
 
+  // KB colectiva — validacion automatica por IA (nemotron-3-ultra via 9router)
+  addColumnIfMissing(db, 'knowledge_base', 'verified_by_ai', 'TEXT');
+
   logger.info('Migración completada: tablas creadas/verificadas');
   closeDb();
 }

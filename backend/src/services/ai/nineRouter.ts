@@ -38,33 +38,38 @@ interface NineRouterResponse {
   };
 }
 
-let modelsCache: { id: string; label: string; owned_by: string }[] = [];
-let modelsCacheTime = 0;
-
-export async function fetchAvailableModels(): Promise<{ id: string; label: string; owned_by: string }[]> {
-  const now = Date.now();
-  if (modelsCache.length > 0 && now - modelsCacheTime < 300000) return modelsCache;
-
-  try {
-    const apiKey = process.env.NINE_ROUTER_API_KEY || '';
-    const baseUrl = process.env.NINE_ROUTER_BASE_URL || 'https://rky8wp8.abc-tunnel.us/v1';
-    const response = await fetch(`${baseUrl}/models`, {
-      headers: { 'Authorization': `Bearer ${apiKey}` },
-    });
-    if (!response.ok) throw new Error(`9router /models returned ${response.status}`);
-    const data = (await response.json()) as { data: Array<{ id: string; owned_by: string }> };
-    modelsCache = data.data.map(m => ({
-      id: m.id,
-      label: m.id.split('/').pop() || m.id,
-      owned_by: m.owned_by,
-    }));
-    modelsCacheTime = now;
-    logger.info('9router models fetched', { count: modelsCache.length });
-    return modelsCache;
-  } catch (err) {
-    logger.warn('Failed to fetch 9router models', { error: (err as Error).message });
-    return modelsCache;
+// Algunos modelos (ej. los gemini/ag) devuelven SSE en chunks (delta) aunque
+// no se pida stream:true. Reensambla esos chunks en la misma forma que un
+// response normal de /chat/completions; si no es SSE, hace JSON.parse plano.
+function parseNineRouterNonStreamResponse(raw: string): NineRouterResponse {
+  const trimmed = raw.trim();
+  if (!trimmed.startsWith('data:')) {
+    // Algunos modelos devuelven un JSON normal pero con "data: [DONE]" pegado
+    // al final sin salto de línea (ej. oc/deepseek-v4-flash-free).
+    const cleaned = trimmed.replace(/data:\s*\[DONE\]\s*$/, '').trim();
+    return JSON.parse(cleaned) as NineRouterResponse;
   }
+
+  let content = '';
+  let reasoning = '';
+  let usage: NineRouterResponse['usage'];
+
+  for (const line of trimmed.split('\n')) {
+    const t = line.trim();
+    if (!t.startsWith('data:') || t === 'data: [DONE]') continue;
+    try {
+      const chunk = JSON.parse(t.slice(5).trim());
+      const delta = chunk.choices?.[0]?.delta;
+      if (delta?.content) content += delta.content;
+      if (delta?.reasoning_content) reasoning += delta.reasoning_content;
+      const msg = chunk.choices?.[0]?.message;
+      if (msg?.content) content += msg.content;
+      if (msg?.reasoning_content) reasoning += msg.reasoning_content;
+      if (chunk.usage) usage = chunk.usage;
+    } catch { /* skip malformed chunk */ }
+  }
+
+  return { choices: [{ message: { content, reasoning_content: reasoning } }], usage };
 }
 
 export async function* parseNineRouterStream(body: ReadableStream<Uint8Array>): AsyncGenerator<StreamChunk> {
@@ -194,13 +199,7 @@ export async function callNineRouter(
   }
 
   const raw = await response.text();
-  let data: NineRouterResponse;
-  try {
-    const cleaned = raw.replace(/data: \[DONE\]\n*$/s, '').trim();
-    data = JSON.parse(cleaned) as NineRouterResponse;
-  } catch {
-    data = JSON.parse(raw) as NineRouterResponse;
-  }
+  const data = parseNineRouterNonStreamResponse(raw);
 
   const content = data.choices?.[0]?.message?.content || '';
   const usage = data.usage || {};

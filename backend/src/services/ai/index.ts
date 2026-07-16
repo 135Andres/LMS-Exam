@@ -19,6 +19,10 @@ export interface GenerateOptions extends NineRouterOptions {}
 const RETRY_TEMPERATURES = [0.3, 0.5, 0.7];
 const TIMEOUT_MS = 30000;
 
+// Si el modelo pedido (gemini, claude, etc.) agota todos sus reintentos,
+// se prueba una vez con este modelo antes de darse por vencido.
+export const FALLBACK_MODEL = 'oc/deepseek-v4-flash-free';
+
 export class AiRetryError extends Error {
   public attempts: number;
   public lastError: string;
@@ -117,6 +121,23 @@ export async function generateFromAI(
 
       const isLastAttempt = attempt === RETRY_TEMPERATURES.length - 1;
       if (isLastAttempt) {
+        if (options?.model && options.model !== FALLBACK_MODEL) {
+          logger.warn('Modelo agotó reintentos, probando fallback', {
+            model: options.model, fallback: FALLBACK_MODEL,
+          });
+          try {
+            return await call(systemPrompt, userPrompt, schema, {
+              model: FALLBACK_MODEL,
+              temperature: 0.4,
+              signal: options?.signal,
+              apiKey: options?.apiKey,
+              baseUrl: options?.baseUrl,
+              max_tokens: options?.max_tokens,
+            });
+          } catch (fallbackErr) {
+            throw new AiRetryError(RETRY_TEMPERATURES.length, (fallbackErr as Error).message);
+          }
+        }
         throw new AiRetryError(RETRY_TEMPERATURES.length, error.message);
       }
     }

@@ -8,13 +8,15 @@ const INSIGHT_PROMPT = `Eres un analizador de progreso académico. Dado un conju
 
 1. FORTALEZAS: temas o habilidades donde el estudiante muestra comprensión
 2. DEBILIDADES: temas donde el estudiante tiene dificultades o hace preguntas recurrentes
-3. RECOMENDACIONES: qué debería estudiar o practicar a continuación
+3. RECOMENDACIONES: qué debería estudiar o practicar a continuación (2-3 oraciones, dirigidas directamente al estudiante en segunda persona, listas para usarse como el mensaje inicial de un chat de tutoría)
+4. CALIFICACION: un número de 0 a 100 que resume qué tan bien le fue al estudiante ese día en esta materia (comprensión demostrada, errores, dudas resueltas vs sin resolver)
 
 Responde ÚNICAMENTE con JSON, sin markdown:
 {
   "fortalezas": ["fortaleza 1", "fortaleza 2"],
   "debilidades": ["debilidad 1", "debilidad 2"],
-  "recomendaciones": "recomendación general de estudio"
+  "recomendaciones": "recomendación general de estudio",
+  "calificacion": 0
 }`;
 
 export async function generateDailyInsights(userId: string, date: string): Promise<void> {
@@ -36,15 +38,19 @@ export async function generateDailyInsights(userId: string, date: string): Promi
 
   try {
     const result = await generateFromAI('nineRouter', INSIGHT_PROMPT, conversationText, null, {
-      model: config.models.chat,
+      model: config.models.insights,
       temperature: 0.3,
-      max_tokens: 500,
+      // deepseek-v4-flash-free razona pesado en reasoning_content antes del
+      // JSON final — probado en vivo: con conversaciones reales necesita
+      // ~1800 tokens solo de razonamiento, 900 dejaba el content vacío.
+      max_tokens: 3000,
     });
 
     const insights = JSON.parse(result.content) as {
       fortalezas: string[];
       debilidades: string[];
       recomendaciones: string;
+      calificacion: number;
     };
 
     // Insertar en chat_insights (ON CONFLICT DO UPDATE para la clave única)

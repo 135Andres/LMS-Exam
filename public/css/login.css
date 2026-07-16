@@ -11,7 +11,7 @@ html, body {
 
 body {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
-  background: #f0f0f0;
+  background: #c5cafa;
 }
 
 .screen {
@@ -30,6 +30,13 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  opacity: 1;
+  transition: opacity 500ms ease;
+}
+
+.screen-1.fade-out {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .gradient-bg {
@@ -50,7 +57,7 @@ body {
     radial-gradient(ellipse at 70% 60%, #b0b8e8 0%, transparent 40%),
     radial-gradient(ellipse at 50% 30%, #d8dfff 0%, transparent 35%),
     radial-gradient(ellipse at 50% 70%, #a0a8d0 0%, transparent 40%);
-  background-color: #e0e4f0;
+  background-color: #c5cafa;
 }
 
 .landing-content {
@@ -77,20 +84,42 @@ body {
 
 .btn-arrow {
   margin-top: 2.5rem;
-  width: 56px;
-  height: 48px;
-  border-radius: 14px;
-  border: none;
-  background: rgba(0, 0, 0, 0.06);
+  width: 88px;
+  height: 72px;
+  border-radius: 20px;
+  border: 2px solid transparent;
+  background: rgba(255, 255, 255, 0.55);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  opacity: 0;
+  transform: translateY(6px);
+  box-shadow: 0 0 0 0 rgba(255, 255, 255, 0), 0 0 0 0 rgba(255, 255, 255, 0);
+  transition: opacity 500ms ease, transform 500ms ease, background 150ms ease;
+}
+
+.btn-arrow.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Anillo de glow que rodea el botón — se dispara una vez al entrar
+   (.enter-glow, JS lo agrega/quita) y se repite en cada hover (CSS puro). */
+.btn-arrow.enter-glow,
+.btn-arrow:hover {
+  animation: btnArrowGlowRing 900ms ease;
+}
+
+@keyframes btnArrowGlowRing {
+  0% { border-color: transparent; box-shadow: 0 0 0 0 rgba(255, 255, 255, 0), 0 0 0 0 rgba(255, 255, 255, 0); }
+  50% { border-color: rgba(255, 255, 255, 0.95); box-shadow: 0 0 0 5px rgba(255, 255, 255, 0.4), 0 0 28px 10px rgba(255, 255, 255, 0.5); }
+  100% { border-color: transparent; box-shadow: 0 0 0 0 rgba(255, 255, 255, 0), 0 0 0 0 rgba(255, 255, 255, 0); }
 }
 
 .btn-arrow svg {
-  width: 20px;
-  height: 20px;
+  width: 30px;
+  height: 30px;
   fill: none;
   stroke: #1a1a1a;
   stroke-width: 2.5;
@@ -99,7 +128,7 @@ body {
 }
 
 .btn-arrow:hover {
-  background: rgba(0, 0, 0, 0.1);
+  background: rgba(255, 255, 255, 0.8);
 }
 
 .screen-2 {
@@ -118,6 +147,12 @@ body {
   align-items: center;
   justify-content: center;
   pointer-events: auto;
+  transform: translateX(-100%);
+  transition: transform 700ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.split-left.slide-in {
+  transform: translateX(0);
 }
 
 .split-right {
@@ -131,6 +166,13 @@ body {
   align-items: center;
   justify-content: center;
   pointer-events: none;
+  transition: width 700ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Al confirmar el correo, lo azul "recorre" hacia la izquierda cubriendo
+   toda la pantalla mientras split-left sale (ver .split-left sin .slide-in). */
+.split-right.cover {
+  width: 100vw;
 }
 
 .form-wrap {
@@ -213,18 +255,25 @@ body {
   color: #1a1a1a;
   text-align: center;
   padding: 2rem;
+  opacity: 0;
+  transition: opacity 600ms ease 150ms;
+}
+
+.info-wrap.fade-in {
+  opacity: 1;
 }
 
 .info-name {
   font-size: 2rem;
   font-weight: 700;
   letter-spacing: -0.02em;
+  color: #1a1a1a;
 }
 
 .info-desc {
   margin-top: 0.5rem;
   font-size: 1rem;
-  color: #888;
+  color: #3d3a7a;
 }
 
 .info-features {
@@ -237,7 +286,7 @@ body {
 .info-features li {
   font-size: 0.95rem;
   margin-bottom: 0.75rem;
-  color: #888;
+  color: #3d3a7a;
   line-height: 1.4;
 }
 
@@ -245,7 +294,7 @@ body {
   position: fixed;
   inset: 0;
   z-index: 20;
-  background: rgba(240, 240, 240, 0.95);
+  background: rgba(197, 202, 250, 0.95);
   display: none;
   align-items: center;
   justify-content: center;
@@ -270,9 +319,13 @@ body {
   z-index: 15;
   opacity: 0;
   pointer-events: none;
+  transition: opacity 500ms ease;
+  overflow-y: auto; /* si el teclado deja poco espacio, la card scrollea en vez de cortarse */
 }
 
-.screen-3.active {
+/* Separada de .active (visibility, genérica a todo .screen) para poder
+   forzar un reflow entre "hacerse visible" y "empezar a animar opacidad". */
+.screen-3.show {
   opacity: 1;
   pointer-events: auto;
 }
@@ -280,11 +333,36 @@ body {
 .otp-card {
   position: relative;
   background: #fff;
-  border-radius: 20px;
-  padding: 2.5rem 2rem;
-  width: 340px;
+  border-radius: 22px;
+  padding: 3rem 2.5rem;
+  width: 400px;
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
   overflow: hidden;
+}
+
+.otp-card-body {
+  transition: opacity 400ms ease;
+}
+
+/* Al validar el OTP: el contenido se apaga y solo queda la card blanca lisa. */
+.otp-card-body.hide {
+  opacity: 0;
+}
+
+/* Luego toda la pantalla se cubre del mismo fondo que welcome.html (#f0f0f0)
+   antes de navegar ahí — así no hay salto de color al llegar. */
+.whiteout {
+  position: fixed;
+  inset: 0;
+  background: #f0f0f0;
+  z-index: 30;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 500ms ease;
+}
+
+.whiteout.show {
+  opacity: 1;
 }
 
 .otp-label {
@@ -332,19 +410,32 @@ body {
 
 .otp-segments span {
   flex: 1;
-  height: 52px;
-  border-radius: 10px;
+  height: 60px;
+  border-radius: 12px;
   border: 2px solid #e0e0e0;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.4rem;
+  font-size: 1.6rem;
   font-weight: 700;
   color: #1a1a1a;
+  transition: border-color 150ms ease, box-shadow 150ms ease, background 150ms ease;
+  cursor: text;
 }
 
 .otp-segments span.active {
   border-color: #8b9aff;
+  box-shadow: 0 0 0 3px rgba(139, 154, 255, 0.18);
+}
+
+@keyframes otpDigitPop {
+  0% { transform: scale(0.55); opacity: 0.4; }
+  60% { transform: scale(1.15); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.otp-segments span.pop {
+  animation: otpDigitPop 220ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .otp-segments span.filled {

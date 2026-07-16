@@ -1,12 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { logger } from '../utils/logger.js';
-import { KnowledgeModel } from '../models/knowledge.model.js';
+import { KnowledgeModel, hashKnowledgeContent } from '../models/knowledge.model.js';
 
 interface ChatLogRow {
   id: string;
   role: string;
   content: string;
-  subject?: string;
+  subject?: string | null;
 }
 
 interface MessagePair {
@@ -94,11 +94,12 @@ export function detectKnowledgeOpportunity(messages: ChatLogRow[]): DetectionRes
 export async function detectAndSuggestKnowledge(
   userId: string,
   sessionId: string,
-  userMsgId: string,
-  assistantMsgId: string,
   messages: ChatLogRow[],
+  hadCollectiveMatch: boolean,
 ): Promise<void> {
   try {
+    if (hadCollectiveMatch) return; // la KB ya tenía algo útil para este tema, no hay vacío que llenar
+
     const opportunity = detectKnowledgeOpportunity(messages);
     if (!opportunity) return;
 
@@ -106,6 +107,8 @@ export async function detectAndSuggestKnowledge(
     const content = `${pair.userMessage.content}\n\n---\n\n${pair.assistantMessage.content}`;
     const summary = pair.userMessage.content.slice(0, 180) + '...';
     const subject = detectSubject(content);
+
+    if (KnowledgeModel.existsByHash(hashKnowledgeContent(content))) return;
 
     const knowledgeId = randomUUID();
     KnowledgeModel.create({
@@ -116,10 +119,12 @@ export async function detectAndSuggestKnowledge(
       source_type: 'user_qa',
       source_user_id: userId,
       tags: ['auto-detectado', subject],
-      status: 'draft',
+      status: 'pending_review',
     });
 
-    logger.info('Knowledge detection: draft creado', { knowledgeId, userId, sessionId, type: opportunity.type });
+    logger.info('Knowledge detection: candidato encolado para validacion IA', {
+      knowledgeId, userId, sessionId, type: opportunity.type,
+    });
   } catch (err) {
     logger.warn('Knowledge detection failed', { error: (err as Error).message });
   }

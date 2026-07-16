@@ -22,6 +22,7 @@
 </div>
 
 <div class="screen screen-2" id="screen2">
+  <div class="gradient-bg"></div>
     <div class="split-left">
       <div class="form-wrap">
         <div class="form-accent"></div>
@@ -33,14 +34,13 @@
       </div>
     </div>
   <div class="split-right">
-    <div class="gradient-bg"></div>
     <div class="info-wrap">
       <h3 class="info-name">LMS Exam</h3>
-      <p class="info-desc">Tu plataforma de estudio inteligente.</p>
+      <p class="info-desc">Tu tutor de estudio con IA, siempre disponible.</p>
       <ul class="info-features">
-        <li>★ Exámenes personalizados con IA</li>
-        <li>✦ Estadísticas y progreso detallado</li>
-        <li>◆ Estudio adaptativo inteligente</li>
+        <li>★ Chat con tutor IA para resolver tus dudas al instante</li>
+        <li>✦ Exámenes generados y adaptados a tu nivel</li>
+        <li>◆ Conocimiento colectivo validado por IA entre estudiantes</li>
       </ul>
     </div>
   </div>
@@ -53,21 +53,25 @@
 <div class="screen screen-3" id="screen3">
   <div class="gradient-bg"></div>
   <div class="otp-card" id="otpCard">
-    <p class="otp-label">Revisa tu correo</p>
-    <p class="otp-sub">Introduce el código de 6 dígitos que enviamos a <span id="otpEmail"></span></p>
-    <div class="otp-input-wrap">
-      <input type="text" id="otpInput" maxlength="6" inputmode="numeric" autocomplete="one-time-code" />
-      <div class="otp-segments" aria-hidden="true">
-        <span></span><span></span><span></span>
-        <span></span><span></span><span></span>
+    <div class="otp-card-body" id="otpCardBody">
+      <p class="otp-label">Revisa tu correo</p>
+      <p class="otp-sub">Introduce el código de 6 dígitos que enviamos a <span id="otpEmail"></span></p>
+      <div class="otp-input-wrap">
+        <input type="text" id="otpInput" maxlength="6" inputmode="numeric" autocomplete="one-time-code" />
+        <div class="otp-segments" aria-hidden="true">
+          <span></span><span></span><span></span>
+          <span></span><span></span><span></span>
+        </div>
       </div>
+      <p class="otp-attempts" id="otpAttempts">3 intentos restantes</p>
+      <div class="otp-timer" id="otpTimer">05:00</div>
     </div>
-    <p class="otp-attempts" id="otpAttempts">3 intentos restantes</p>
-    <div class="otp-timer" id="otpTimer">05:00</div>
     <div class="otp-flood" id="otpFlood"></div>
   </div>
 </div>
 
-<script src="js/login.js?v=2" defer></script>
+<div class="whiteout" id="whiteout"></div>
+
+<script src="js/login.js?v=3" defer></script>
 </body>
 </html>

@@ -1,5 +1,8 @@
 import { callNineRouterStream, parseNineRouterStream, type StreamChunk } from '../ai/nineRouter.js';
+import { FALLBACK_MODEL } from '../ai/index.js';
 import { logger } from '../../utils/logger.js';
+import { ChatModel } from '../../models/chat.model.js';
+import { detectAndSuggestKnowledge } from '../knowledge-detection.service.js';
 import type { ChatPersistenceService } from './chat.persistence.service.js';
 import type { ChatEmbeddingService } from './chat.embedding.service.js';
 import type { ChatRAGService } from './chat.rag.service.js';
@@ -33,7 +36,9 @@ export class ChatStreamingService {
 
     const queryVector = await this.embeddingService.generateAndSave(userMsgId, userId, message, outboxId);
 
-    const ragContext = queryVector ? await this.ragService.buildContext(userId, userMsgId, queryVector) : '';
+    const { context: ragContext, hadCollectiveMatch } = queryVector
+      ? await this.ragService.buildContext(userId, userMsgId, queryVector, message)
+      : { context: '', hadCollectiveMatch: false };
 
     this.profileDetectionService.detectAndApply(message, userId).catch(err =>
       logger.warn('Profile detection async failed', { error: (err as Error).message })
@@ -47,10 +52,21 @@ export class ChatStreamingService {
 
     let responseBody: ReadableStream<Uint8Array>;
     try {
-      const response = await callNineRouterStream(systemPrompt, content, {
-        model: resolved.model, signal: controller.signal,
-      });
-      responseBody = response.body!;
+      try {
+        const response = await callNineRouterStream(systemPrompt, content, {
+          model: resolved.model, signal: controller.signal,
+        });
+        responseBody = response.body!;
+      } catch (err) {
+        if (resolved.model === FALLBACK_MODEL) throw err;
+        logger.warn('Modelo de chat falló, probando fallback', {
+          model: resolved.model, fallback: FALLBACK_MODEL, error: (err as Error).message,
+        });
+        const response = await callNineRouterStream(systemPrompt, content, {
+          model: FALLBACK_MODEL, signal: controller.signal,
+        });
+        responseBody = response.body!;
+      }
     } finally {
       clearTimeout(timeoutId);
     }
@@ -69,6 +85,10 @@ export class ChatStreamingService {
       } finally {
         if (fullResponse) {
           self.persistence.saveAssistantMessageWithOutbox(userId, sessionId, fullResponse);
+          const recentMessages = ChatModel.getSessionMessages(sessionId, 10);
+          detectAndSuggestKnowledge(userId, sessionId, recentMessages, hadCollectiveMatch).catch(
+            err => logger.warn('Knowledge detection async failed', { error: (err as Error).message })
+          );
         }
       }
     }

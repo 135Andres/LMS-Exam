@@ -3,6 +3,7 @@ import { getDb } from '../db/connection.js';
 import { logger } from '../utils/logger.js';
 import { generateDailyInsights } from '../services/insights.service.js';
 import { updateProfileForUser } from '../services/profile-update.service.js';
+import { validatePendingKnowledge } from '../services/kb-validator.service.js';
 import { acquireLock, releaseLock } from '../utils/lock.js';
 
 const LOCK_NAME = 'cron-scheduler';
@@ -54,6 +55,17 @@ export function startScheduler(): void {
     }
   });
   tasks.push(profilesTask);
+
+  const kbValidatorTask = cron.schedule('*/30 * * * *', async () => {
+    logger.info('Cron: iniciando validacion de KB pendiente');
+    try {
+      await validatePendingKnowledge();
+      logger.info('Cron: validacion de KB pendiente completada');
+    } catch (err) {
+      logger.error('Cron: error validando KB pendiente', { error: (err as Error).message });
+    }
+  });
+  tasks.push(kbValidatorTask);
 }
 
 export function stopScheduler(): void {

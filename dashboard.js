@@ -24,10 +24,10 @@ const RESTART_DELAY = 2000;
 const PYTHON_CWD = path.join(ROOT, 'backend-python');
 const NODE_CWD = path.join(ROOT, 'backend');
 
-const PYTHON_CMD = 'python';
+const PYTHON_CMD = process.platform === 'win32' ? 'python' : './.venv/bin/python';
 const PYTHON_ARGS = ['-m', 'uvicorn', 'main:app', '--host', '0.0.0.0', '--port', '3001'];
 
-const NODE_CMD = 'npx.cmd tsx watch server.ts';
+const NODE_CMD = process.platform === 'win32' ? 'npx.cmd tsx watch server.ts' : 'npx tsx watch server.ts';
 
 // ═════════════════════════════════════════════════════════════════════
 //  Screen

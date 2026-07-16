@@ -13,7 +13,7 @@ export class ChatPromptService {
 
     const profile = ProfileService.getProfile(userId);
     if (profile) {
-      prompt += `\n\n--- Perfil del estudiante ---\n${profile}\n---`;
+      prompt += `\n\n--- Preferencias del estudiante (obligatorias, tienen prioridad — ver directriz 12) ---\n${profile}\n---`;
     }
 
     if (ragContext) {

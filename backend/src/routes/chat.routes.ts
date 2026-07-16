@@ -3,7 +3,7 @@ import { sendChatMessageHandler, sendChatMessageStreamHandler, getChatHistoryHan
 import { authenticate } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { chatMessageSchema } from '../validators/chat.js';
-import { fetchAvailableModels } from '../services/ai/nineRouter.js';
+import { AVAILABLE_MODELS } from '../config/models.js';
 
 const router = Router();
 
@@ -19,14 +19,13 @@ router.post('/unarchive', unarchiveSessionHandler);
 router.post('/delete', deleteSessionHandler);
 router.get('/sessions/archived', getArchivedSessionsHandler);
 
-router.get('/models', async (_req, res) => {
-  const models = await fetchAvailableModels();
+router.get('/models', (_req, res) => {
   res.json({
-    models: models.map(m => ({
+    models: AVAILABLE_MODELS.map(m => ({
       id: m.id,
       label: m.label,
       model: m.id,
-      multimodal: m.id.includes('nemotron') || m.id.includes('gemma') || m.id.includes('multimodal'),
+      multimodal: m.multimodal,
       contextLength: 128000,
     })),
   });

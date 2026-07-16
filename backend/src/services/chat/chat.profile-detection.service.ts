@@ -3,10 +3,31 @@ import { ProfileService } from '../profile.service.js';
 import { config } from '../../config/index.js';
 import { logger } from '../../utils/logger.js';
 
-const PROFILE_EDIT_REGEX = /\b(?:quiero que|cambia mi|actualiza mi|prefiero que|configura mi|ajusta mi|modifica mi)\b/i;
+// Filtro barato antes de gastar una llamada IA (el clasificador de abajo).
+// Frases sin acentos — el mensaje se normaliza (sin acentos, minúsculas) antes
+// de probar, así "sé menos formal" y "se menos formal" matchean igual.
+// Para agregar una frase nueva: solo agrégala a este array.
+const PROFILE_EDIT_TRIGGERS = [
+  'quiero que', 'cambia mi', 'actualiza mi', 'prefiero que', 'configura mi', 'ajusta mi', 'modifica mi',
+  'se mas', 'se menos', 'seas mas', 'seas menos',
+  'habla mas', 'habla menos', 'hablame',
+  'actua mas', 'actua menos',
+  'explica mas', 'explica menos', 'explicame mas', 'explicame menos',
+  'responde mas', 'responde menos',
+  'tratame', 'no seas', 'deja de ser', 'evita ser', 'trata de ser',
+];
+
+const PROFILE_EDIT_REGEX = new RegExp(
+  `\\b(?:${PROFILE_EDIT_TRIGGERS.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})\\b`,
+  'i'
+);
+
+function normalize(text: string): string {
+  return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}
 
 export function isProfileEditIntent(message: string): boolean {
-  return PROFILE_EDIT_REGEX.test(message);
+  return PROFILE_EDIT_REGEX.test(normalize(message));
 }
 
 const SYSTEM_PROMPT_CLASSIFIER = `Eres un clasificador de intención. Analiza si el mensaje del estudiante contiene una instrucción para CAMBIAR o AJUSTAR la forma en que el tutor IA debe comportarse (preferencias de aprendizaje, tono, profundidad, temas, etc.).

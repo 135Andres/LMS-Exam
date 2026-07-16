@@ -19,6 +19,7 @@ interface SearchResult {
 interface HybridRAGOptions {
   userId: string;
   queryVector: number[];
+  excludeMessageId?: string;
   subject?: string;
   personalWeight?: number;
   collectiveWeight?: number;
@@ -28,6 +29,11 @@ interface HybridRAGOptions {
   minPersonalScore?: number;
   minCollectiveScore?: number;
   verifiedOnly?: boolean;
+}
+
+export interface HybridRAGResult {
+  context: string;
+  hadCollectiveMatch: boolean;
 }
 
 const DEFAULTS = {
@@ -42,10 +48,10 @@ const DEFAULTS = {
 };
 
 export class HybridRAGService {
-  async buildContext(options: HybridRAGOptions): Promise<string> {
+  async buildContext(options: HybridRAGOptions): Promise<HybridRAGResult> {
     const opts = { ...DEFAULTS, ...options };
 
-    if (opts.queryVector.length === 0) return '';
+    if (opts.queryVector.length === 0) return { context: '', hadCollectiveMatch: false };
 
     const [personalResults, collectiveResults] = await Promise.all([
       this.searchPersonal(opts as Required<HybridRAGOptions>),
@@ -54,6 +60,7 @@ export class HybridRAGService {
 
     const filteredPersonal = personalResults.filter(r => r.score >= opts.minPersonalScore);
     const filteredCollective = collectiveResults.filter(r => r.score >= opts.minCollectiveScore);
+    const hadCollectiveMatch = filteredCollective.length > 0;
 
     const merged = [
       ...filteredPersonal.map(r => ({ ...r, finalScore: r.score * opts.personalWeight })),
@@ -63,13 +70,14 @@ export class HybridRAGService {
     merged.sort((a, b) => b.finalScore - a.finalScore);
     const topK = merged.slice(0, opts.finalTopK);
 
-    if (topK.length === 0) return '';
+    if (topK.length === 0) return { context: '', hadCollectiveMatch };
 
-    return this.formatContext(topK);
+    return { context: this.formatContext(topK), hadCollectiveMatch };
   }
 
   private async searchPersonal(opts: Required<HybridRAGOptions>): Promise<SearchResult[]> {
-    const embeddings = EmbeddingModel.getUserEmbeddings(opts.userId, opts.personalLimit);
+    const embeddings = EmbeddingModel.getUserEmbeddings(opts.userId, opts.personalLimit)
+      .filter(e => e.messageId !== opts.excludeMessageId);
     if (embeddings.length < 2) return [];
 
     const topK = findTopK(opts.queryVector, embeddings as any, opts.finalTopK * 2, opts.minPersonalScore);

@@ -16,7 +16,7 @@ export const config = {
 
   nineRouter: {
     apiKey: required('NINE_ROUTER_API_KEY'),
-    baseUrl: process.env.NINE_ROUTER_BASE_URL || 'https://rky8wp8.abc-tunnel.us/v1',
+    baseUrl: process.env.NINE_ROUTER_BASE_URL || 'http://localhost:20128/v1',
   },
 
   nvidia: {
@@ -25,9 +25,13 @@ export const config = {
   },
 
   models: {
-    generate: process.env.GENERATE_MODEL || 'nvidia/minimaxai/minimax-m2.7',
-    polish: process.env.POLISH_MODEL || 'nvidia/deepseek-ai/deepseek-v4-flash',
-    chat: process.env.CHAT_MODEL || 'nvidia/deepseek-ai/deepseek-v4-flash',
+    generate: process.env.GENERATE_MODEL || 'nvidia/minimaxai/minimax-m3',
+    polish: process.env.POLISH_MODEL || 'nvidia/minimaxai/minimax-m3',
+    chat: process.env.CHAT_MODEL || 'ag/gemini-3-flash',
+    // Validador batch de la KB colectiva.
+    kbValidator: process.env.KB_VALIDATOR_MODEL || 'oc/deepseek-v4-flash-free',
+    // Análisis nocturno de progreso (insights.service.ts).
+    insights: process.env.INSIGHTS_MODEL || 'oc/deepseek-v4-flash-free',
   },
 
   embeddings: {

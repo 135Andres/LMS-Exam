@@ -1,4 +1,5 @@
 import { config } from '../../config/index.js';
+import { isModelMultimodal } from '../../config/models.js';
 
 export interface ResolvedModel {
   model: string;
@@ -7,15 +8,13 @@ export interface ResolvedModel {
   contextLength?: number;
 }
 
-const MULTIMODAL_HINTS = ['nemotron', 'gemma', 'multimodal', 'nano'];
-
 export class ChatModelRouter {
   resolve(modelId?: string): ResolvedModel {
     const model = modelId || config.models.chat;
     return {
       model,
       label: model.split('/').pop() || model,
-      multimodal: MULTIMODAL_HINTS.some(h => model.toLowerCase().includes(h)),
+      multimodal: isModelMultimodal(model),
       contextLength: 128000,
     };
   }

@@ -18,7 +18,7 @@ Auditoría de `fixes/` contra código real. Estado del repo: `tsc --noEmit` limp
 ```
 git show 4e76c77:REPORTE_CAMBIOS.txt | grep -E 'sk-[a-zA-Z0-9]'
 ```
-Produce dos ocurrencias de la key real (`sk-f7b6a3eaea16665b-c9gyxw-512378bf`).
+Produce dos ocurrencias de la key real (redactada aquí — ya rotada el 2026-07-15, ver memoria del proyecto).
 
 **Fix (irreversible — requiere decisión humana):**
 1. Rotar la key en el panel de 9router ANTES de cualquier otra acción (no se reproduce la key aquí).
