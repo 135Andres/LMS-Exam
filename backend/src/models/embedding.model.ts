@@ -1,5 +1,4 @@
 import { getDb } from '../db/connection.js';
-import type { ChatEmbeddingRow } from '../types/db.js';
 
 function vectorToBlob(vector: number[]): Buffer {
   return Buffer.from(new Float32Array(vector).buffer);

@@ -96,6 +96,7 @@ function extractSubjects(messages: Array<{ content: string; role: string }>): st
     historia: ['historia', 'revolución', 'guerra', 'imperio', 'civilización'],
     lenguaje: ['español', 'literatura', 'gramática', 'ortografía', 'redacción'],
     biologia: ['biología', 'célula', 'genética', 'organismo', 'evolución'],
+    informatica: ['algoritmo', 'código', 'programa', 'variable', 'bucle', 'array', 'base de datos'],
   };
 
   const detected = new Set<string>();

@@ -7,7 +7,7 @@ import type { ChatPersistenceService } from './chat.persistence.service.js';
 import type { ChatEmbeddingService } from './chat.embedding.service.js';
 import type { ChatRAGService } from './chat.rag.service.js';
 import type { ChatProfileDetectionService } from './chat.profile-detection.service.js';
-import type { ChatModelRouter, ResolvedModel } from './chat.model-router.js';
+import type { ChatModelRouter } from './chat.model-router.js';
 import type { ChatPromptService, Attachment } from './chat.prompt.service.js';
 
 const TIMEOUT_MS = 30000;

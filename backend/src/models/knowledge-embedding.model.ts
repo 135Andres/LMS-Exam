@@ -1,5 +1,5 @@
 import { getDb } from '../db/connection.js';
-import { cosineSimilarity, findTopK } from '../utils/vector.js';
+import { findTopK } from '../utils/vector.js';
 
 interface SearchOptions {
   subject?: string;

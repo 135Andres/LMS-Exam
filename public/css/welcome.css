@@ -55,7 +55,7 @@ body {
 }
 
 .sidebar.open {
-  width: 260px;
+  width: 310px;
   border-right: 1px solid rgba(0, 0, 0, 0.06);
 }
 
@@ -74,7 +74,7 @@ body {
 }
 
 .sidebar-brand {
-  font-size: 0.9rem;
+  font-size: 1.05rem;
   font-weight: 700;
   color: #1a1a1a;
   cursor: pointer;
@@ -148,17 +148,22 @@ body {
 .sidebar-new-chat {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.65rem 0.75rem;
+  gap: 0.6rem;
+  padding: 0.85rem 1rem;
   border: 1px solid rgba(0, 0, 0, 0.12);
   border-radius: 8px;
   background: none;
   color: #1a1a1a;
   font-family: 'Space Mono', monospace;
-  font-size: 0.8rem;
+  font-size: 0.95rem;
   cursor: pointer;
   transition: background 150ms ease, border-color 150ms ease;
   white-space: nowrap;
+}
+
+.sidebar-new-chat svg {
+  width: 18px;
+  height: 18px;
 }
 
 .sidebar-new-chat:hover {
@@ -179,22 +184,22 @@ body {
 }
 
 .sidebar-date-label {
-  font-size: 0.6rem;
+  font-size: 0.68rem;
   color: rgba(0, 0, 0, 0.35);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  padding: 0.25rem 0.5rem;
+  padding: 0.3rem 0.5rem;
 }
 
 .sidebar-chat-item {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.6rem;
+  gap: 0.6rem;
+  padding: 0.7rem 0.75rem;
   border-radius: 6px;
   cursor: pointer;
   color: #1a1a1a;
-  font-size: 0.75rem;
+  font-size: 0.88rem;
   transition: background 150ms ease;
   white-space: nowrap;
   overflow: hidden;
@@ -210,6 +215,8 @@ body {
 }
 
 .sidebar-chat-item svg {
+  width: 16px;
+  height: 16px;
   flex-shrink: 0;
 }
 
@@ -239,8 +246,8 @@ body {
   border: none;
   color: rgba(0, 0, 0, 0.35);
   cursor: pointer;
-  width: 22px;
-  height: 22px;
+  width: 26px;
+  height: 26px;
   border-radius: 4px;
   display: flex;
   align-items: center;
@@ -274,12 +281,12 @@ body {
 }
 
 .sidebar-user-avatar {
-  width: 28px;
-  height: 28px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   background: rgba(0, 0, 0, 0.08);
   color: #1a1a1a;
-  font-size: 0.7rem;
+  font-size: 0.85rem;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -288,7 +295,7 @@ body {
 }
 
 .sidebar-user-name {
-  font-size: 0.75rem;
+  font-size: 0.88rem;
   color: rgba(0, 0, 0, 0.6);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -334,14 +341,14 @@ body {
 .sidebar-dropdown-item {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.6rem;
   width: 100%;
-  padding: 0.5rem 0.6rem;
+  padding: 0.65rem 0.75rem;
   border: none;
   background: none;
   color: #1a1a1a;
   font-family: 'Space Mono', monospace;
-  font-size: 0.72rem;
+  font-size: 0.85rem;
   cursor: pointer;
   border-radius: 6px;
   text-align: left;
@@ -658,6 +665,11 @@ body {
 
 .chat-input-inner.shrunken {
   overflow: hidden;
+}
+
+.chat-input-wrapper.drag-over .chat-input-inner {
+  border-color: #8b9aff;
+  box-shadow: 0 0 0 3px rgba(139, 154, 255, 0.15);
 }
 
 .input-resize-handle {
@@ -992,6 +1004,62 @@ body {
 .chat-messages::-webkit-scrollbar-track {
   background: transparent;
 }
+
+/* ── Modo examen (toggle en sidebar) ── */
+.mode-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.85rem 1rem;
+  border: 1.5px solid #8b9aff;
+  border-radius: 8px;
+  background: #fff;
+  color: #1a1a1a;
+  font-family: 'Space Mono', monospace;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease, border-color 150ms ease;
+}
+
+.mode-toggle-btn:hover {
+  background: #8b9aff;
+  color: #fff;
+}
+
+.mode-toggle-btn.exam-active {
+  border-color: #facc15;
+}
+
+.mode-toggle-btn.exam-active:hover {
+  background: #facc15;
+  color: #1a1a1a;
+}
+
+.exam-mode-placeholder {
+  display: none;
+  position: absolute;
+  top: 72px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  align-items: center;
+  justify-content: center;
+  color: rgba(0, 0, 0, 0.4);
+  font-size: 0.95rem;
+}
+
+body.exam-mode .exam-mode-placeholder {
+  display: flex;
+}
+
+body.exam-mode #chatMessages,
+body.exam-mode #bottomBar,
+body.exam-mode #topBarModelSelect,
+body.exam-mode #contextBtn,
+body.exam-mode #sidebarHistory,
+body.exam-mode #showArchivedBtn {
+  display: none !important;
+}
 .chat-messages::-webkit-scrollbar-thumb {
   background: rgba(0, 0, 0, 0.12);
   border-radius: 999px;
@@ -1223,6 +1291,7 @@ body {
   padding: 0.5rem 0;
   overflow-x: auto;
   flex-shrink: 0;
+  width: 100%; /* fuerza su propia fila dentro de .chat-input-inner (flex-wrap) */
 }
 
 .att-chip {
@@ -1461,10 +1530,10 @@ body {
 
 /* ── Attachment chip preview thumb ── */
 .att-chip-preview {
-  width: 36px;
-  height: 36px;
+  width: 72px;
+  height: 72px;
   object-fit: cover;
-  border-radius: 4px;
+  border-radius: 8px;
 }
 
 .att-thumb {

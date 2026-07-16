@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto';
 import { getDb } from '../db/connection.js';
-import { KnowledgeModel } from './knowledge.model.js';
 
 export const knowledgeVoteModel = {
   vote(knowledgeId: string, userId: string, voteType: 1 | -1): boolean {

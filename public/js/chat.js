@@ -331,6 +331,21 @@ function toggleSidebar() {
   }
 }
 
+/* ── Modo chat / examen ── */
+let currentMode = 'chat';
+
+function setMode(mode) {
+  currentMode = mode;
+  const examActive = mode === 'exam';
+  document.body.classList.toggle('exam-mode', examActive);
+
+  const toggleBtn = document.getElementById('modeToggleBtn');
+  toggleBtn.classList.toggle('exam-active', examActive);
+  toggleBtn.textContent = examActive ? 'Cambiar a Chat' : 'Cambiar a Examen';
+
+  document.getElementById('sidebarNewChatLabel').textContent = examActive ? 'Nuevo Examen' : 'Nuevo Chat';
+}
+
 function populateTopBarModels() {
   const topSelect = document.getElementById('topBarModelSelect');
   if (!topSelect) return;
@@ -574,6 +589,46 @@ function setupChatInput() {
       reader.readAsDataURL(file);
     }
     fileInput.value = '';
+  });
+
+  // Arrastrar y soltar: archivos/imágenes locales se adjuntan completos;
+  // contenido arrastrado desde otra página web (sin archivo real, solo URL)
+  // se agrega al menú de enlaces en vez de intentar adjuntarlo.
+  const chatInputWrapper = document.querySelector('.chat-input-wrapper');
+  ['dragenter', 'dragover'].forEach(evt => {
+    chatInputWrapper.addEventListener(evt, (e) => {
+      e.preventDefault();
+      chatInputWrapper.classList.add('drag-over');
+    });
+  });
+  ['dragleave', 'drop'].forEach(evt => {
+    chatInputWrapper.addEventListener(evt, () => {
+      chatInputWrapper.classList.remove('drag-over');
+    });
+  });
+  chatInputWrapper.addEventListener('drop', (e) => {
+    e.preventDefault();
+
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      for (const file of e.dataTransfer.files) {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const data = ev.target.result.split(',')[1];
+          const type = file.type.startsWith('image/') ? 'image' : 'file';
+          pendingAttachments.push({ type, mime: file.type, data, name: file.name });
+          renderAttachmentPreviews();
+        };
+        reader.readAsDataURL(file);
+      }
+      return;
+    }
+
+    // Arrastrado desde otra web (imagen o link) — viene como URL, no archivo.
+    const draggedUrl = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text/plain');
+    if (draggedUrl && /^https?:\/\//i.test(draggedUrl) && !activeLinks.includes(draggedUrl)) {
+      activeLinks.push(draggedUrl);
+      renderLinksList();
+    }
   });
 
   document.getElementById('sendBtn').addEventListener('click', handleSend);
@@ -848,9 +903,11 @@ function renderAttachmentPreviews() {
   if (!container) {
     container = document.createElement('div');
     container.id = 'attachmentPreviews';
-    const wrapper = document.querySelector('.chat-input-wrapper');
-    if (wrapper) {
-      wrapper.insertBefore(container, wrapper.firstChild);
+    // Dentro de .chat-input-inner (la burbuja del input), no como hermano de
+    // .chat-input-wrapper — así la preview queda dentro del chat, no a un lado.
+    const inner = document.getElementById('chatInputInner');
+    if (inner) {
+      inner.insertBefore(container, inner.firstChild);
     } else {
       document.querySelector('.bottom-bar').insertBefore(container, document.querySelector('.bar-actions'));
     }
@@ -1478,7 +1535,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('sidebarCollapseBtn').addEventListener('click', toggleSidebar);
   document.getElementById('sidebarToggleBtn').addEventListener('click', toggleSidebar);
-  document.getElementById('sidebarNewChat').addEventListener('click', newChat);
+  document.getElementById('sidebarNewChat').addEventListener('click', () => {
+    if (currentMode === 'exam') return; // modo examen aún sin funcionalidad
+    newChat();
+  });
+  document.getElementById('modeToggleBtn').addEventListener('click', () => {
+    setMode(currentMode === 'chat' ? 'exam' : 'chat');
+  });
 
   document.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === 'b') {

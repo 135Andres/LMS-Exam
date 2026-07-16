@@ -1,7 +1,6 @@
 import type { Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { ExamModel } from '../models/exam.model.js';
-import { getDb } from '../db/connection.js';
 import { NotFoundError, AppError, ForbiddenError } from '../utils/errors.js';
 import { generateExam, suggestSubtopics, polishQuestion, calculateCost } from '../services/exam.service.js';
 import { recordUsage } from '../services/billing.service.js';

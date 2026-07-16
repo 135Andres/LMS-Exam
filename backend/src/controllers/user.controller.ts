@@ -81,6 +81,28 @@ export function getDashboardSummary(req: Request, res: Response): void {
     });
   }
 
+  // Autoexpansión: una materia con exámenes generados pero sin análisis
+  // nocturno todavía (usuario nuevo, cron aún no corre) igual aparece —
+  // calificación = promedio de sus exámenes calificados, sin recomendación
+  // de IA hasta que el análisis nocturno la alcance.
+  const examSubjectRows = db.prepare(
+    `SELECT subject, AVG(score) as avgScore, MAX(created_at) as lastCreated
+     FROM exams
+     WHERE user_id = ? AND subject != '' AND subject IS NOT NULL AND score IS NOT NULL
+     GROUP BY subject`
+  ).all(userId) as Array<{ subject: string; avgScore: number; lastCreated: string }>;
+
+  for (const row of examSubjectRows) {
+    if (seenSubjects.has(row.subject)) continue;
+    seenSubjects.add(row.subject);
+    subjects.push({
+      subject: row.subject,
+      calificacion: Math.round(row.avgScore || 0),
+      recomendaciones: '',
+      lastUpdated: row.lastCreated,
+    });
+  }
+
   res.json({
     user: {
       name: user.username || user.email,

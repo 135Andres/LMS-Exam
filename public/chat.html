@@ -20,11 +20,12 @@
       </button>
     </div>
     <div class="sidebar-body">
+      <button class="mode-toggle-btn" id="modeToggleBtn">Cambiar a Examen</button>
       <button class="sidebar-new-chat" id="sidebarNewChat">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
         </svg>
-        Nuevo Chat
+        <span id="sidebarNewChatLabel">Nuevo Chat</span>
       </button>
       <div class="sidebar-history" id="sidebarHistory">
         <div class="sidebar-date-group">
@@ -81,6 +82,7 @@
     </nav>
 
     <div class="chat-messages" id="chatMessages"></div>
+    <div class="exam-mode-placeholder" id="examModePlaceholder">Modo examen — próximamente.</div>
 
     <nav class="bottom-bar" id="bottomBar"></nav>
   </div>
