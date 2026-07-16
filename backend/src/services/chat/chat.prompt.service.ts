@@ -1,4 +1,4 @@
-import { SYSTEM_PROMPT_TUTOR } from '../../prompts/system.js';
+import { SYSTEM_PROMPT_TUTOR, SYSTEM_PROMPT_TUTOR_ADMIN_OVERRIDE } from '../../prompts/system.js';
 import { ProfileService } from '../profile.service.js';
 import { UserModel } from '../../models/user.model.js';
 import { SessionSummaryService } from '../session-summary.service.js';
@@ -10,7 +10,7 @@ export interface Attachment {
 }
 
 export class ChatPromptService {
-  buildSystemPrompt(modelLabel: string, ragContext: string, userId: string, regenerateInstruction?: string, sessionId?: string): string {
+  buildSystemPrompt(modelLabel: string, ragContext: string, userId: string, regenerateInstruction?: string, sessionId?: string, crossChatContext?: string): string {
     let prompt = SYSTEM_PROMPT_TUTOR.replace(/\{MODEL_NAME\}/g, modelLabel);
 
     if (sessionId) {
@@ -23,6 +23,9 @@ export class ChatPromptService {
     const user = UserModel.findById(userId);
     if (user?.username) {
       prompt += `\n\n--- Nombre del estudiante ---\nEl estudiante se llama "${user.username}". Dirígete a él/ella por ese nombre de forma natural en la conversación.\n---`;
+    }
+    if (user?.role === 'admin') {
+      prompt += SYSTEM_PROMPT_TUTOR_ADMIN_OVERRIDE;
     }
 
     const profile = ProfileService.getProfile(userId);
@@ -39,6 +42,10 @@ export class ChatPromptService {
 
     if (ragContext) {
       prompt += ragContext;
+    }
+
+    if (crossChatContext) {
+      prompt += crossChatContext;
     }
     return prompt;
   }
