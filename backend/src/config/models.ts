@@ -9,11 +9,11 @@ export interface ChatModelOption {
 }
 
 export const AVAILABLE_MODELS: ChatModelOption[] = [
+  { id: 'oc/deepseek-v4-flash-free', label: 'DeepSeek Flash', multimodal: false },
   { id: 'ag/gemini-3-flash', label: 'Gemini Flash', multimodal: true },
   { id: 'ag/gemini-3.1-pro-low', label: 'Gemini Pro', multimodal: true },
   { id: 'ag/claude-sonnet-4-6', label: 'Claude Sonnet', multimodal: false },
   { id: 'nvidia/z-ai/glm-5.2', label: 'GLM 5.2', multimodal: false },
-  { id: 'oc/deepseek-v4-flash-free', label: 'DeepSeek Flash', multimodal: false },
 ];
 
 export function isModelMultimodal(modelId: string): boolean {

@@ -7,8 +7,8 @@ export class ChatPersistenceService {
     ChatModel.saveMessage(msgId, userId, sessionId, 'user', content);
   }
 
-  saveAssistantMessage(msgId: string, userId: string, sessionId: string, content: string): void {
-    ChatModel.saveMessage(msgId, userId, sessionId, 'assistant', content);
+  saveAssistantMessage(msgId: string, userId: string, sessionId: string, content: string, model?: string): void {
+    ChatModel.saveMessage(msgId, userId, sessionId, 'assistant', content, 0, model || null);
   }
 
   saveUserMessageWithOutbox(userId: string, sessionId: string, content: string): { msgId: string; outboxId: string } {
@@ -19,9 +19,9 @@ export class ChatPersistenceService {
     return { msgId, outboxId };
   }
 
-  saveAssistantMessageWithOutbox(userId: string, sessionId: string, content: string): string {
+  saveAssistantMessageWithOutbox(userId: string, sessionId: string, content: string, model?: string): string {
     const msgId = uuidv4();
-    this.saveAssistantMessage(msgId, userId, sessionId, content);
+    this.saveAssistantMessage(msgId, userId, sessionId, content, model);
     EmbeddingOutboxModel.enqueue(uuidv4(), msgId, userId, content, 'assistant');
     return msgId;
   }

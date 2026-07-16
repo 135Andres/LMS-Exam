@@ -417,6 +417,19 @@ function migrate(): void {
   // KB colectiva — validacion automatica por IA (nemotron-3-ultra via 9router)
   addColumnIfMissing(db, 'knowledge_base', 'verified_by_ai', 'TEXT');
 
+  // Compactador de contexto — reemplaza el envio de los ultimos N mensajes crudos
+  // por un resumen incremental (archivo, ver session-summary.service.ts) + cola cruda
+  // desde el ultimo corte. Este cursor marca hasta donde ya esta resumido.
+  addColumnIfMissing(db, 'chat_logs', 'model', 'TEXT');
+  addColumnIfMissing(db, 'chat_sessions', 'summary_covers_until', 'TEXT');
+
+  // Notas rápidas — mensajes fijados por el usuario, listados en el panel de sesión.
+  addColumnIfMissing(db, 'chat_logs', 'is_pinned', 'INTEGER DEFAULT 0');
+
+  // Título editable del chat (navbar superior) — si es NULL se usa el preview
+  // (primer mensaje) como fallback, ver ChatModel.getUserSessions.
+  addColumnIfMissing(db, 'chat_sessions', 'title', 'TEXT');
+
   logger.info('Migración completada: tablas creadas/verificadas');
   closeDb();
 }

@@ -25,6 +25,15 @@ const state = {
   email: '',
 };
 
+(async function redirectIfAlreadyLoggedIn() {
+  try {
+    const res = await fetch('/auth/me', { credentials: 'same-origin' });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data?.email) window.location.href = 'chat.html';
+  } catch {}
+})();
+
 async function apiRequest(path, options = {}) {
   const res = await fetch(`${API_BASE}${path}`, {
     credentials: 'same-origin',
@@ -217,8 +226,8 @@ function triggerOtpFlood(reason) {
       document.getElementById('whiteout').classList.add('show');
 
       setTimeout(() => {
-        // 3) Ya todo blanco, se navega a welcome.html.
-        window.location.href = 'welcome.html';
+        // 3) Ya todo blanco, se navega a chat.html.
+        window.location.href = 'chat.html';
       }, WHITEOUT_MS);
     }, CARD_HIDE_MS);
   } else {

@@ -36,6 +36,10 @@ export const UserModel = {
     getDb().prepare('UPDATE users SET role = ? WHERE email = ?').run(role, email);
   },
 
+  setUsername(id: string, username: string): void {
+    getDb().prepare('UPDATE users SET username = ? WHERE id = ?').run(username, id);
+  },
+
   listAll(): UserRow[] {
     return getDb().prepare(
       'SELECT id, email, username, role, created_at, exams_generated, total_api_cost FROM users ORDER BY created_at DESC',

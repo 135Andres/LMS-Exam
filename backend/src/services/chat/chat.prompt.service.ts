@@ -1,5 +1,7 @@
 import { SYSTEM_PROMPT_TUTOR } from '../../prompts/system.js';
 import { ProfileService } from '../profile.service.js';
+import { UserModel } from '../../models/user.model.js';
+import { SessionSummaryService } from '../session-summary.service.js';
 
 export interface Attachment {
   type: 'image' | 'audio' | 'file';
@@ -8,12 +10,31 @@ export interface Attachment {
 }
 
 export class ChatPromptService {
-  buildSystemPrompt(modelLabel: string, ragContext: string, userId: string): string {
+  buildSystemPrompt(modelLabel: string, ragContext: string, userId: string, regenerateInstruction?: string, sessionId?: string): string {
     let prompt = SYSTEM_PROMPT_TUTOR.replace(/\{MODEL_NAME\}/g, modelLabel);
+
+    if (sessionId) {
+      const summary = SessionSummaryService.getSummary(sessionId);
+      if (summary) {
+        prompt += `\n\n--- Resumen de la conversación previa ---\n${summary}\n---`;
+      }
+    }
+
+    const user = UserModel.findById(userId);
+    if (user?.username) {
+      prompt += `\n\n--- Nombre del estudiante ---\nEl estudiante se llama "${user.username}". Dirígete a él/ella por ese nombre de forma natural en la conversación.\n---`;
+    }
 
     const profile = ProfileService.getProfile(userId);
     if (profile) {
       prompt += `\n\n--- Preferencias del estudiante (obligatorias, tienen prioridad — ver directriz 12) ---\n${profile}\n---`;
+    }
+
+    if (regenerateInstruction !== undefined) {
+      const custom = regenerateInstruction.trim();
+      prompt += `\n\n--- Nota de regeneración ---\nEsta es una SEGUNDA explicación del mismo tema para este estudiante — ya recibió una respuesta y pidió que se la expliques diferente.${
+        custom ? ` Pidió específicamente: "${custom}" — sigue esa indicación al explicar.` : ' Cambia el enfoque (otra analogía, otro orden, otro tipo de ejemplo). No repitas la explicación anterior con las mismas palabras.'
+      }\n---`;
     }
 
     if (ragContext) {

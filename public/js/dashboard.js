@@ -123,8 +123,8 @@ async function loadDashboard() {
   subjectsList.innerHTML = data.subjects.map(subjectCardHtml).join('');
 }
 
-document.getElementById('homeBtn').addEventListener('click', () => { window.location.href = 'welcome.html'; });
-document.getElementById('sidebarHome').addEventListener('click', () => { window.location.href = 'welcome.html'; });
+document.getElementById('homeBtn').addEventListener('click', () => { window.location.href = 'chat.html'; });
+document.getElementById('sidebarHome').addEventListener('click', () => { window.location.href = 'chat.html'; });
 document.getElementById('sidebarCollapseBtn').addEventListener('click', toggleSidebar);
 document.getElementById('sidebarToggleBtn').addEventListener('click', toggleSidebar);
 document.addEventListener('keydown', (e) => {

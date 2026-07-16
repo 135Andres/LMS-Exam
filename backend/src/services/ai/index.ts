@@ -82,6 +82,7 @@ export async function generateFromAI(
         apiKey: options?.apiKey,
         baseUrl: options?.baseUrl,
         max_tokens: options?.max_tokens,
+        history: options?.history,
       });
 
       if (onAbort && options?.signal) options.signal.removeEventListener('abort', onAbort);
@@ -133,6 +134,7 @@ export async function generateFromAI(
               apiKey: options?.apiKey,
               baseUrl: options?.baseUrl,
               max_tokens: options?.max_tokens,
+              history: options?.history,
             });
           } catch (fallbackErr) {
             throw new AiRetryError(RETRY_TEMPERATURES.length, (fallbackErr as Error).message);

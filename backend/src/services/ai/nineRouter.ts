@@ -8,11 +8,14 @@ export interface NineRouterOptions {
   apiKey?: string;
   baseUrl?: string;
   max_tokens?: number;
+  history?: NineRouterMessage[];
 }
 
 export type StreamChunk = {
-  type: 'reasoning' | 'content';
+  type: 'reasoning' | 'content' | 'done';
   content: string;
+  msgId?: string;
+  userMsgId?: string;
 };
 
 const EMBEDDINGS_BASE_URL = 'https://integrate.api.nvidia.com/v1';
@@ -25,7 +28,7 @@ export {
   EMBEDDINGS_MODEL,
 };
 
-interface NineRouterMessage {
+export interface NineRouterMessage {
   role: string;
   content: string | Array<Record<string, unknown>>;
 }
@@ -115,6 +118,7 @@ export async function callNineRouterStream(
     model,
     messages: [
       { role: 'system', content: systemPrompt },
+      ...(options?.history || []),
       { role: 'user', content: userContent },
     ] as NineRouterMessage[],
     max_tokens: options?.max_tokens ?? 4096,
@@ -164,6 +168,7 @@ export async function callNineRouter(
     model,
     messages: [
       { role: 'system', content: systemPrompt },
+      ...(options?.history || []),
       { role: 'user', content: userContent },
     ] as NineRouterMessage[],
     max_tokens: options?.max_tokens ?? 4096,

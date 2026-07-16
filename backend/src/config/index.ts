@@ -27,7 +27,7 @@ export const config = {
   models: {
     generate: process.env.GENERATE_MODEL || 'nvidia/minimaxai/minimax-m3',
     polish: process.env.POLISH_MODEL || 'nvidia/minimaxai/minimax-m3',
-    chat: process.env.CHAT_MODEL || 'ag/gemini-3-flash',
+    chat: process.env.CHAT_MODEL || 'oc/deepseek-v4-flash-free',
     // Validador batch de la KB colectiva.
     kbValidator: process.env.KB_VALIDATOR_MODEL || 'oc/deepseek-v4-flash-free',
     // Análisis nocturno de progreso (insights.service.ts).

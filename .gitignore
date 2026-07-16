@@ -26,6 +26,8 @@ backend-python/whitelist.json
 backend/src/data/reports.json
 # Perfiles de usuario generados por IA
 backend/data/profiles/
+# Resúmenes de conversación (compactador de contexto)
+backend/data/session-summaries/
 
 #  LOGS
 logs/

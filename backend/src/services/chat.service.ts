@@ -33,8 +33,17 @@ export async function sendChatMessageStream(
   attachments: Attachment[] | undefined,
   userId: string,
   sessionId: string,
-): Promise<AsyncGenerator<{ type: string; content: string }>> {
+): Promise<AsyncGenerator<{ type: string; content: string; msgId?: string; userMsgId?: string }>> {
   return streamingService.execute(message, modelId, attachments, userId, sessionId);
+}
+
+export async function regenerateChatMessageStream(
+  sessionId: string,
+  modelId: string | undefined,
+  userId: string,
+  instruction: string | undefined,
+): Promise<AsyncGenerator<{ type: string; content: string; msgId?: string; userMsgId?: string }>> {
+  return streamingService.regenerate(sessionId, modelId, userId, instruction);
 }
 
 export async function sendChatMessage(

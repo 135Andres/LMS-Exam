@@ -77,7 +77,6 @@ body {
   font-size: 1.05rem;
   font-weight: 700;
   color: #1a1a1a;
-  cursor: pointer;
   white-space: nowrap;
 }
 
@@ -272,6 +271,95 @@ body {
   position: relative;
 }
 
+/* ── Cronómetro (arriba del bloque de usuario en la sidebar) ── */
+.stopwatch-widget {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height 280ms ease, opacity 220ms ease, margin-bottom 280ms ease;
+}
+
+.stopwatch-widget.visible {
+  max-height: 90px;
+  opacity: 1;
+  margin-bottom: 0.6rem;
+}
+
+.stopwatch-display {
+  font-family: 'Space Mono', monospace;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  padding: 0.4rem 0;
+  cursor: default;
+}
+
+/* Modo edición (botón "Contador"): texto plano editable, sin bordes/caja de
+   input — solo un cursor de texto para escribir el tiempo de arranque. */
+.stopwatch-display[contenteditable="true"] {
+  outline: none;
+  cursor: text;
+  color: #6c5ce7;
+}
+
+.stopwatch-btn-row {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.35rem;
+  max-height: 40px;
+  overflow: hidden;
+  transition: opacity 200ms ease, max-height 250ms ease, margin-top 200ms ease;
+  opacity: 1;
+}
+
+.stopwatch-btn {
+  border: none;
+  background: rgba(0, 0, 0, 0.06);
+  color: #1a1a1a;
+  font-family: 'Space Mono', monospace;
+  font-size: 0.72rem;
+  padding: 0.4rem 0.7rem;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.stopwatch-btn:hover {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.stopwatch-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* Corriendo: la fila de botones colapsa, el display se recorre hacia el
+   centro/abajo para aprovechar el espacio liberado (reflow natural de
+   flexbox mientras la fila encoge — no hace falta animar el display). */
+.stopwatch-widget.running .stopwatch-btn-row {
+  opacity: 0;
+  pointer-events: none;
+  max-height: 0;
+  margin-top: 0;
+}
+
+/* Hover sobre el widget corriendo: el botón activo reaparece, empujando el
+   cronómetro de vuelta hacia arriba. */
+.stopwatch-widget.running:hover .stopwatch-btn-row {
+  opacity: 1;
+  pointer-events: auto;
+  max-height: 40px;
+  margin-top: 0.35rem;
+}
+
+.stopwatch-widget.running #stopwatchCountdownBtn {
+  display: none;
+}
+
 .sidebar-user-info {
   display: flex;
   align-items: center;
@@ -390,8 +478,7 @@ body {
 }
 
 .sidebar.open ~ .page-content .top-bar-title {
-  opacity: 0;
-  pointer-events: none;
+  display: none;
 }
 
 .hero {
@@ -464,19 +551,70 @@ body {
   right: 420px;
 }
 
-.top-bar-title {
-  cursor: pointer;
-}
-
 .top-bar-left {
   display: flex;
   align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
 }
 
 .top-bar-title {
   font-size: 1rem;
   font-weight: 700;
   color: #1a1a1a;
+  flex-shrink: 0;
+}
+
+/* ── Título del chat activo (junto al logo decorativo) ── */
+.top-bar-chat-title {
+  font-size: 0.9rem;
+  color: rgba(0, 0, 0, 0.75);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.top-bar-chat-title:has(.top-bar-chat-title-text:not(:empty))::before {
+  content: '/';
+  margin-right: 0.6rem;
+  color: rgba(0, 0, 0, 0.2);
+}
+
+/* Sidebar abierta: el logo decorativo ya se desvanece (ver .top-bar-title
+   arriba) — el "/" quedaría apuntando a texto invisible, así que se quita. */
+.sidebar.open ~ .page-content .top-bar-chat-title::before {
+  content: none;
+}
+
+/* En mobile la sidebar cubre toda la pantalla (100vw) al abrirse — el
+   título del chat no tiene espacio ni sentido visible ahí, se oculta. */
+@media (max-width: 768px) {
+  .sidebar.open ~ .page-content .top-bar-chat-title {
+    display: none;
+  }
+}
+
+.top-bar-chat-title-input {
+  font-size: 0.9rem;
+  color: #1a1a1a;
+  background: #fff;
+  border: 1.5px solid #8b9aff;
+  border-radius: 6px;
+  padding: 2px 8px;
+  outline: none;
+  min-width: 120px;
+  max-width: 260px;
+  font-family: inherit;
+}
+
+.top-bar-chat-title-text {
+  cursor: pointer;
+}
+
+.top-bar-chat-title-text.hidden,
+.top-bar-chat-title-input.hidden {
+  display: none;
 }
 
 .top-bar-right {
@@ -578,58 +716,15 @@ body {
   right: 420px;
 }
 
-/* Entrada del bottom-bar en welcome.html (hub): sube desde abajo y, una vez
-   que llega, sus links (Dashboard/Chat) aparecen en cascada. Clases exclusivas
-   de welcome.js — chat.html nunca las agrega, así que su propio bottom-bar
-   (input de chat) no se ve afectado. */
-.bottom-bar.slide-up {
-  transform: translateY(100%);
-  opacity: 0;
-  transition: transform 500ms cubic-bezier(0.22, 1, 0.36, 1), opacity 400ms ease;
-}
-
-.bottom-bar.slide-up.in {
-  transform: translateY(0);
-  opacity: 1;
-}
-
-.bottom-bar.slide-up .nav-link {
-  opacity: 0;
-  transform: translateY(8px);
-  transition: opacity 350ms ease, transform 350ms ease;
-}
-
-.bottom-bar.slide-up.in .nav-link {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-.bottom-bar.slide-up.in .nav-link:nth-child(1) { transition-delay: 500ms; }
-.bottom-bar.slide-up.in .nav-link:nth-child(2) { transition-delay: 580ms; }
-
-.nav-link {
-  color: #1a1a1a;
-  font-size: 1.1rem;
-  text-decoration: none;
-  padding: 0.6rem 1.4rem;
-  border-radius: 8px;
-  transition: background 150ms ease, opacity 150ms ease;
-}
-
-.nav-link:hover {
-  background: rgba(0, 0, 0, 0.05);
-}
-
-.nav-link:first-child {
-  margin-right: 0.5rem;
-}
-
-.cursor-blink {
-  animation: blink 1s step-end infinite;
-}
-
-@keyframes blink {
-  50% { opacity: 0; }
+/* ── Clon del input que "viaja" del hero al input real del chat (morph) ── */
+.ask-morph-clone {
+  position: fixed;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 18px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06), 0 8px 32px rgba(0, 0, 0, 0.12);
+  z-index: 200;
+  pointer-events: none;
 }
 
 /* ── Chat Input (inside bottom bar, overflows upward) ── */
@@ -640,6 +735,116 @@ body {
   display: flex;
   align-items: flex-end;
   gap: 0.5rem;
+  position: relative;
+}
+
+/* ── Menú de comandos slash (tipo Claude Code CLI) ── */
+.slash-menu {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  width: 100%;
+  max-width: 360px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 10px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.14);
+  padding: 0.3rem;
+  z-index: 50;
+}
+
+.slash-menu.hidden {
+  display: none;
+}
+
+.slash-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.slash-item.active {
+  background: rgba(108, 92, 231, 0.08);
+}
+
+.slash-item-cmd {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.slash-item-desc {
+  font-size: 0.7rem;
+  color: rgba(0, 0, 0, 0.5);
+}
+
+/* ── División delgada entre secciones del chat (ej. "Sesión compactada") ── */
+.session-divider {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  max-width: 780px;
+  gap: 0.6rem;
+  margin: 0.5rem 0;
+  font-size: 0.68rem;
+  color: rgba(0, 0, 0, 0.35);
+  font-family: 'Space Mono', monospace;
+}
+
+.session-divider::before,
+.session-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: rgba(0, 0, 0, 0.08);
+}
+
+/* ── Mensaje de sistema (NO es respuesta de la IA — /help, etc.) ── */
+.msg-row.msg-system {
+  align-items: center;
+}
+
+.bubble-system {
+  background: rgba(0, 0, 0, 0.035);
+  border: 1px dashed rgba(0, 0, 0, 0.18);
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  font-family: 'Space Mono', monospace;
+  font-size: 0.75rem;
+  color: rgba(0, 0, 0, 0.65);
+  max-width: 90%;
+}
+
+.sys-help-title {
+  font-weight: 700;
+  color: #1a1a1a;
+  margin-bottom: 0.5rem;
+  font-size: 0.8rem;
+}
+
+.sys-cmd-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.3rem 0;
+  border-top: 1px dashed rgba(0, 0, 0, 0.1);
+}
+
+.sys-cmd-row:first-of-type {
+  border-top: none;
+}
+
+.sys-cmd-name {
+  font-weight: 700;
+  color: #6c5ce7;
+}
+
+.sys-cmd-desc {
+  color: rgba(0, 0, 0, 0.55);
 }
 
 .chat-input-inner {
@@ -773,12 +978,9 @@ body {
 }
 
 #sendBtn {
-  background: #1a1a1a;
+  background: #8b9aff;
   border: none;
   color: #fff;
-  font-family: 'Space Mono', monospace;
-  font-size: 1.1rem;
-  line-height: 1;
   cursor: pointer;
   padding: 0;
   width: 32px;
@@ -792,7 +994,7 @@ body {
 }
 
 #sendBtn:hover {
-  background: #333;
+  background: #7788ee;
   transform: scale(1.05);
 }
 
@@ -979,6 +1181,178 @@ body {
   color: rgba(108, 92, 231, 0.9);
 }
 
+/* ── Modo re-explicar (arriba del textarea — inverso de modo enlace) ── */
+.reexplicar-bar {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.4rem 0.5rem;
+  background: rgba(108, 92, 231, 0.08);
+  border: 1px solid rgba(108, 92, 231, 0.25);
+  border-radius: 8px;
+  flex-shrink: 0;
+  order: -1;
+}
+
+.reexplicar-bar.hidden {
+  display: none;
+}
+
+.reexplicar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.reexplicar-header span {
+  font-size: 0.72rem;
+  color: rgba(108, 92, 231, 0.9);
+  font-family: 'Space Mono', monospace;
+}
+
+.reexplicar-close {
+  background: none;
+  border: none;
+  color: rgba(108, 92, 231, 0.5);
+  cursor: pointer;
+  font-size: 0.8rem;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: color 150ms ease, background 150ms ease;
+}
+
+.reexplicar-close:hover {
+  color: rgba(108, 92, 231, 1);
+  background: rgba(108, 92, 231, 0.12);
+}
+
+.reexplicar-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.reexplicar-chip {
+  background: rgba(108, 92, 231, 0.06);
+  border: 1px solid rgba(108, 92, 231, 0.15);
+  border-radius: 6px;
+  padding: 0.25rem 0.55rem;
+  font-size: 0.68rem;
+  font-family: 'Space Mono', monospace;
+  color: rgba(0, 0, 0, 0.65);
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+
+.reexplicar-chip:hover {
+  background: rgba(108, 92, 231, 0.14);
+  border-color: rgba(108, 92, 231, 0.35);
+}
+
+/* Glow morado en el input mientras el modo re-explicar está activo. */
+.chat-input-wrapper.reexplicar-active .chat-input-inner {
+  border-color: #6c5ce7;
+  box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.18);
+}
+
+/* ── Popup de confirmación genérico ("¿Quieres cambiar el enfoque?") ── */
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.confirm-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 1.5rem;
+  width: 90%;
+  max-width: 320px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.2);
+  text-align: center;
+}
+
+.confirm-question {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin-bottom: 1.1rem;
+  font-family: 'Space Mono', monospace;
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.confirm-btn {
+  flex: 1;
+  padding: 0.6rem;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  font-family: 'Space Mono', monospace;
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: background 150ms ease, transform 100ms ease;
+}
+
+.confirm-btn-secondary {
+  background: rgba(0, 0, 0, 0.06);
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.confirm-btn-secondary:hover {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.confirm-btn-primary {
+  background: #6c5ce7;
+  color: #fff;
+}
+
+.confirm-btn-primary:hover {
+  background: #5b4bd4;
+  transform: translateY(-1px);
+}
+
+/* ── Hero embebido en chat.html (reemplaza a welcome.html) — visible solo
+   cuando la sesión está vacía, se muestra en vez del saludo de bienvenida. ── */
+.hero-view {
+  display: none;
+  position: absolute;
+  top: 72px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  padding: 2rem;
+}
+
+.page-content.hero-active #heroView {
+  display: flex;
+}
+
+.page-content.hero-active #chatMessages,
+.page-content.hero-active #bottomBar {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .chat-messages {
   position: absolute;
   top: 72px;
@@ -990,6 +1364,7 @@ body {
   padding: 1.25rem 2rem;
   display: flex;
   flex-direction: column-reverse;
+  align-items: center;
   justify-content: flex-start;
   gap: 0.35rem;
   opacity: 0;
@@ -1103,8 +1478,7 @@ body.exam-mode #showArchivedBtn {
 
 /* ── Thinking / Reasoning section ── */
 .thinking-row {
-  align-self: flex-start;
-  max-width: 82%;
+  align-items: flex-start;
   margin-bottom: 0.3rem;
 }
 
@@ -1337,6 +1711,7 @@ body.exam-mode #showArchivedBtn {
   display: flex;
   flex-direction: column;
   width: 100%;
+  max-width: 780px;
   margin-bottom: 0.6rem;
 }
 
@@ -1774,6 +2149,74 @@ body.exam-mode #showArchivedBtn {
   color: #60a5fa;
 }
 
+/* ── Notas rápidas (mensajes fijados) — panel de sesión ── */
+.pinned-messages-section {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 1rem 1.25rem;
+  flex-shrink: 0;
+}
+
+.pinned-messages-section summary {
+  cursor: pointer;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.7);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  list-style: none;
+}
+
+.pinned-messages-section summary::-webkit-details-marker {
+  display: none;
+}
+
+.pinned-messages-section summary::before {
+  content: '▸';
+  display: inline-block;
+  margin-right: 0.4rem;
+  transition: transform 150ms ease;
+}
+
+.pinned-messages-section[open] summary::before {
+  transform: rotate(90deg);
+}
+
+.pinned-messages-section #pinnedMessagesCount {
+  color: rgba(255, 255, 255, 0.4);
+  font-weight: 400;
+}
+
+.pinned-messages-section .raw-messages-list {
+  margin-top: 0.6rem;
+}
+
+.pinned-message-item {
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  transition: background 120ms ease;
+  border-radius: 4px;
+  padding: 0.35rem 0.3rem;
+}
+
+.pinned-message-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.pinned-message-preview {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.65rem;
+}
+
+/* Resalte breve al saltar a un mensaje fijado desde el panel. */
+.msg-row.jump-highlight .bubble-user,
+.msg-row.jump-highlight .bubble-ai {
+  outline: 2px solid #6c5ce7;
+  outline-offset: 2px;
+  transition: outline-color 1.5s ease;
+}
+
 /* ── Registration View (no user in localStorage) ── */
 .hero-register {
   display: flex;
@@ -1813,238 +2256,183 @@ body.exam-mode #showArchivedBtn {
   stroke-linejoin: round;
 }
 
-/* ── Onboarding Ready View (circular settings button) ── */
-.hero-onboarding-ready {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
+/* ── Hero centrado (estado "ready", vía Claude Design import) ── */
+.hero-centered {
+  padding-left: 2rem;
+  padding-right: 2rem;
+  align-items: center;
+  text-align: center;
 }
 
-.onboarding-float-btn {
-  position: fixed;
-  bottom: 96px;
-  right: 24px;
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: #fff;
-  border: 2px solid rgba(0, 0, 0, 0.08);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-  cursor: pointer;
+.hero-greet-row {
   display: flex;
   align-items: center;
+  gap: 0.9rem;
+  flex-wrap: wrap;
   justify-content: center;
-  z-index: 100;
-  transition: transform 200ms ease, box-shadow 200ms ease;
 }
 
-.onboarding-float-btn:hover {
-  transform: scale(1.06);
-  box-shadow: 0 6px 28px rgba(0, 0, 0, 0.15);
-}
-
-.onboarding-float-btn svg {
-  width: 22px;
-  height: 22px;
-  stroke: #1a1a1a;
-  fill: none;
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-/* ── Onboarding Popup (wizard overlay) ── */
-.onboarding-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(4px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  animation: fadeIn 200ms ease;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-.onboarding-card {
-  background: #fff;
-  border-radius: 20px;
-  width: 90%;
-  max-width: 480px;
-  padding: 0;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.2);
-  overflow: hidden;
-  font-family: 'Inter', 'Space Mono', monospace;
-}
-
-.onboarding-header {
-  padding: 1.5rem 1.5rem 0;
-}
-
-.onboarding-title {
-  font-size: 1.15rem;
-  font-weight: 700;
+.corner-dashboard-link {
+  position: absolute;
+  top: 1.5rem;
+  right: 2rem;
   color: #1a1a1a;
-  margin: 0 0 0.25rem;
-  font-family: 'Space Mono', monospace;
-}
-
-.onboarding-desc {
-  font-size: 0.8rem;
-  color: rgba(0, 0, 0, 0.5);
-  margin: 0;
-  line-height: 1.4;
-}
-
-.onboarding-dots {
-  display: flex;
-  gap: 6px;
-  padding: 1rem 1.5rem;
-}
-
-.onboarding-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.12);
-  transition: background 250ms ease, transform 250ms ease;
-}
-
-.onboarding-dot.active {
-  background: #1a1a1a;
-  transform: scale(1.25);
-}
-
-.onboarding-dot.completed {
-  background: rgba(0, 0, 0, 0.35);
-}
-
-.onboarding-body {
-  padding: 0 1.5rem 1.5rem;
-  min-height: 220px;
-}
-
-.onboarding-question {
   font-size: 0.95rem;
-  font-weight: 600;
-  color: #1a1a1a;
-  margin-bottom: 0.75rem;
-  line-height: 1.4;
-  font-family: 'Space Mono', monospace;
+  text-decoration: none;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  transition: background 150ms ease;
+  z-index: 10;
 }
 
-.onboarding-options {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
+.corner-dashboard-link:hover {
+  background: rgba(0, 0, 0, 0.05);
 }
 
-.onboarding-option {
-  display: flex;
+.name-chip {
+  display: inline-flex;
   align-items: center;
-  gap: 0.6rem;
-  padding: 0.7rem 1rem;
-  background: #f4f4f4;
-  border: 1.5px solid transparent;
-  border-radius: 10px;
-  cursor: pointer;
-  transition: background 150ms ease, border-color 150ms ease, transform 100ms ease;
-  font-size: 0.85rem;
+  gap: 0.55rem;
+  border: 1.5px dashed #22c55e;
+  border-radius: 14px;
+  padding: 0.5rem 0.9rem;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  opacity: 0;
+  transition: opacity 0.6s ease, border-color 350ms ease, background 350ms ease,
+    box-shadow 350ms ease, padding 350ms ease;
+}
+
+.name-chip.chip-in {
+  opacity: 1;
+}
+
+.name-chip.hidden {
+  display: none;
+}
+
+/* Al guardar un nombre — border-width/estilo se mantienen (solo cambia el
+   color a transparente) para que no salte de tamaño, todo interpola parejo. */
+.name-chip.has-name {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  padding: 0.5rem 0;
+}
+
+.name-chip.has-name .name-chip-btn,
+.name-chip.has-name .name-chip-input {
   color: #1a1a1a;
-  font-family: inherit;
+  font-size: 3.5rem;
+  font-weight: 400;
 }
 
-.onboarding-option:hover {
-  background: #ececec;
-  border-color: rgba(0, 0, 0, 0.1);
-}
-
-.onboarding-option.selected {
-  background: #e8e5ff;
-  border-color: #6c5ce7;
-}
-
-.onboarding-option-radio {
-  width: 16px;
-  height: 16px;
+.name-chip-plus {
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  border: 2px solid rgba(0, 0, 0, 0.2);
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.28);
+  color: #22c55e;
+  font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  transition: border-color 150ms ease;
+  font-size: 0.9rem;
 }
 
-.onboarding-option.selected .onboarding-option-radio {
-  border-color: #6c5ce7;
+.name-chip-plus.hidden {
+  display: none;
 }
 
-.onboarding-option-radio-inner {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #6c5ce7;
-  transform: scale(0);
-  transition: transform 150ms ease;
-}
-
-.onboarding-option.selected .onboarding-option-radio-inner {
-  transform: scale(1);
-}
-
-.onboarding-footer {
-  display: flex;
-  gap: 0.6rem;
-  padding: 1rem 1.5rem 1.5rem;
-}
-
-.onboarding-back-btn {
-  flex: 1;
-  padding: 0.65rem;
-  border-radius: 10px;
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  background: transparent;
-  color: rgba(0, 0, 0, 0.5);
-  cursor: pointer;
-  font-family: 'Space Mono', monospace;
-  font-size: 0.8rem;
-  transition: background 150ms ease, color 150ms ease;
-}
-
-.onboarding-back-btn:hover {
-  background: rgba(0, 0, 0, 0.04);
-  color: #1a1a1a;
-}
-
-.onboarding-next-btn {
-  flex: 2;
-  padding: 0.65rem;
-  border-radius: 10px;
+.name-chip-btn {
+  background: none;
   border: none;
-  background: #1a1a1a;
-  color: #fff;
   cursor: pointer;
-  font-family: 'Space Mono', monospace;
-  font-size: 0.8rem;
+  color: #22c55e;
   font-weight: 600;
-  transition: background 150ms ease, transform 100ms ease;
+  font-size: 1.6rem;
+  font-family: inherit;
+  padding: 0;
+  transition: font-size 350ms ease, color 350ms ease;
 }
 
-.onboarding-next-btn:hover {
-  background: #333;
-  transform: translateY(-1px);
+.name-chip-btn.hidden {
+  display: none;
 }
 
-.onboarding-next-btn:disabled {
-  opacity: 0.4;
-  cursor: default;
-  transform: none;
+.name-chip-input {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #22c55e;
+  font-weight: 600;
+  font-size: 1.6rem;
+  font-family: inherit;
+  padding: 0;
+  width: 10ch;
+}
+
+.name-chip-input.hidden {
+  display: none;
+}
+
+.hero-ask-bar {
+  width: 100%;
+  max-width: 620px;
+  margin-top: 2rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 18px;
+  padding: 0.5rem 0.5rem 0.5rem 1.1rem;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06), 0 8px 32px rgba(0, 0, 0, 0.12);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+.hero-ask-bar.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.hero-ask-bar:not(.hidden) {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.hero-ask-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 0.95rem;
+  font-family: inherit;
+  color: #1a1a1a;
+  padding: 0.35rem 0;
+}
+
+.hero-ask-send {
+  background: #8b9aff;
+  border: none;
+  color: #fff;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 150ms ease;
+}
+
+.hero-ask-send:hover {
+  background: #7788ee;
 }
 
 /* ── Dashboard ── */

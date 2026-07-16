@@ -86,6 +86,8 @@ export interface ChatLogRow {
   content: string;
   subject: string | null;
   tokens: number;
+  model: string | null;
+  is_pinned: number;
   created_at: string;
 }
 

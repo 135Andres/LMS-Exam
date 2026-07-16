@@ -24,6 +24,19 @@ export const EmbeddingModel = {
     })();
   },
 
+  getVectorByMessageId(messageId: string): number[] | null {
+    const db = getDb();
+    const vecRow = db.prepare(
+      'SELECT embedding FROM chat_embeddings_vec WHERE message_id = ? LIMIT 1'
+    ).get(messageId) as { embedding: Buffer } | undefined;
+    if (vecRow) return blobToVector(vecRow.embedding);
+
+    const jsonRow = db.prepare(
+      'SELECT vector_text FROM chat_embeddings WHERE message_id = ? LIMIT 1'
+    ).get(messageId) as { vector_text: string } | undefined;
+    return jsonRow ? JSON.parse(jsonRow.vector_text) : null;
+  },
+
   getUserEmbeddings(userId: string, limit = 100): Array<{ vector: number[]; content: string; messageId: string; role: string }> {
     const db = getDb();
 

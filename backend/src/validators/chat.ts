@@ -20,3 +20,13 @@ export const chatMessageSchema = z.object({
   links: z.array(z.string().url()).max(5, 'Máximo 5 enlaces').optional(),
   sessionId: uuidV4.optional(),
 });
+
+export const regenerateSchema = z.object({
+  sessionId: uuidV4,
+  modelId: z.string().optional(),
+  instruction: z.string().max(500, 'Instrucción muy larga').optional(),
+});
+
+export const summarySchema = z.object({
+  sessionId: uuidV4,
+});

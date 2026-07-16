@@ -46,14 +46,30 @@ let selectedModelId = '';
 let availableModels = [];
 let pendingAttachments = [];
 let sessionId = sessionStorage.getItem('chatSessionId') || '';
-let historyLoaded = null;
 let linkModeActive = false;
 let activeLinks = [];
+let reExplicarModeActive = false;
+let reExplicarTargetRow = null;
+
+const SLASH_COMMANDS = [
+  { primary: '/resumen', aliases: ['/resumen', '/resume'], desc: 'Fuerza un resumen de la conversación hasta ahora' },
+  { primary: '/help', aliases: ['/help', '/ayuda'], desc: 'Muestra esta lista de comandos' },
+];
+
+let slashMenuActive = false;
+let slashMenuIndex = 0;
+let slashMenuMatches = [];
+
+const REEXPLICAR_SUGGESTIONS = [
+  'con una analogía de cocina',
+  'más simple, como si tuviera 10 años',
+  'con un ejemplo de la vida diaria',
+  'con un diagrama en texto',
+];
 
 checkSession();
 
 const historyPromise = loadChatHistory().then(data => {
-  historyLoaded = data;
   if (!sessionId && data && data.sessionId) {
     sessionId = data.sessionId;
     sessionStorage.setItem('chatSessionId', sessionId);
@@ -140,7 +156,8 @@ function renderSidebarSessions(sessions) {
     if (items.length === 0) continue;
     html += `<div class="sidebar-date-group"><div class="sidebar-date-label">${label}</div>`;
     items.forEach(s => {
-      const preview = s.preview ? s.preview.slice(0, 40) + (s.preview.length > 40 ? '…' : '') : 'Chat';
+      const raw = s.title || s.preview || 'Chat';
+      const preview = raw.slice(0, 40) + (raw.length > 40 ? '…' : '');
       const isActive = s.session_id === sessionId;
       let icon = 'chatText';
       if (isActive && isGenerating) icon = 'chatMore';
@@ -162,6 +179,72 @@ function renderSidebarSessions(sessions) {
     html = `<div class="sidebar-date-group"><div class="sidebar-date-label">Sin chats aún</div></div>`;
   }
   container.innerHTML = html;
+  // La vista de archivados no refleja necesariamente la sesión activa —
+  // no toques el título del chat mientras el usuario la está navegando.
+  if (!showingArchived) updateTopBarTitle(sessions);
+}
+
+// Soporte mínimo de markdown en el título: **negrita** y *cursiva*.
+// Bold primero — si no, "**x**" se leería como dos itálicas pegadas.
+function renderTitleMarkup(raw) {
+  let html = escapeHtml(raw);
+  html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+  return html;
+}
+
+function setChatTitleRaw(raw) {
+  const textEl = document.getElementById('chatTitleText');
+  if (!textEl) return;
+  textEl.dataset.raw = raw;
+  textEl.innerHTML = renderTitleMarkup(raw);
+}
+
+// Título del chat activo en la navbar superior — usa el nombre renombrado a
+// mano si existe (cs.title), si no el "preview" (primer mensaje truncado).
+function updateTopBarTitle(sessions) {
+  const input = document.getElementById('chatTitleInput');
+  if (input && !input.classList.contains('hidden')) return; // no pisar mientras el usuario edita
+  const active = sessions.find(s => s.session_id === sessionId);
+  const raw = active?.title || active?.preview || 'Nuevo chat';
+  setChatTitleRaw(raw.length > 50 ? raw.slice(0, 50) + '…' : raw);
+}
+
+function setupChatTitleEditing() {
+  const textEl = document.getElementById('chatTitleText');
+  const input = document.getElementById('chatTitleInput');
+  if (!textEl || !input || textEl._wired) return;
+  textEl._wired = true;
+
+  function startEdit() {
+    input.value = textEl.dataset.raw || '';
+    textEl.classList.add('hidden');
+    input.classList.remove('hidden');
+    input.focus();
+    input.select();
+  }
+
+  async function saveEdit() {
+    const value = input.value.trim();
+    input.classList.add('hidden');
+    textEl.classList.remove('hidden');
+    if (!value || value === textEl.dataset.raw) return;
+    setChatTitleRaw(value);
+    try {
+      await fetch('/api/chat/rename', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin',
+        body: JSON.stringify({ sessionId, title: value }),
+      });
+    } catch {}
+    refreshSidebarSessions();
+  }
+
+  textEl.addEventListener('click', startEdit);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') input.blur();
+    if (e.key === 'Escape') { input.value = textEl.dataset.raw || ''; input.blur(); }
+  });
+  input.addEventListener('blur', saveEdit);
 }
 
 async function refreshSidebarSessions() {
@@ -178,26 +261,42 @@ async function loadSession(sid) {
   chatMessages.innerHTML = '';
   document.getElementById('contextPanel').classList.remove('open');
   document.querySelector('.page-content').classList.remove('panel-open');
-  try {
-    const res = await fetch(`/api/chat/tutor/history?session_id=${sid}&limit=100`, { credentials: 'same-origin' });
-    if (res.ok) {
-      const data = await res.json();
-      if (data.messages && data.messages.length > 0) {
-        data.messages.forEach(msg => {
-          addMessage(msg.content, msg.role === 'user' ? 'user' : 'ai');
-        });
+
+  async function renderHistoryAndFinish() {
+    try {
+      const res = await fetch(`/api/chat/tutor/history?session_id=${sid}&limit=100`, { credentials: 'same-origin' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.messages && data.messages.length > 0) {
+          data.messages.forEach(msg => {
+            addMessage(msg.content, msg.role === 'user' ? 'user' : 'ai', undefined, msg.id, !!msg.is_pinned);
+          });
+        }
       }
+    } catch {}
+    chatMessages.classList.add('open');
+    if (!sessionState.chatCreated) {
+      sessionState.chatCreated = formatTime();
     }
-  } catch {}
-  chatMessages.classList.add('open');
-  if (!sessionState.chatCreated) {
-    sessionState.chatCreated = formatTime();
+    // Mantener vista actual (archivados/normales) al abrir un chat
+    const sidebarMode = document.getElementById('sidebar')?.dataset.mode;
+    if (sidebarMode === 'archived') await fetchArchivedSessions();
+    else await refreshSidebarSessions();
+    updateSessionInfo();
   }
-  // Mantener vista actual (archivados/normales) al abrir un chat
-  const sidebarMode = document.getElementById('sidebar')?.dataset.mode;
-  if (sidebarMode === 'archived') await fetchArchivedSessions();
-  else await refreshSidebarSessions();
-  updateSessionInfo();
+
+  // Si estaba en la posición (new), seleccionar un chat del sidebar debe
+  // pasar a la posición (chat) con la misma animación que al enviar el
+  // primer mensaje — si no, los mensajes se renderizan pero quedan ocultos
+  // (hero-active pone #chatMessages en visibility:hidden).
+  if (document.getElementById('pageContent').classList.contains('hero-active')) {
+    playHeroToChatMorph(() => {
+      document.getElementById('pageContent').classList.remove('hero-active');
+      renderHistoryAndFinish();
+    });
+  } else {
+    await renderHistoryAndFinish();
+  }
 }
 
 async function archiveSession(sid) {
@@ -244,7 +343,9 @@ async function deleteSession(sid) {
       document.getElementById('chatMessages').innerHTML = '';
     }
   } catch {}
-  await refreshSidebarSessions();
+  const isArchivedView = document.getElementById('sidebar')?.dataset.mode === 'archived';
+  if (isArchivedView) fetchArchivedSessions();
+  else await refreshSidebarSessions();
 }
 
 function toggleArchivedView() {
@@ -380,6 +481,7 @@ function newChat() {
 
   sessionId = crypto.randomUUID();
   sessionStorage.setItem('chatSessionId', sessionId);
+  setChatTitleRaw('Nuevo chat');
 
   document.getElementById('chatMessages').classList.add('open');
   sessionState.chatCreated = formatTime();
@@ -387,18 +489,135 @@ function newChat() {
   updateSessionInfo();
   refreshSidebarSessions();
 }
+function formatStopwatch(totalSeconds) {
+  const pad2 = n => String(n).padStart(2, '0');
+  const totalMinutes = Math.floor(totalSeconds / 60);
+  const secs = totalSeconds % 60;
+  if (totalMinutes < 100) return `${pad2(totalMinutes)}:${pad2(secs)}`;
+  const hours = Math.floor(totalMinutes / 60);
+  const mins = totalMinutes % 60;
+  const hoursStr = hours < 10 ? String(hours) : pad2(hours);
+  return `${hoursStr}:${pad2(mins)}:${pad2(secs)}`;
+}
+
+// Acepta "MM:SS" o "H:MM:SS"/"HH:MM:SS". null si no se puede interpretar.
+function parseStopwatchInput(text) {
+  const parts = text.trim().split(':');
+  if (parts.length < 2 || parts.length > 3 || parts.some(p => !/^\d+$/.test(p.trim()))) return null;
+  const nums = parts.map(p => parseInt(p.trim(), 10));
+  if (nums.length === 2) return nums[0] * 60 + nums[1];
+  return nums[0] * 3600 + nums[1] * 60 + nums[2];
+}
+
+function setupStopwatch() {
+  const widget = document.getElementById('stopwatchWidget');
+  const display = document.getElementById('stopwatchDisplay');
+  const startBtn = document.getElementById('stopwatchStartBtn');
+  const countdownBtn = document.getElementById('stopwatchCountdownBtn');
+  let seconds = 0;
+  let mode = 'up'; // 'up' (cronómetro) | 'down' (contador)
+  let interval = null;
+
+  function render() { display.textContent = formatStopwatch(seconds); }
+
+  function tick() {
+    if (mode === 'up') {
+      seconds++;
+    } else {
+      seconds = Math.max(0, seconds - 1);
+      if (seconds === 0) { render(); stop(); return; }
+    }
+    render();
+  }
+
+  function start() {
+    widget.classList.add('running');
+    startBtn.textContent = 'Pausar';
+    interval = setInterval(tick, 1000);
+  }
+
+  function stop() {
+    clearInterval(interval);
+    interval = null;
+    widget.classList.remove('running');
+    startBtn.textContent = 'Reanudar';
+  }
+
+  startBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (interval) { stop(); return; }
+    if (seconds === 0 && mode === 'down') mode = 'up'; // contador ya llegó a 0: reinicia como cronómetro normal
+    if (mode === 'up' && seconds === 0) startBtn.textContent = 'Pausar';
+    start();
+  });
+
+  countdownBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (interval) return;
+    display.contentEditable = 'true';
+    display.focus();
+    const range = document.createRange();
+    range.selectNodeContents(display);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  });
+
+  function commitEdit() {
+    display.contentEditable = 'false';
+    const parsed = parseStopwatchInput(display.textContent);
+    if (parsed !== null && parsed > 0) {
+      seconds = parsed;
+      mode = 'down';
+      render();
+      start();
+    } else {
+      render();
+    }
+  }
+
+  function placeCaretAtEnd() {
+    const range = document.createRange();
+    range.selectNodeContents(display);
+    range.collapse(false);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+
+  // Autoformatea mientras escribe: solo dígitos, ":" cada 2 (ej. "1000" → "10:00").
+  display.addEventListener('input', () => {
+    if (display.contentEditable !== 'true') return;
+    const digits = display.textContent.replace(/\D/g, '').slice(0, 6);
+    display.textContent = digits.match(/.{1,2}/g)?.join(':') || digits;
+    placeCaretAtEnd();
+  });
+
+  display.addEventListener('keydown', (e) => {
+    if (display.contentEditable === 'true' && e.key === 'Enter') { e.preventDefault(); display.blur(); }
+  });
+  display.addEventListener('blur', () => {
+    if (display.contentEditable === 'true') commitEdit();
+  });
+}
 /* ── End Sidebar ── */
 
-// Construye el input de chat en el bottom-bar y arranca todas las interacciones
-// (adaptado de transformBottomBar en welcome.js — aquí se ejecuta al cargar la página,
-// sin la animación de borrado del hero que ya no existe en esta página)
+// Construye el input de chat en el bottom-bar y arranca todas las interacciones.
 function setupChatInput() {
   const bar = document.querySelector('.bottom-bar');
 
   bar.innerHTML = `
     <div class="chat-input-wrapper">
+      <div class="slash-menu hidden" id="slashMenu"></div>
       <div class="chat-input-inner" id="chatInputInner">
         <div class="input-resize-handle"></div>
+        <div class="reexplicar-bar hidden" id="reexplicarBar">
+          <div class="reexplicar-header">
+            <span>Modo re-explicar — escribe cómo quieres que te lo expliquen</span>
+            <button class="reexplicar-close" id="reexplicarClose" type="button">&times;</button>
+          </div>
+          <div class="reexplicar-suggestions" id="reexplicarSuggestions"></div>
+        </div>
         <textarea id="messageInput" placeholder="Message..." rows="1"></textarea>
         <div id="chatLinksList"></div>
         <div class="link-mode-bar" id="linkModeBar">
@@ -408,7 +627,7 @@ function setupChatInput() {
       </div>
       <div class="chat-input-actions" id="chatInputActions">
         <button id="plusBtn">+</button>
-        <button id="sendBtn">↑</button>
+        <button id="sendBtn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg></button>
         <div class="plus-menu" id="plusMenu">
           <button class="plus-menu-item" data-action="image">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
@@ -437,9 +656,10 @@ function setupChatInput() {
     document.getElementById('sendBtn').style.opacity = '1';
   });
 
-  openSidebar();
   populateTopBarModels(); // best-effort inmediato, no bloquea el input por la red
   modelsPromise.then(populateTopBarModels); // repuebla cuando (re)llegue de verdad
+
+  document.getElementById('reexplicarClose').addEventListener('click', () => exitReExplicarMode());
 
   const plusBtn = document.getElementById('plusBtn');
   const plusMenu = document.getElementById('plusMenu');
@@ -491,6 +711,9 @@ function setupChatInput() {
     }
     if (linkModeActive && !e.target.closest('.bottom-bar')) {
       exitLinkMode();
+    }
+    if (slashMenuActive && !e.target.closest('.chat-input-wrapper')) {
+      closeSlashMenu();
     }
   });
 
@@ -633,7 +856,40 @@ function setupChatInput() {
 
   document.getElementById('sendBtn').addEventListener('click', handleSend);
   const msgInput = document.getElementById('messageInput');
+
+  msgInput.addEventListener('input', () => updateSlashMenu(msgInput.value));
+
   msgInput.addEventListener('keydown', (e) => {
+    if (slashMenuActive) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        slashMenuIndex = (slashMenuIndex + 1) % slashMenuMatches.length;
+        renderSlashMenu();
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        slashMenuIndex = (slashMenuIndex - 1 + slashMenuMatches.length) % slashMenuMatches.length;
+        renderSlashMenu();
+        return;
+      }
+      if (e.key === 'Tab' || e.key === 'ArrowRight') {
+        e.preventDefault();
+        completeSlashCommand();
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeSlashMenu();
+        return;
+      }
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        selectSlashCommand(slashMenuMatches[slashMenuIndex]);
+        return;
+      }
+    }
+
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       if (linkModeActive) {
@@ -745,23 +1001,222 @@ function setupChatInput() {
   if (!sessionState.chatCreated) {
     sessionState.chatCreated = formatTime();
   }
-  // Renderizar historial si existe, o mensaje de bienvenida
-  if (historyLoaded && historyLoaded.messages && historyLoaded.messages.length > 0) {
-    historyLoaded.messages.forEach(msg => {
-      addMessage(msg.content, msg.role === 'user' ? 'user' : 'ai');
-    });
-    document.getElementById('chatMessages').scrollTop = 0;
-  } else {
-    addMessage('Hola, soy tu tutor. ¿En qué puedo ayudarte?', 'ai');
-  }
+  // Al entrar a la página siempre arranca en "new" (hero) — el historial de
+  // la última sesión solo se retoma si el usuario lo abre a propósito desde
+  // el sidebar (loadSession), no automáticamente al cargar/navegar aquí.
+  initHeroView();
 }
 
-function addMessage(text, sender, attachments) {
+// ── Hero (reemplaza a welcome.html) — se muestra solo si la sesión está vacía ──
+
+async function initHeroView() {
+  document.getElementById('pageContent').classList.add('hero-active');
+
+  // El hero siempre representa un chat todavía sin crear — genera un
+  // sessionId nuevo aquí (mismo patrón que newChat()) para no arrastrar el
+  // de la sesión anterior que quedó en sessionStorage.
+  sessionId = crypto.randomUUID();
+  sessionStorage.setItem('chatSessionId', sessionId);
+  setChatTitleRaw('Nuevo chat');
+
+  // El ancho final de la fila depende de si hay chip de nombre o no — hay
+  // que esperar a que ese layout esté resuelto en el DOM ANTES de revelar
+  // "Hola,". Si se revela antes, se ve centrado solo y luego salta de golpe
+  // en cuanto el chip entra al flujo (display:none → inline-flex).
+  try {
+    const res = await fetch('/api/user/profile', { credentials: 'same-origin' });
+    if (res.ok) {
+      const data = await res.json();
+      const u = data.user || data;
+      renderHeroNameChip(u.username || '');
+    }
+  } catch {}
+
+  // Fade-in escalonado: "Hola," primero, el nombre unos ms después — recién
+  // ahora, con el layout final ya en el DOM (aunque todavía en opacity:0).
+  // Doble rAF: un solo rAF puede caer en el mismo frame que ese render y el
+  // navegador nunca pinta el estado de partida, la transición no se vería.
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      document.getElementById('heroLine1')?.classList.add('visible');
+    });
+  });
+
+  const heroInput = document.getElementById('heroAskInput');
+  const heroSend = document.getElementById('heroAskSend');
+  heroSend.addEventListener('click', submitHeroAsk);
+  heroInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') submitHeroAsk(); });
+  heroInput.focus();
+}
+
+function renderHeroNameChip(initialName) {
+  const chip = document.getElementById('nameChip');
+  const btn = document.getElementById('nameChipBtn');
+  const input = document.getElementById('nameChipInput');
+  const plus = document.getElementById('nameChipPlus');
+  if (!chip) return;
+
+  let name = initialName || '';
+  btn.textContent = name || 'Agregar nombre';
+  chip.classList.remove('hidden');
+  chip.classList.toggle('has-name', !!name);
+  plus.classList.toggle('hidden', !!name);
+  // Aparece un poco después que "Hola," (fade-in escalonado).
+  chip.classList.remove('chip-in');
+  setTimeout(() => chip.classList.add('chip-in'), 250);
+
+  // Ancho del texto ya escrito, para hacer crecer el input al tipear.
+  function measureTextWidth(text) {
+    const canvas = measureTextWidth._canvas || (measureTextWidth._canvas = document.createElement('canvas'));
+    const ctx = canvas.getContext('2d');
+    ctx.font = getComputedStyle(input).font;
+    return ctx.measureText(text || ' ').width;
+  }
+
+  function growToFitContent() {
+    const width = measureTextWidth(input.value) + 24; // + padding/cursor breathing room
+    input.style.width = Math.max(width, input._baseWidth) + 'px';
+  }
+
+  function startEditing() {
+    input.value = name;
+    const rect = btn.getBoundingClientRect();
+    // El input pasa a position:fixed anclado al lugar exacto del botón —
+    // así crece solo hacia la derecha (sin límite) sin mover nada verticalmente.
+    // Pero eso lo saca del flujo del chip — sin fijar el ancho del chip,
+    // "Hola," se recentraba al perder ese espacio reservado.
+    chip.style.width = chip.getBoundingClientRect().width + 'px';
+    input._baseWidth = rect.width;
+    input.style.position = 'fixed';
+    input.style.left = rect.left + 'px';
+    input.style.top = rect.top + 'px';
+    input.style.width = rect.width + 'px';
+    btn.classList.add('hidden');
+    input.classList.remove('hidden');
+    input.focus();
+    growToFitContent();
+  }
+
+  async function saveName() {
+    const value = input.value.trim();
+    input.classList.add('hidden');
+    input.style.position = '';
+    input.style.left = '';
+    input.style.top = '';
+    input.style.width = '';
+    chip.style.width = '';
+    btn.classList.remove('hidden');
+    if (!value || value === name) return;
+    name = value;
+    btn.textContent = name;
+    chip.classList.add('has-name');
+    plus.classList.add('hidden');
+    try {
+      await fetch('/api/user/username', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ username: name }),
+      });
+    } catch {}
+  }
+
+  btn.addEventListener('click', startEditing);
+  input.addEventListener('input', growToFitContent);
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); });
+  input.addEventListener('blur', saveName);
+}
+
+function submitHeroAsk() {
+  const heroInput = document.getElementById('heroAskInput');
+  const text = heroInput.value.trim();
+  playHeroToChatMorph(() => {
+    document.getElementById('pageContent').classList.remove('hero-active');
+    document.getElementById('chatMessages').classList.add('open');
+    if (text) {
+      const msgInput = document.getElementById('messageInput');
+      msgInput.value = text;
+      handleSend();
+    } else {
+      addMessage('Hola, soy tu tutor. ¿En qué puedo ayudarte?', 'ai');
+    }
+  });
+}
+
+// Anima el input del hero "viajando" hasta la posición real del input del
+// chat — todo dentro de la misma página (sin recarga, a diferencia de la
+// versión anterior que usaba sessionStorage para cruzar welcome.html → chat.html).
+const MORPH_MS = 500;
+const MORPH_EASE = 'cubic-bezier(0.22, 1, 0.36, 1)';
+
+function playHeroToChatMorph(onComplete) {
+  const heroBar = document.getElementById('heroAskBar');
+  const heroView = document.getElementById('heroView');
+  const wrapper = document.querySelector('.chat-input-wrapper');
+  const bottomBar = document.getElementById('bottomBar');
+  if (!heroBar || !wrapper) { onComplete(); return; }
+
+  // Medir posiciones reales ANTES de tocar el bottom-bar (visibility:hidden
+  // no altera el layout, así que toRect ya es su posición natural final).
+  const fromRect = heroBar.getBoundingClientRect();
+  const toRect = wrapper.getBoundingClientRect();
+
+  heroView.style.transition = 'opacity 250ms ease';
+  heroView.style.opacity = '0';
+
+  // El navbar inferior arranca oculto debajo de la pantalla y sube en sync
+  // con el clon, para que ambos lleguen a su posición final al mismo tiempo.
+  if (bottomBar) {
+    bottomBar.style.transition = 'none';
+    bottomBar.style.visibility = 'visible';
+    bottomBar.style.pointerEvents = 'none';
+    bottomBar.style.transform = 'translateY(100%)';
+    void bottomBar.offsetHeight; // fuerza reflow antes de animar
+    bottomBar.style.transition = `transform ${MORPH_MS}ms ${MORPH_EASE}`;
+  }
+
+  const clone = document.createElement('div');
+  clone.className = 'ask-morph-clone';
+  clone.style.top = `${fromRect.top}px`;
+  clone.style.left = `${fromRect.left}px`;
+  clone.style.width = `${fromRect.width}px`;
+  clone.style.height = `${fromRect.height}px`;
+  document.body.appendChild(clone);
+
+  void clone.offsetHeight; // fuerza reflow antes de animar
+  clone.style.transition = `top ${MORPH_MS}ms ${MORPH_EASE}, left ${MORPH_MS}ms ${MORPH_EASE}, width ${MORPH_MS}ms ${MORPH_EASE}, height ${MORPH_MS}ms ${MORPH_EASE}, opacity 250ms ease 300ms`;
+  requestAnimationFrame(() => {
+    clone.style.top = `${toRect.top}px`;
+    clone.style.left = `${toRect.left}px`;
+    clone.style.width = `${toRect.width}px`;
+    clone.style.height = `${toRect.height}px`;
+    clone.style.opacity = '0';
+    if (bottomBar) bottomBar.style.transform = 'translateY(0)';
+  });
+
+  clone.addEventListener('transitionend', function onDone(e) {
+    if (e.propertyName !== 'opacity') return;
+    clone.removeEventListener('transitionend', onDone);
+    clone.remove();
+    heroView.style.display = 'none';
+    if (bottomBar) {
+      bottomBar.style.transform = '';
+      bottomBar.style.transition = '';
+      bottomBar.style.visibility = '';
+      bottomBar.style.pointerEvents = '';
+    }
+    onComplete();
+  });
+}
+
+function addMessage(text, sender, attachments, msgId, isPinned) {
   const chatMessages = document.getElementById('chatMessages');
 
   const msgRow = document.createElement('div');
   msgRow.className = `msg-row msg-${sender}`;
   msgRow.dataset.sender = sender;
+  if (msgId) msgRow.dataset.msgId = msgId;
+  if (isPinned) msgRow.dataset.pinned = 'true';
 
   // Attachments above the bubble (outside)
   if (attachments && attachments.length > 0) {
@@ -822,6 +1277,13 @@ function addMessage(text, sender, attachments) {
   copyBtn.addEventListener('click', () => handleCopy(text, copyBtn));
   actions.appendChild(copyBtn);
 
+  const pinBtn = document.createElement('button');
+  pinBtn.className = 'msg-action';
+  pinBtn.title = isPinned ? 'Quitar de fijados' : 'Fijar mensaje';
+  pinBtn.innerHTML = svgIcon(isPinned ? 'pinFilled' : 'pin');
+  pinBtn.addEventListener('click', () => togglePinMessage(msgRow, pinBtn));
+  actions.appendChild(pinBtn);
+
   if (sender === 'user') {
     const editBtn = document.createElement('button');
     editBtn.className = 'msg-action';
@@ -844,6 +1306,13 @@ function addMessage(text, sender, attachments) {
     reportBtn.dataset.reported = 'false';
     reportBtn.addEventListener('click', () => handleReport(text, msgRow, reportBtn));
     actions.appendChild(reportBtn);
+
+    const reexplainBtn = document.createElement('button');
+    reexplainBtn.className = 'msg-action';
+    reexplainBtn.title = 'Explícamelo diferente';
+    reexplainBtn.innerHTML = svgIcon('retry');
+    reexplainBtn.addEventListener('click', () => openReExplicarConfirm(msgRow));
+    actions.appendChild(reexplainBtn);
   }
 
   footer.appendChild(timeSpan);
@@ -874,19 +1343,24 @@ function addMessage(text, sender, attachments) {
 
 function showTyping() {
   const chatMessages = document.getElementById('chatMessages');
+  // Envuelto en .msg-row.msg-ai (mismo patrón que las burbujas reales) para
+  // heredar el ancho centrado de 780px en vez de pegarse al borde izquierdo.
+  const row = document.createElement('div');
+  row.className = 'msg-row msg-ai';
+  row.id = 'typingIndicator';
   const typing = document.createElement('div');
   typing.className = 'typing-indicator';
-  typing.id = 'typingIndicator';
   typing.innerHTML = '<span></span><span></span><span></span>';
-  typing.style.opacity = '0';
-  typing.style.transform = 'translateY(8px)';
-  typing.style.transition = 'opacity 250ms ease, transform 250ms ease';
-  chatMessages.prepend(typing);
+  row.appendChild(typing);
+  row.style.opacity = '0';
+  row.style.transform = 'translateY(8px)';
+  row.style.transition = 'opacity 250ms ease, transform 250ms ease';
+  chatMessages.prepend(row);
 
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
-      typing.style.opacity = '1';
-      typing.style.transform = 'translateY(0)';
+      row.style.opacity = '1';
+      row.style.transform = 'translateY(0)';
     });
   });
 
@@ -1049,30 +1523,456 @@ function handleEdit(msgRow) {
 }
 
 function handleRetry(msgRow) {
-  const isUser = msgRow.dataset.sender === 'user';
-  if (isUser) {
-    const bubble = msgRow.querySelector('.bubble-user');
-    if (!bubble) return;
-    const textDiv = bubble.querySelector('.bubble-text');
-    if (!textDiv) return;
-    const text = textDiv.textContent;
-    msgRow.remove();
-    document.getElementById('messageInput').value = text;
-    handleSend();
-  } else {
-    const chatMessages = document.getElementById('chatMessages');
-    const userRows = chatMessages.querySelectorAll('.msg-row.msg-user');
-    if (userRows.length === 0) return;
-    const lastUserRow = userRows[0];
-    const bubble = lastUserRow.querySelector('.bubble-user');
-    if (!bubble) return;
-    const textDiv = bubble.querySelector('.bubble-text');
-    if (!textDiv) return;
-    const text = textDiv.textContent;
-    msgRow.remove();
-    document.getElementById('messageInput').value = text;
-    handleSend();
+  const bubble = msgRow.querySelector('.bubble-user');
+  if (!bubble) return;
+  const textDiv = bubble.querySelector('.bubble-text');
+  if (!textDiv) return;
+  const text = textDiv.textContent;
+  msgRow.remove();
+  document.getElementById('messageInput').value = text;
+  handleSend();
+}
+
+// ── Menú de comandos slash (tipo Claude Code CLI) ──
+
+function updateSlashMenu(text) {
+  const menu = document.getElementById('slashMenu');
+  if (!menu) return;
+  if (!text.startsWith('/') || text.includes(' ')) { closeSlashMenu(); return; }
+  const lower = text.toLowerCase();
+  slashMenuMatches = SLASH_COMMANDS.filter(c => c.aliases.some(a => a.startsWith(lower)));
+  if (slashMenuMatches.length === 0) { closeSlashMenu(); return; }
+  slashMenuActive = true;
+  slashMenuIndex = Math.min(slashMenuIndex, slashMenuMatches.length - 1);
+  renderSlashMenu();
+  menu.classList.remove('hidden');
+}
+
+function renderSlashMenu() {
+  const menu = document.getElementById('slashMenu');
+  if (!menu) return;
+  menu.innerHTML = slashMenuMatches.map((c, i) => `
+    <div class="slash-item ${i === slashMenuIndex ? 'active' : ''}" data-index="${i}">
+      <span class="slash-item-cmd">${c.primary}</span>
+      <span class="slash-item-desc">${escapeHtml(c.desc)}</span>
+    </div>
+  `).join('');
+  menu.querySelectorAll('.slash-item').forEach(el => {
+    el.addEventListener('mouseenter', () => {
+      slashMenuIndex = parseInt(el.dataset.index, 10);
+      renderSlashMenu();
+    });
+    el.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      selectSlashCommand(slashMenuMatches[parseInt(el.dataset.index, 10)]);
+    });
+  });
+}
+
+function closeSlashMenu() {
+  slashMenuActive = false;
+  slashMenuMatches = [];
+  slashMenuIndex = 0;
+  const menu = document.getElementById('slashMenu');
+  if (menu) menu.classList.add('hidden');
+}
+
+function completeSlashCommand() {
+  if (!slashMenuActive) return;
+  const input = document.getElementById('messageInput');
+  const cmd = slashMenuMatches[slashMenuIndex];
+  input.value = cmd.primary;
+  updateSlashMenu(input.value);
+}
+
+function selectSlashCommand(cmd) {
+  const input = document.getElementById('messageInput');
+  input.value = '';
+  closeSlashMenu();
+  executeSlashCommand(cmd.primary);
+}
+
+function executeSlashCommand(primary) {
+  if (primary === '/help') { showHelpMessage(); return; }
+  if (primary === '/resumen') { runSummaryCommand(); return; }
+}
+
+function showHelpMessage() {
+  const rows = SLASH_COMMANDS.map(c =>
+    `<div class="sys-cmd-row"><span class="sys-cmd-name">${c.aliases.join(', ')}</span><span class="sys-cmd-desc">${escapeHtml(c.desc)}</span></div>`
+  ).join('');
+  addSystemMessage(`<div class="sys-help-title">Comandos disponibles</div>${rows}`);
+}
+
+// Mensaje de sistema: NO es respuesta de la IA (sin botones de copiar/reportar,
+// formato visual distinto — recuadro punteado, monoespaciado).
+function addSystemMessage(html) {
+  const chatMessages = document.getElementById('chatMessages');
+  const row = document.createElement('div');
+  row.className = 'msg-row msg-system';
+  row.innerHTML = `<div class="bubble-system">${html}</div>`;
+  row.style.opacity = '0';
+  row.style.transform = 'translateY(8px)';
+  row.style.transition = 'opacity 250ms ease, transform 250ms ease';
+  chatMessages.prepend(row);
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    row.style.opacity = '1';
+    row.style.transform = 'translateY(0)';
+  }));
+  chatMessages.scrollTop = 0;
+}
+
+// Al terminar un stream, el turno del usuario que lo disparó no tenía id todavía
+// (se generó server-side) — se lo asignamos al primer .msg-user (el más
+// reciente, por el patrón prepend) para que se pueda fijar sin recargar.
+function setLastUserMsgId(id) {
+  if (!id) return;
+  const row = document.querySelector('.msg-row.msg-user');
+  if (row && !row.dataset.msgId) row.dataset.msgId = id;
+}
+
+// ── Notas rápidas (fijar mensajes) ──
+
+async function togglePinMessage(msgRow, btn) {
+  const msgId = msgRow.dataset.msgId;
+  if (!msgId) return;
+  const pinned = msgRow.dataset.pinned === 'true';
+  try {
+    await fetch(`/api/chat/${pinned ? 'unpin' : 'pin'}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ messageId: msgId }),
+    });
+    msgRow.dataset.pinned = pinned ? 'false' : 'true';
+    btn.innerHTML = svgIcon(pinned ? 'pin' : 'pinFilled');
+    btn.title = pinned ? 'Fijar mensaje' : 'Quitar de fijados';
+    if (document.getElementById('contextPanel')?.classList.contains('open')) {
+      fetchPinnedMessages().then(renderPinnedSection);
+    }
+  } catch {}
+}
+
+async function fetchPinnedMessages() {
+  try {
+    const res = await fetch('/api/chat/pinned', { credentials: 'same-origin' });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.messages || [];
+  } catch {
+    return [];
   }
+}
+
+function renderPinnedSection(pinned) {
+  const list = document.getElementById('pinnedMessagesList');
+  const countEl = document.getElementById('pinnedMessagesCount');
+  if (!list) return;
+  if (countEl) countEl.textContent = pinned.length;
+
+  if (pinned.length === 0) {
+    list.innerHTML = '<div class="raw-message-item">Todavía no has fijado ningún mensaje.</div>';
+    return;
+  }
+
+  list.innerHTML = pinned.map(m => `
+    <div class="raw-message-item pinned-message-item" data-msg-id="${m.id}" data-session-id="${m.session_id}">
+      <span class="raw-message-role ${m.role}">${m.role === 'user' ? 'Tú' : 'Tutor'}</span>
+      <span class="pinned-message-preview">${escapeHtml(m.content.slice(0, 90))}${m.content.length > 90 ? '…' : ''}</span>
+    </div>
+  `).join('');
+
+  list.querySelectorAll('.pinned-message-item').forEach(el => {
+    el.addEventListener('click', () => jumpToPinnedMessage(el.dataset.sessionId, el.dataset.msgId));
+  });
+}
+
+async function jumpToPinnedMessage(targetSessionId, targetMsgId) {
+  closeContextPanel();
+  if (targetSessionId !== sessionId) {
+    await loadSession(targetSessionId);
+  }
+  requestAnimationFrame(() => {
+    const row = document.querySelector(`.msg-row[data-msg-id="${targetMsgId}"]`);
+    if (!row) return;
+    row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    row.classList.add('jump-highlight');
+    setTimeout(() => row.classList.remove('jump-highlight'), 1500);
+  });
+}
+
+// División delgada y gris entre secciones del chat (ej. "Sesión compactada").
+function addSessionDivider(label) {
+  const chatMessages = document.getElementById('chatMessages');
+  const row = document.createElement('div');
+  row.className = 'session-divider';
+  row.innerHTML = `<span>${escapeHtml(label)}</span>`;
+  row.style.opacity = '0';
+  row.style.transition = 'opacity 300ms ease';
+  chatMessages.prepend(row);
+  requestAnimationFrame(() => requestAnimationFrame(() => { row.style.opacity = '1'; }));
+  chatMessages.scrollTop = 0;
+}
+
+// ── Comando /resumen ("/resume" en inglés) — fuerza compactación y muestra el resumen ──
+async function runSummaryCommand() {
+  showTyping();
+  try {
+    const res = await fetch('/api/chat/tutor/summary', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ sessionId }),
+    });
+    hideTyping();
+    if (res.status === 401) { window.location.href = 'login.html'; return; }
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      addMessage('No se pudo generar el resumen: ' + (err.error || 'error desconocido'), 'ai');
+      return;
+    }
+    const data = await res.json();
+    addSessionDivider('Sesión compactada');
+    addMessage(data.summary || 'Todavía no hay suficiente conversación para resumir.', 'ai');
+  } catch (err) {
+    hideTyping();
+    addMessage('Error: ' + (err.message || 'Error de conexión'), 'ai');
+  }
+}
+
+// ── "Explícamelo diferente" (regenerar última respuesta de la IA) ──
+
+function openReExplicarConfirm(msgRow) {
+  const overlay = document.createElement('div');
+  overlay.className = 'confirm-overlay';
+  overlay.innerHTML = `
+    <div class="confirm-card">
+      <p class="confirm-question">¿Quieres cambiar el enfoque?</p>
+      <div class="confirm-actions">
+        <button class="confirm-btn confirm-btn-secondary" id="confirmNo" type="button">No</button>
+        <button class="confirm-btn confirm-btn-primary" id="confirmYes" type="button">Sí</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  overlay.querySelector('#confirmNo').addEventListener('click', () => {
+    overlay.remove();
+    runRegenerate(msgRow, '');
+  });
+  overlay.querySelector('#confirmYes').addEventListener('click', () => {
+    overlay.remove();
+    enterReExplicarMode(msgRow);
+  });
+}
+
+function renderReExplicarSuggestions() {
+  const box = document.getElementById('reexplicarSuggestions');
+  if (!box) return;
+  box.innerHTML = REEXPLICAR_SUGGESTIONS.map(s =>
+    `<button type="button" class="reexplicar-chip">${escapeHtml(s)}</button>`
+  ).join('');
+  box.querySelectorAll('.reexplicar-chip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const input = document.getElementById('messageInput');
+      if (!input) return;
+      input.value = 'Explícamelo ' + btn.textContent;
+      input.focus();
+    });
+  });
+}
+
+function enterReExplicarMode(msgRow) {
+  reExplicarModeActive = true;
+  reExplicarTargetRow = msgRow;
+  document.querySelector('.chat-input-wrapper')?.classList.add('reexplicar-active');
+  const bar = document.getElementById('reexplicarBar');
+  if (bar) bar.classList.remove('hidden');
+  renderReExplicarSuggestions();
+  const input = document.getElementById('messageInput');
+  if (input) { input.placeholder = '¿Cómo quieres que te lo expliquen?'; input.focus(); }
+}
+
+function exitReExplicarMode() {
+  reExplicarModeActive = false;
+  reExplicarTargetRow = null;
+  document.querySelector('.chat-input-wrapper')?.classList.remove('reexplicar-active');
+  const bar = document.getElementById('reexplicarBar');
+  if (bar) bar.classList.add('hidden');
+  const input = document.getElementById('messageInput');
+  if (input) input.placeholder = 'Message...';
+}
+
+// Regenera la última respuesta de la IA (msgRow debe ser la más reciente en
+// la sesión — el backend lo valida y rechaza si ya no lo es).
+async function runRegenerate(targetRow, instruction) {
+  if (!targetRow.dataset.msgId) return;
+  const chatMessages = document.getElementById('chatMessages');
+  targetRow.remove();
+  showTyping();
+
+  let fullTextRef = '';
+  let fullReasoningRef = '';
+  let aiBubble = null;
+  let textDiv = null;
+  let thinkingRow = null;
+  let thinkingTextDiv = null;
+  let thinkingOpen = false;
+
+  function createRegenBubble() {
+    const msgRow = document.createElement('div');
+    msgRow.className = 'msg-row msg-ai';
+    msgRow.dataset.sender = 'ai';
+
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble-ai';
+    const textDivEl = document.createElement('div');
+    textDivEl.className = 'bubble-text';
+    bubble.appendChild(textDivEl);
+
+    const footer = document.createElement('div');
+    footer.className = 'msg-footer';
+    const timeSpan = document.createElement('span');
+    timeSpan.className = 'msg-time';
+    timeSpan.textContent = formatTime();
+    const actions = document.createElement('div');
+    actions.className = 'msg-actions';
+
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'msg-action';
+    copyBtn.title = 'Copiar';
+    copyBtn.innerHTML = svgIcon('copy');
+    copyBtn.addEventListener('click', () => handleCopy(fullTextRef, copyBtn));
+    actions.appendChild(copyBtn);
+
+    const pinBtn = document.createElement('button');
+    pinBtn.className = 'msg-action';
+    pinBtn.title = 'Fijar mensaje';
+    pinBtn.innerHTML = svgIcon('pin');
+    pinBtn.addEventListener('click', () => togglePinMessage(msgRow, pinBtn));
+    actions.appendChild(pinBtn);
+
+    const reportBtn = document.createElement('button');
+    reportBtn.className = 'msg-action';
+    reportBtn.title = 'Reportar';
+    reportBtn.innerHTML = svgIcon('flag');
+    reportBtn.dataset.reported = 'false';
+    reportBtn.addEventListener('click', () => handleReport(fullTextRef, null, reportBtn));
+    actions.appendChild(reportBtn);
+
+    const reexplainBtn = document.createElement('button');
+    reexplainBtn.className = 'msg-action';
+    reexplainBtn.title = 'Explícamelo diferente';
+    reexplainBtn.innerHTML = svgIcon('retry');
+    reexplainBtn.addEventListener('click', () => openReExplicarConfirm(msgRow));
+    actions.appendChild(reexplainBtn);
+
+    footer.appendChild(timeSpan);
+    footer.appendChild(actions);
+    msgRow.appendChild(bubble);
+    msgRow.appendChild(footer);
+
+    msgRow.style.opacity = '0';
+    msgRow.style.transform = 'translateY(8px)';
+    msgRow.style.transition = 'opacity 250ms ease, transform 250ms ease';
+    chatMessages.prepend(msgRow);
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      msgRow.style.opacity = '1';
+      msgRow.style.transform = 'translateY(0)';
+    }));
+    chatMessages.scrollTop = 0;
+    return { msgRow, textDiv: textDivEl };
+  }
+
+  try {
+    const res = await fetch('/api/chat/tutor/regenerate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ sessionId, modelId: selectedModelId || undefined, instruction }),
+    });
+
+    if (res.status === 401) { window.location.href = 'login.html'; return; }
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Error del servidor');
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const parts = buffer.split('\n\n');
+      buffer = parts.pop() || '';
+      for (const part of parts) {
+        const line = part.trim();
+        if (!line || !line.startsWith('data: ')) continue;
+        const payload = line.slice(6);
+        if (payload === '[DONE]') continue;
+        try {
+          const json = JSON.parse(payload);
+          if (json.error) throw new Error(json.error);
+          if (json.done) {
+            if (aiBubble && json.msgId) aiBubble.dataset.msgId = json.msgId;
+            setLastUserMsgId(json.userMsgId);
+            continue;
+          }
+          if (json.reasoning) {
+            if (!thinkingRow) {
+              hideTyping();
+              const row = document.createElement('div');
+              row.className = 'msg-row thinking-row';
+              const label = document.createElement('div');
+              label.className = 'thinking-label';
+              label.innerHTML = `${svgIcon('chevronRight', 12)} Pensando...`;
+              const contentDiv = document.createElement('div');
+              contentDiv.className = 'thinking-content';
+              row.appendChild(label);
+              row.appendChild(contentDiv);
+              chatMessages.prepend(row);
+              chatMessages.scrollTop = 0;
+              thinkingRow = row;
+              thinkingTextDiv = contentDiv;
+              label.addEventListener('click', () => {
+                thinkingOpen = !thinkingOpen;
+                contentDiv.classList.toggle('open', thinkingOpen);
+                label.querySelector('svg').style.transform = thinkingOpen ? 'rotate(90deg)' : '';
+              });
+            }
+            fullReasoningRef += json.reasoning;
+            thinkingTextDiv.innerHTML = formatAIResponse(fullReasoningRef);
+            if (thinkingOpen) thinkingTextDiv.scrollTop = thinkingTextDiv.scrollHeight;
+          }
+          if (json.content) {
+            if (!aiBubble) {
+              hideTyping();
+              const b = createRegenBubble();
+              aiBubble = b.msgRow;
+              textDiv = b.textDiv;
+            }
+            fullTextRef += json.content;
+            textDiv.innerHTML = formatAIResponse(fullTextRef);
+            chatMessages.scrollTop = 0;
+          }
+        } catch (e) {
+          if (e instanceof SyntaxError) continue;
+          throw e;
+        }
+      }
+    }
+
+    hideTyping();
+    if (fullTextRef) renderKaTeX();
+  } catch (err) {
+    hideTyping();
+    addMessage('Error: ' + (err.message || 'Error de conexión'), 'ai');
+  }
+  updateSessionInfo();
+  refreshSidebarSessions();
 }
 
 async function handleReport(aiText, msgRow, btn) {
@@ -1114,6 +2014,24 @@ async function handleSend() {
   const input = document.getElementById('messageInput');
   const text = input.value.trim();
   if (!text) return;
+
+  if (!reExplicarModeActive) {
+    const matchedCmd = SLASH_COMMANDS.find(c => c.aliases.includes(text.toLowerCase()));
+    if (matchedCmd) {
+      input.value = '';
+      closeSlashMenu();
+      executeSlashCommand(matchedCmd.primary);
+      return;
+    }
+  }
+
+  if (reExplicarModeActive) {
+    const targetRow = reExplicarTargetRow;
+    input.value = '';
+    exitReExplicarMode();
+    if (targetRow) runRegenerate(targetRow, text);
+    return;
+  }
 
   if (pendingAttachments.length > 0) {
     const model = availableModels.find(m => m.id === selectedModelId);
@@ -1170,6 +2088,13 @@ async function handleSend() {
     copyBtn.addEventListener('click', () => handleCopy(fullTextRef, copyBtn));
     actions.appendChild(copyBtn);
 
+    const pinBtn = document.createElement('button');
+    pinBtn.className = 'msg-action';
+    pinBtn.title = 'Fijar mensaje';
+    pinBtn.innerHTML = svgIcon('pin');
+    pinBtn.addEventListener('click', () => togglePinMessage(msgRow, pinBtn));
+    actions.appendChild(pinBtn);
+
     const reportBtn = document.createElement('button');
     reportBtn.className = 'msg-action';
     reportBtn.title = 'Reportar';
@@ -1177,6 +2102,13 @@ async function handleSend() {
     reportBtn.dataset.reported = 'false';
     reportBtn.addEventListener('click', () => handleReport(fullTextRef, null, reportBtn));
     actions.appendChild(reportBtn);
+
+    const reexplainBtn = document.createElement('button');
+    reexplainBtn.className = 'msg-action';
+    reexplainBtn.title = 'Explícamelo diferente';
+    reexplainBtn.innerHTML = svgIcon('retry');
+    reexplainBtn.addEventListener('click', () => openReExplicarConfirm(msgRow));
+    actions.appendChild(reexplainBtn);
     footer.appendChild(timeSpan);
     footer.appendChild(actions);
     msgRow.appendChild(bubble);
@@ -1245,6 +2177,11 @@ async function handleSend() {
           if (json.sessionId) {
             sessionId = json.sessionId;
             sessionStorage.setItem('chatSessionId', sessionId);
+          }
+          if (json.done) {
+            if (aiBubble && json.msgId) aiBubble.dataset.msgId = json.msgId;
+            setLastUserMsgId(json.userMsgId);
+            continue;
           }
           if (json.reasoning) {
             if (!thinkingRow) {
@@ -1514,6 +2451,7 @@ function toggleContextPanel() {
   const panel = document.getElementById('contextPanel');
   const isOpen = panel.classList.toggle('open');
   document.querySelector('.page-content').classList.toggle('panel-open', isOpen);
+  if (isOpen) fetchPinnedMessages().then(renderPinnedSection);
 }
 
 function closeContextPanel() {
@@ -1527,8 +2465,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('contextBtn').addEventListener('click', toggleContextPanel);
   document.getElementById('contextPanelClose').addEventListener('click', closeContextPanel);
-  document.getElementById('homeBtn').addEventListener('click', () => { window.location.href = 'welcome.html'; });
-  document.getElementById('sidebarHome').addEventListener('click', () => { window.location.href = 'welcome.html'; });
+  // "LMS Exams" ya no navega a ningún lado — chat.html es la página raíz ahora,
+  // el logo es solo decoración.
   document.getElementById('settingsBtn').addEventListener('click', () => {
     console.log('settings');
   });
@@ -1551,6 +2489,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   document.getElementById('showArchivedBtn').addEventListener('click', toggleArchivedView);
+  document.getElementById('toggleStopwatchBtn').addEventListener('click', () => {
+    document.getElementById('stopwatchWidget').classList.toggle('visible');
+    document.getElementById('userDropdown').classList.remove('open');
+  });
+  setupStopwatch();
 
   // Click fuera del input → colapsa con animación
   document.addEventListener('mousedown', (e) => {
@@ -1608,6 +2551,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   await historyPromise;
   setupChatInput();
+  setupChatTitleEditing();
 
   // Viene de dashboard.html con un prompt preparado (ej. "Recomendaciones" de
   // una materia) — se autoenvía y se limpia el query param para que un
@@ -1615,6 +2559,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const prefilledPrompt = new URLSearchParams(location.search).get('prompt');
   if (prefilledPrompt) {
     history.replaceState(null, '', 'chat.html');
+    newChat();
     const input = document.getElementById('messageInput');
     input.value = prefilledPrompt;
     handleSend();

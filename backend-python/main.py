@@ -63,6 +63,14 @@ RATE_LIMIT_EXEMPT_EMAILS = {
 
 SESSION_COOKIE_NAME = "session_token"
 
+# Cuentas que jamás disparan un envío SMTP real — el OTP solo se imprime en
+# consola. Evita tráfico saliente para cuentas de prueba/admin.
+NO_SMTP_EMAILS = {
+    e.strip().lower()
+    for e in os.getenv("NO_SMTP_EMAILS", "admin@lmsexam.com").split(",")
+    if e.strip()
+}
+
 # ---------------------------------------------------------------------------
 # In-memory stores
 # ---------------------------------------------------------------------------
@@ -117,6 +125,10 @@ def is_email_authorized(email: str) -> bool:
 def transmit_otp_email(email: str, otp_code: str):
     # Console fallback para desarrollo (visible en terminal Python)
     print(f"\n=== OTP para {email}: {otp_code} ===\n", flush=True)
+
+    if email.strip().lower() in NO_SMTP_EMAILS:
+        print(f"[NO-SMTP] {email} está en NO_SMTP_EMAILS, no se envía correo real.", flush=True)
+        return
 
     if GMAIL_APP_PASSWORD == "" or GMAIL_SENDER_EMAIL == "tu_correo@gmail.com":
         print(f"[DEV] SMTP no configurado. OTP: {otp_code}", flush=True)

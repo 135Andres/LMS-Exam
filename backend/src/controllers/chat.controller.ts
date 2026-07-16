@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import type { Request, Response } from 'express';
-import { sendChatMessage, sendChatMessageStream } from '../services/chat.service.js';
+import { sendChatMessage, sendChatMessageStream, regenerateChatMessageStream } from '../services/chat.service.js';
+import { compactSession } from '../services/chat/chat.compaction.service.js';
+import { SessionSummaryService } from '../services/session-summary.service.js';
 import { ChatModel } from '../models/chat.model.js';
 import { logger } from '../utils/logger.js';
 import type { Attachment } from '../validators/chat.js';
@@ -98,6 +100,8 @@ export async function sendChatMessageStreamHandler(req: Request, res: Response):
     for await (const chunk of stream) {
       if (chunk.type === 'reasoning') {
         res.write(`data: ${JSON.stringify({ reasoning: chunk.content })}\n\n`);
+      } else if (chunk.type === 'done') {
+        res.write(`data: ${JSON.stringify({ done: true, msgId: chunk.msgId, userMsgId: chunk.userMsgId })}\n\n`);
       } else {
         res.write(`data: ${JSON.stringify({ content: chunk.content })}\n\n`);
       }
@@ -111,6 +115,67 @@ export async function sendChatMessageStreamHandler(req: Request, res: Response):
   } finally {
     res.end();
   }
+}
+
+export async function regenerateMessageStreamHandler(req: Request, res: Response): Promise<void> {
+  const { sessionId, modelId, instruction } = req.validatedBody as {
+    sessionId: string; modelId?: string; instruction?: string;
+  };
+  const userId = req.user!.id;
+
+  try {
+    ChatModel.assertSessionOwnership(sessionId, userId);
+  } catch {
+    res.status(403).json({ error: 'No tienes acceso a esta sesión' });
+    return;
+  }
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+
+  try {
+    const stream = await regenerateChatMessageStream(sessionId, modelId, userId, instruction);
+    for await (const chunk of stream) {
+      if (chunk.type === 'reasoning') {
+        res.write(`data: ${JSON.stringify({ reasoning: chunk.content })}\n\n`);
+      } else if (chunk.type === 'done') {
+        res.write(`data: ${JSON.stringify({ done: true, msgId: chunk.msgId, userMsgId: chunk.userMsgId })}\n\n`);
+      } else {
+        res.write(`data: ${JSON.stringify({ content: chunk.content })}\n\n`);
+      }
+    }
+    res.write('data: [DONE]\n\n');
+  } catch (err: unknown) {
+    const isNotLast = err instanceof Error && err.message === 'NOT_LAST_EXCHANGE';
+    const msg = isNotLast
+      ? 'Solo puedes regenerar la última respuesta de la conversación.'
+      : (err instanceof Error ? err.message : 'Error desconocido');
+    logger.error('Error en regenerate', { error: msg });
+    res.write(`data: ${JSON.stringify({ error: msg })}\n\n`);
+    res.write('data: [DONE]\n\n');
+  } finally {
+    res.end();
+  }
+}
+
+// Comando /resumen (/resume) — fuerza una compactación ya (sin esperar el
+// umbral de fondo) y devuelve el resumen resultante.
+export async function summarizeSessionHandler(req: Request, res: Response): Promise<void> {
+  const { sessionId } = req.validatedBody as { sessionId: string };
+  const userId = req.user!.id;
+
+  try {
+    ChatModel.assertSessionOwnership(sessionId, userId);
+  } catch {
+    res.status(403).json({ error: 'No tienes acceso a esta sesión' });
+    return;
+  }
+
+  await compactSession(sessionId, userId, true);
+  const summary = SessionSummaryService.getSummary(sessionId);
+  res.json({ summary });
 }
 
 export async function getChatHistoryHandler(req: Request, res: Response): Promise<void> {
@@ -201,6 +266,28 @@ function requireOwnedSession(sessionId: string, userId: string, res: Response): 
   return true;
 }
 
+export async function pinMessageHandler(req: Request, res: Response): Promise<void> {
+  const { messageId } = req.body as { messageId: string };
+  const userId = req.user!.id;
+  if (!messageId) { res.status(400).json({ error: 'messageId requerido' }); return; }
+  ChatModel.pinMessage(messageId, userId);
+  res.json({ success: true });
+}
+
+export async function unpinMessageHandler(req: Request, res: Response): Promise<void> {
+  const { messageId } = req.body as { messageId: string };
+  const userId = req.user!.id;
+  if (!messageId) { res.status(400).json({ error: 'messageId requerido' }); return; }
+  ChatModel.unpinMessage(messageId, userId);
+  res.json({ success: true });
+}
+
+export async function getPinnedMessagesHandler(req: Request, res: Response): Promise<void> {
+  const userId = req.user!.id;
+  const messages = ChatModel.getPinnedMessages(userId);
+  res.json({ messages });
+}
+
 export async function archiveSessionHandler(req: Request, res: Response): Promise<void> {
   const { sessionId } = req.body as { sessionId: string };
   const userId = req.user!.id;
@@ -217,6 +304,21 @@ export async function unarchiveSessionHandler(req: Request, res: Response): Prom
   if (!requireOwnedSession(sessionId, userId, res)) return;
   ChatModel.unarchiveSession(sessionId, userId);
   res.json({ success: true });
+}
+
+export async function renameSessionHandler(req: Request, res: Response): Promise<void> {
+  const { sessionId, title } = req.body as { sessionId: string; title: string };
+  const userId = req.user!.id;
+  if (!sessionId) { res.status(400).json({ error: 'sessionId requerido' }); return; }
+  const trimmed = (title || '').trim().slice(0, 100);
+  if (!trimmed) { res.status(400).json({ error: 'title requerido' }); return; }
+  // A diferencia de archive/delete, renombrar debe funcionar también para un
+  // chat recién creado en el frontend que todavía no mandó su primer mensaje
+  // (sessionId generado pero sin fila en chat_sessions todavía).
+  ChatModel.ensureSession(sessionId, userId);
+  if (!requireOwnedSession(sessionId, userId, res)) return;
+  ChatModel.renameSession(sessionId, userId, trimmed);
+  res.json({ success: true, title: trimmed });
 }
 
 export async function deleteSessionHandler(req: Request, res: Response): Promise<void> {

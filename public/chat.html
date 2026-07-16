@@ -20,6 +20,10 @@
       </button>
     </div>
     <div class="sidebar-body">
+      <a href="dashboard.html" class="dashboard-nav-item">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        Dashboard
+      </a>
       <button class="mode-toggle-btn" id="modeToggleBtn">Cambiar a Examen</button>
       <button class="sidebar-new-chat" id="sidebarNewChat">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -40,6 +44,13 @@
       </div>
     </div>
     <div class="sidebar-footer">
+      <div class="stopwatch-widget" id="stopwatchWidget">
+        <div class="stopwatch-display" id="stopwatchDisplay">00:00</div>
+        <div class="stopwatch-btn-row" id="stopwatchBtnRow">
+          <button class="stopwatch-btn" id="stopwatchStartBtn">Iniciar</button>
+          <button class="stopwatch-btn" id="stopwatchCountdownBtn">Contador</button>
+        </div>
+      </div>
       <div class="sidebar-user-info" id="sidebarUserInfo">
         <div class="sidebar-user-avatar" id="sidebarUserAvatar">?</div>
         <div class="sidebar-user-name" id="sidebarUserName">Cargando...</div>
@@ -49,6 +60,10 @@
         <button class="sidebar-dropdown-item" id="showArchivedBtn">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="5" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/></svg>
           Chats archivados
+        </button>
+        <button class="sidebar-dropdown-item" id="toggleStopwatchBtn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5"/><path d="M9 2h6"/></svg>
+          Cronómetro
         </button>
       </div>
     </div>
@@ -63,6 +78,10 @@
           </svg>
         </button>
         <span class="top-bar-title" id="homeBtn">LMS Exams</span>
+        <span class="top-bar-chat-title" id="chatTitle" title="Haz clic para renombrar">
+          <span class="top-bar-chat-title-text" id="chatTitleText"></span>
+          <input class="top-bar-chat-title-input hidden" id="chatTitleInput" type="text" maxlength="100">
+        </span>
       </div>
       <div class="top-bar-right">
         <select id="topBarModelSelect" class="model-select"></select>
@@ -81,6 +100,24 @@
       </div>
     </nav>
 
+    <div class="hero-view" id="heroView">
+      <div class="hero-greet-row">
+        <p class="hero-line" id="heroLine1">Hola,</p>
+        <div class="name-chip hidden" id="nameChip">
+          <span class="name-chip-plus" id="nameChipPlus">+</span>
+          <button class="name-chip-btn" id="nameChipBtn" type="button">Agregar nombre</button>
+          <input class="name-chip-input hidden" id="nameChipInput" type="text" placeholder="Agregar nombre" maxlength="60">
+        </div>
+      </div>
+
+      <div class="hero-ask-bar" id="heroAskBar">
+        <input type="text" id="heroAskInput" class="hero-ask-input" placeholder="Pregúntame lo que quieras…">
+        <button class="hero-ask-send" id="heroAskSend" type="button" title="Enviar">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>
+        </button>
+      </div>
+    </div>
+
     <div class="chat-messages" id="chatMessages"></div>
     <div class="exam-mode-placeholder" id="examModePlaceholder">Modo examen — próximamente.</div>
 
@@ -94,6 +131,10 @@
     <button class="context-panel-close" id="contextPanelClose">✕</button>
   </div>
   <div class="context-panel-body" id="contextPanelBody"></div>
+  <details class="pinned-messages-section" id="pinnedMessagesSection">
+    <summary>Notas rápidas <span id="pinnedMessagesCount">0</span></summary>
+    <div class="raw-messages-list" id="pinnedMessagesList"></div>
+  </details>
 </aside>
 
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" crossorigin="anonymous"></script>
