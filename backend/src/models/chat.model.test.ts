@@ -73,4 +73,21 @@ describe('ChatModel', () => {
     const sid = ChatModel.getLastSessionId(USER_A);
     expect(sid).toBe(SESSION_A);
   });
+
+  it('getMessageById returns message for owner', () => {
+    ChatModel.saveMessage('m1', USER_A, SESSION_A, 'user', 'Enunciado del cuestionario');
+    const msg = ChatModel.getMessageById('m1', USER_A);
+    expect(msg?.content).toBe('Enunciado del cuestionario');
+  });
+
+  it('getMessageById returns undefined for non-owner', () => {
+    ChatModel.saveMessage('m1', USER_A, SESSION_A, 'user', 'Enunciado del cuestionario');
+    const msg = ChatModel.getMessageById('m1', USER_B);
+    expect(msg).toBeUndefined();
+  });
+
+  it('getMessageById returns undefined for non-existent message', () => {
+    const msg = ChatModel.getMessageById('nope', USER_A);
+    expect(msg).toBeUndefined();
+  });
 });

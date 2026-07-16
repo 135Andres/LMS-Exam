@@ -21,12 +21,14 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS chat_logs (
   id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id),
   session_id TEXT NOT NULL, role TEXT NOT NULL,
-  content TEXT NOT NULL, subject TEXT, tokens INTEGER DEFAULT 0,
+  content TEXT NOT NULL, subject TEXT, tokens INTEGER DEFAULT 0, model TEXT,
+  is_pinned INTEGER DEFAULT 0,
   created_at TEXT DEFAULT (datetime('now'))
 );
 CREATE TABLE IF NOT EXISTS chat_sessions (
   session_id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id),
   is_archived INTEGER DEFAULT 0, archived_at TEXT,
+  summary_covers_until TEXT, title TEXT,
   created_at TEXT DEFAULT (datetime('now'))
 );
 CREATE TABLE IF NOT EXISTS chat_embeddings (

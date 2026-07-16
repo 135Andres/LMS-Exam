@@ -144,4 +144,10 @@ export const ChatModel = {
     ).get(sessionId);
     return !!row;
   },
+
+  getMessageById(id: string, userId: string): ChatLogRow | undefined {
+    return getDb().prepare(
+      'SELECT * FROM chat_logs WHERE id = ? AND user_id = ?'
+    ).get(id, userId) as ChatLogRow | undefined;
+  },
 };
