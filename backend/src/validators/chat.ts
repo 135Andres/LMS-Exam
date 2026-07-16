@@ -30,3 +30,7 @@ export const regenerateSchema = z.object({
 export const summarySchema = z.object({
   sessionId: uuidV4,
 });
+
+export const exportSchema = z.object({
+  sessionId: uuidV4,
+});

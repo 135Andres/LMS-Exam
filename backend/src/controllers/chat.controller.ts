@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto';
 import type { Request, Response } from 'express';
 import { sendChatMessage, sendChatMessageStream, regenerateChatMessageStream } from '../services/chat.service.js';
 import { compactSession } from '../services/chat/chat.compaction.service.js';
+import { exportSessionMarkdown, SessionForbiddenError, SessionNotFoundError } from '../services/chat/chat.export.service.js';
+import { AiRetryError } from '../services/ai/index.js';
 import { SessionSummaryService } from '../services/session-summary.service.js';
 import { ChatModel } from '../models/chat.model.js';
 import { logger } from '../utils/logger.js';
@@ -176,6 +178,27 @@ export async function summarizeSessionHandler(req: Request, res: Response): Prom
   await compactSession(sessionId, userId, true);
   const summary = SessionSummaryService.getSummary(sessionId);
   res.json({ summary });
+}
+
+// Comando /exportar (/export) — descarga la conversación sintetizada como
+// documento Markdown (los modelos detrás de 9router no generan PDF real,
+// ver chat.export.service.ts).
+export async function exportSessionHandler(req: Request, res: Response): Promise<void> {
+  const { sessionId } = req.validatedBody as { sessionId: string };
+  const userId = req.user!.id;
+
+  try {
+    const markdown = await exportSessionMarkdown(sessionId, userId);
+    res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="chat-export.md"');
+    res.send(markdown);
+  } catch (err) {
+    if (err instanceof SessionForbiddenError) { res.status(403).json({ error: err.message }); return; }
+    if (err instanceof SessionNotFoundError) { res.status(404).json({ error: err.message }); return; }
+    if (err instanceof AiRetryError) { res.status(502).json({ error: 'No se pudo generar el export: ' + err.message }); return; }
+    logger.error('Error exportando sesión', { sessionId, error: (err as Error).message });
+    res.status(500).json({ error: 'Error interno al exportar' });
+  }
 }
 
 export async function getChatHistoryHandler(req: Request, res: Response): Promise<void> {

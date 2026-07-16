@@ -53,6 +53,7 @@ let reExplicarTargetRow = null;
 
 const SLASH_COMMANDS = [
   { primary: '/resumen', aliases: ['/resumen', '/resume'], desc: 'Fuerza un resumen de la conversación hasta ahora' },
+  { primary: '/exportar', aliases: ['/exportar', '/export'], desc: 'Descarga la conversación como Markdown' },
   { primary: '/help', aliases: ['/help', '/ayuda'], desc: 'Muestra esta lista de comandos' },
 ];
 
@@ -1595,6 +1596,7 @@ function selectSlashCommand(cmd) {
 function executeSlashCommand(primary) {
   if (primary === '/help') { showHelpMessage(); return; }
   if (primary === '/resumen') { runSummaryCommand(); return; }
+  if (primary === '/exportar') { runExportCommand(); return; }
 }
 
 function showHelpMessage() {
@@ -1734,6 +1736,39 @@ async function runSummaryCommand() {
     const data = await res.json();
     addSessionDivider('Sesión compactada');
     addMessage(data.summary || 'Todavía no hay suficiente conversación para resumir.', 'ai');
+  } catch (err) {
+    hideTyping();
+    addMessage('Error: ' + (err.message || 'Error de conexión'), 'ai');
+  }
+}
+
+// ── Comando /exportar ("/export") — descarga la conversación sintetizada
+// como Markdown. Los modelos detrás de 9router no generan PDF real (solo
+// texto), así que se limita a Markdown.
+async function runExportCommand() {
+  showTyping();
+  try {
+    const res = await fetch('/api/chat/export', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ sessionId }),
+    });
+    hideTyping();
+    if (res.status === 401) { window.location.href = 'login.html'; return; }
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      addMessage('No se pudo exportar la conversación: ' + (err.error || 'error desconocido'), 'ai');
+      return;
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'chat-export.md';
+    a.click();
+    URL.revokeObjectURL(url);
+    addSystemMessage('Conversación exportada a Markdown.');
   } catch (err) {
     hideTyping();
     addMessage('Error: ' + (err.message || 'Error de conexión'), 'ai');
