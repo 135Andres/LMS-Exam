@@ -2586,6 +2586,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('stopwatchWidget').classList.toggle('visible');
     document.getElementById('userDropdown').classList.remove('open');
   });
+  document.getElementById('logoutBtn').addEventListener('click', async () => {
+    try {
+      await fetch('/auth/logout', { method: 'POST', credentials: 'same-origin' });
+    } catch {}
+    sessionStorage.clear();
+    window.location.href = 'login.html';
+  });
   setupStopwatch();
 
   // Click fuera del input → colapsa con animación
