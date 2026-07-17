@@ -45,6 +45,10 @@ function allCorrect(verifications: VerifyResult[]): boolean {
 }
 
 function formatFinalMessage(items: SolvedItem[], lastVerification: VerifyResult[] | null): string {
+  if (items.length === 0) {
+    return 'No pude resolver este cuestionario. Por favor, intentá de nuevo.';
+  }
+
   const failedNums = new Set(
     (lastVerification || []).filter(v => !v.correcto).map(v => v.num)
   );
@@ -66,21 +70,30 @@ export async function resolveQuiz(quizText: string): Promise<string> {
   let lastVerification: VerifyResult[] | null = null;
 
   for (let attempt = 1; attempt <= MAX_SOLVE_ATTEMPTS; attempt++) {
-    items = await solve(quizText);
+    try {
+      items = await solve(quizText);
 
-    const firstPass = await verify(items);
-    if (!allCorrect(firstPass)) {
-      lastVerification = firstPass;
-      logger.warn('Verificación de cuestionario falló en primera pasada', { attempt });
-      continue;
-    }
+      const firstPass = await verify(items);
+      if (!allCorrect(firstPass)) {
+        lastVerification = firstPass;
+        logger.warn('Verificación de cuestionario falló en primera pasada', { attempt });
+        continue;
+      }
 
-    const secondPass = await verify(items);
-    lastVerification = secondPass;
-    if (allCorrect(secondPass)) {
-      return formatFinalMessage(items, null);
+      const secondPass = await verify(items);
+      lastVerification = secondPass;
+      if (allCorrect(secondPass)) {
+        return formatFinalMessage(items, null);
+      }
+      logger.warn('Verificación de cuestionario falló en segunda pasada', { attempt });
+    } catch (err) {
+      // Fallo al resolver/verificar (AI caído, JSON malformado, etc.) nunca
+      // debe crashear resolveQuiz: se trata como intento agotado.
+      logger.warn('Fallo al resolver/verificar cuestionario, se trata como intento agotado', {
+        attempt,
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
-    logger.warn('Verificación de cuestionario falló en segunda pasada', { attempt });
   }
 
   logger.warn('Cuestionario no verificado tras agotar intentos, enviando última versión con advertencia', {

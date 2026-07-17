@@ -66,4 +66,18 @@ describe('resolveQuiz', () => {
     expect(generateFromAIMock).toHaveBeenCalledTimes(6);
     expect(result).toContain('No pude verificar');
   });
+
+  it('si solve() lanza en el primer intento, se trata como intento fallido y no rechaza la promesa', async () => {
+    generateFromAIMock
+      .mockRejectedValueOnce(new Error('AiRetryError: proveedor caído')) // solve intento 1 falla
+      .mockResolvedValueOnce(aiResponse(SOLVED_OK)) // solve intento 2
+      .mockResolvedValueOnce(aiResponse(VERIFY_FAIL))
+      .mockResolvedValueOnce(aiResponse(SOLVED_OK)) // solve intento 3
+      .mockResolvedValueOnce(aiResponse(VERIFY_FAIL));
+
+    const result = await resolveQuiz('¿Cuánto es 2+2?');
+
+    expect(result).not.toBe('');
+    expect(result).toContain('No pude verificar');
+  });
 });
