@@ -354,6 +354,7 @@ export async function deleteSessionHandler(req: Request, res: Response): Promise
   if (!sessionId) { res.status(400).json({ error: 'sessionId requerido' }); return; }
   if (!requireOwnedSession(sessionId, userId, res)) return;
   ChatModel.deleteSession(sessionId, userId);
+  ChatQuizModeService.deactivate(sessionId);
   res.json({ success: true });
 }
 
