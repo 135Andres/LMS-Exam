@@ -67,6 +67,24 @@ describe('resolveQuiz', () => {
     expect(result).toContain('No pude verificar');
   });
 
+  it('repara backslashes de LaTeX sin escapar (\\sqrt, \\frac) en la respuesta antes de parsear JSON', async () => {
+    // La IA a veces no escapa \\sqrt/\\frac/etc como \\\\ pese a la instrucción del
+    // prompt — un \\s, \\f (seguido de letra), \\l, etc. no son escapes JSON
+    // válidos y JSON.parse tira "Unexpected token" en un JSON.parse ingenuo.
+    const SOLVED_WITH_LATEX = '[{"num": 1, "pregunta": "Resuelve \\sqrt{4}", "desarrollo": "\\sqrt{4} = 2 porque 2^2=4", "respuesta": "2"}]';
+    generateFromAIMock
+      .mockResolvedValueOnce(aiResponse(SOLVED_WITH_LATEX)) // solve
+      .mockResolvedValueOnce(aiResponse(VERIFY_OK)) // verify 1
+      .mockResolvedValueOnce(aiResponse(VERIFY_OK)); // verify 2
+
+    const result = await resolveQuiz('Resuelve la raíz de 4');
+
+    expect(generateFromAIMock).toHaveBeenCalledTimes(3);
+    expect(result).toContain('sqrt{4}');
+    expect(result).not.toContain('No pude resolver este cuestionario');
+    expect(result).not.toContain('No pude verificar');
+  });
+
   it('si solve() lanza en el primer intento, se trata como intento fallido y no rechaza la promesa', async () => {
     generateFromAIMock
       .mockRejectedValueOnce(new Error('AiRetryError: proveedor caído')) // solve intento 1 falla

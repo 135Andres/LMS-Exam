@@ -28,6 +28,26 @@ function appendLinks(message: string, links?: string[]): string {
   return `${message}\n\nEnlaces adjuntos:\n${links.map(l => `- ${l}`).join('\n')}`;
 }
 
+// El cliente puede desconectarse (cambia de chat, cierra la pestaña, navega)
+// mientras la IA sigue generando — la generación y el guardado en DB deben
+// continuar en segundo plano de todas formas. Escribir en un socket muerto
+// dispara un evento 'error' sin listener, que tumba TODO el proceso Node
+// (no solo esta petición); este guard evita escribir tras la desconexión y
+// nunca deja un 'error' sin manejar.
+function guardStreamResponse(res: Response): (data: string) => void {
+  let closed = false;
+  res.on('close', () => { closed = true; });
+  res.on('error', () => { closed = true; });
+  return (data: string) => {
+    if (closed) return;
+    try {
+      res.write(data);
+    } catch {
+      closed = true;
+    }
+  };
+}
+
 export async function sendChatMessageHandler(req: Request, res: Response): Promise<void> {
   const { message, modelId, attachments, links, sessionId } = req.validatedBody as {
     message: string;
@@ -98,28 +118,30 @@ export async function sendChatMessageStreamHandler(req: Request, res: Response):
   res.setHeader('Connection', 'keep-alive');
   res.setHeader('X-Accel-Buffering', 'no');
 
+  const write = guardStreamResponse(res);
+
   // Enviar sessionId como primer evento para que el frontend lo capture
-  res.write(`data: ${JSON.stringify({ sessionId: sid })}\n\n`);
+  write(`data: ${JSON.stringify({ sessionId: sid })}\n\n`);
 
   try {
     const stream = await sendChatMessageStream(appendLinks(message, links), modelId, attachments, userId, sid);
     for await (const chunk of stream) {
       if (chunk.type === 'reasoning') {
-        res.write(`data: ${JSON.stringify({ reasoning: chunk.content })}\n\n`);
+        write(`data: ${JSON.stringify({ reasoning: chunk.content })}\n\n`);
       } else if (chunk.type === 'done') {
-        res.write(`data: ${JSON.stringify({ done: true, msgId: chunk.msgId, userMsgId: chunk.userMsgId })}\n\n`);
+        write(`data: ${JSON.stringify({ done: true, msgId: chunk.msgId, userMsgId: chunk.userMsgId })}\n\n`);
       } else {
-        res.write(`data: ${JSON.stringify({ content: chunk.content })}\n\n`);
+        write(`data: ${JSON.stringify({ content: chunk.content })}\n\n`);
       }
     }
-    res.write('data: [DONE]\n\n');
+    write('data: [DONE]\n\n');
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Error desconocido';
     logger.error('Error en chat streaming', { error: msg });
-    res.write(`data: ${JSON.stringify({ error: msg })}\n\n`);
-    res.write('data: [DONE]\n\n');
+    write(`data: ${JSON.stringify({ error: msg })}\n\n`);
+    write('data: [DONE]\n\n');
   } finally {
-    res.end();
+    try { res.end(); } catch { /* socket ya cerrado */ }
   }
 }
 
@@ -141,28 +163,30 @@ export async function regenerateMessageStreamHandler(req: Request, res: Response
   res.setHeader('Connection', 'keep-alive');
   res.setHeader('X-Accel-Buffering', 'no');
 
+  const write = guardStreamResponse(res);
+
   try {
     const stream = await regenerateChatMessageStream(sessionId, modelId, userId, instruction);
     for await (const chunk of stream) {
       if (chunk.type === 'reasoning') {
-        res.write(`data: ${JSON.stringify({ reasoning: chunk.content })}\n\n`);
+        write(`data: ${JSON.stringify({ reasoning: chunk.content })}\n\n`);
       } else if (chunk.type === 'done') {
-        res.write(`data: ${JSON.stringify({ done: true, msgId: chunk.msgId, userMsgId: chunk.userMsgId })}\n\n`);
+        write(`data: ${JSON.stringify({ done: true, msgId: chunk.msgId, userMsgId: chunk.userMsgId })}\n\n`);
       } else {
-        res.write(`data: ${JSON.stringify({ content: chunk.content })}\n\n`);
+        write(`data: ${JSON.stringify({ content: chunk.content })}\n\n`);
       }
     }
-    res.write('data: [DONE]\n\n');
+    write('data: [DONE]\n\n');
   } catch (err: unknown) {
     const isNotLast = err instanceof Error && err.message === 'NOT_LAST_EXCHANGE';
     const msg = isNotLast
       ? 'Solo puedes regenerar la última respuesta de la conversación.'
       : (err instanceof Error ? err.message : 'Error desconocido');
     logger.error('Error en regenerate', { error: msg });
-    res.write(`data: ${JSON.stringify({ error: msg })}\n\n`);
-    res.write('data: [DONE]\n\n');
+    write(`data: ${JSON.stringify({ error: msg })}\n\n`);
+    write('data: [DONE]\n\n');
   } finally {
-    res.end();
+    try { res.end(); } catch { /* socket ya cerrado */ }
   }
 }
 

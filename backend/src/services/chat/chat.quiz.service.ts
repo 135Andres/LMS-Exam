@@ -18,13 +18,23 @@ interface VerifyResult {
 
 const MAX_SOLVE_ATTEMPTS = 3;
 
+// La IA mete LaTeX (\sqrt, \frac, \sum, etc.) dentro de strings JSON — pese a
+// que el prompt pide escapar backslashes como \\, no siempre lo hace, y un
+// \s/\f(letra)/\l/etc. no es un escape JSON válido: JSON.parse tira "Bad
+// escaped character" en CADA intento de un cuestionario real con matemáticas,
+// vaciando items y cayendo siempre al mensaje de "no pude resolver". Reparamos
+// duplicando cualquier backslash que no preceda a un escape JSON válido.
+function repairBackslashEscapes(json: string): string {
+  return json.replace(/\\(?!["\\/bfnrtu])/g, '\\\\');
+}
+
 function parseJSONArray<T>(raw: string): T[] {
   let cleaned = raw.trim();
   const jsonMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/);
   if (jsonMatch) cleaned = jsonMatch[1].trim();
   const arrayMatch = cleaned.match(/\[[\s\S]*\]/);
   if (arrayMatch) cleaned = arrayMatch[0];
-  const parsed = JSON.parse(cleaned);
+  const parsed = JSON.parse(repairBackslashEscapes(cleaned));
   if (!Array.isArray(parsed)) throw new Error('La IA no devolvió un array');
   return parsed as T[];
 }
