@@ -2698,12 +2698,17 @@ function triggerVisibleMessage(text) {
 
 async function handleQuizExplain() {
   try {
-    await fetch('/api/chat/tutor/quiz/explain-start', {
+    const res = await fetch('/api/chat/tutor/quiz/explain-start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'same-origin',
       body: JSON.stringify({ sessionId }),
     });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      addMessage('Error activando el modo Explicar: ' + (err.error || 'error desconocido'), 'ai');
+      return;
+    }
     quizExplainActive = true;
     triggerVisibleMessage('Quiero que vayamos por partes.');
   } catch (err) {
