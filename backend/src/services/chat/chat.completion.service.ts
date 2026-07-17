@@ -11,7 +11,9 @@ import type { ChatModelRouter } from './chat.model-router.js';
 import { buildEffortInstruction, type ChatOrchestratorService } from './chat.orchestrator.service.js';
 import type { ChatPromptService, Attachment } from './chat.prompt.service.js';
 
-const TIMEOUT_MS = 30000;
+// Ver comentario análogo en chat.streaming.service.ts — Inkling puede tardar
+// mucho más de 30s en responder.
+const TIMEOUT_MS = 120000;
 const RAW_TAIL_CAP = 30;
 const RAW_TAIL_MSG_MAX_CHARS = 2000;
 

@@ -15,12 +15,37 @@ import type { ChatModelRouter } from './chat.model-router.js';
 import { buildEffortInstruction, type ChatOrchestratorService } from './chat.orchestrator.service.js';
 import type { ChatPromptService, Attachment } from './chat.prompt.service.js';
 
-const TIMEOUT_MS = 30000;
+// Inkling (modelo default desde el orquestador) es un modelo de razonamiento
+// lento: medido en vivo contra 9router, 41.7s solo para el primer byte en una
+// pregunta trivial. 30s abortaba la conexión antes de que arrancara el
+// stream — de ahí el "This operation was aborted" reportado. Este timeout
+// solo cubre el establecimiento de la conexión (se cancela apenas llegan los
+// headers), no la duración total del stream.
+const TIMEOUT_MS = 120000;
 // Cola cruda desde el último corte de resumen — normalmente pequeña, porque
 // la compactación en segundo plano va adelantando el cursor. El cap es solo
 // una red de seguridad si la compactación viene fallando repetido.
 const RAW_TAIL_CAP = 30;
 const RAW_TAIL_MSG_MAX_CHARS = 2000;
+
+// Un controller/timeout por intento — reusar uno ya abortado (ej. el
+// intento con Inkling que expiró a los 120s) mataría instantáneamente
+// también el intento de fallback.
+async function streamWithTimeout(
+  systemPrompt: string,
+  content: string | Array<Record<string, unknown>>,
+  model: string,
+  history: ReturnType<typeof buildRawTail>,
+): Promise<ReadableStream<Uint8Array>> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  try {
+    const response = await callNineRouterStream(systemPrompt, content, { model, signal: controller.signal, history });
+    return response.body!;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
 
 function buildRawTail(sessionId: string) {
   const cursor = ChatModel.getSummaryCursor(sessionId);
@@ -103,30 +128,17 @@ export class ChatStreamingService {
     if (decision?.effort !== undefined) systemPrompt += buildEffortInstruction(decision.effort);
     const content = this.promptService.buildContent(message, attachments);
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
-
     let responseBody: ReadableStream<Uint8Array>;
     let usedModel = resolved.model;
     try {
-      try {
-        const response = await callNineRouterStream(systemPrompt, content, {
-          model: resolved.model, signal: controller.signal, history,
-        });
-        responseBody = response.body!;
-      } catch (err) {
-        if (resolved.model === FALLBACK_MODEL) throw err;
-        logger.warn('Modelo de chat falló, probando fallback', {
-          model: resolved.model, fallback: FALLBACK_MODEL, error: (err as Error).message,
-        });
-        usedModel = FALLBACK_MODEL;
-        const response = await callNineRouterStream(systemPrompt, content, {
-          model: FALLBACK_MODEL, signal: controller.signal, history,
-        });
-        responseBody = response.body!;
-      }
-    } finally {
-      clearTimeout(timeoutId);
+      responseBody = await streamWithTimeout(systemPrompt, content, resolved.model, history);
+    } catch (err) {
+      if (resolved.model === FALLBACK_MODEL) throw err;
+      logger.warn('Modelo de chat falló, probando fallback', {
+        model: resolved.model, fallback: FALLBACK_MODEL, error: (err as Error).message,
+      });
+      usedModel = FALLBACK_MODEL;
+      responseBody = await streamWithTimeout(systemPrompt, content, FALLBACK_MODEL, history);
     }
 
     const originalStream = parseNineRouterStream(responseBody);
@@ -195,30 +207,17 @@ export class ChatStreamingService {
     if (decision?.effort !== undefined) systemPrompt += buildEffortInstruction(decision.effort);
     const content = this.promptService.buildContent(prev.content);
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
-
     let responseBody: ReadableStream<Uint8Array>;
     let usedModel = resolved.model;
     try {
-      try {
-        const response = await callNineRouterStream(systemPrompt, content, {
-          model: resolved.model, signal: controller.signal, history,
-        });
-        responseBody = response.body!;
-      } catch (err) {
-        if (resolved.model === FALLBACK_MODEL) throw err;
-        logger.warn('Modelo de chat falló en regenerate, probando fallback', {
-          model: resolved.model, fallback: FALLBACK_MODEL, error: (err as Error).message,
-        });
-        usedModel = FALLBACK_MODEL;
-        const response = await callNineRouterStream(systemPrompt, content, {
-          model: FALLBACK_MODEL, signal: controller.signal, history,
-        });
-        responseBody = response.body!;
-      }
-    } finally {
-      clearTimeout(timeoutId);
+      responseBody = await streamWithTimeout(systemPrompt, content, resolved.model, history);
+    } catch (err) {
+      if (resolved.model === FALLBACK_MODEL) throw err;
+      logger.warn('Modelo de chat falló en regenerate, probando fallback', {
+        model: resolved.model, fallback: FALLBACK_MODEL, error: (err as Error).message,
+      });
+      usedModel = FALLBACK_MODEL;
+      responseBody = await streamWithTimeout(systemPrompt, content, FALLBACK_MODEL, history);
     }
 
     const originalStream = parseNineRouterStream(responseBody);
