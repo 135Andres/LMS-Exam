@@ -2282,6 +2282,7 @@ async function handleSend() {
           }
           if (json.done) {
             if (aiBubble && json.msgId) aiBubble.dataset.msgId = json.msgId;
+            if (aiBubble && json.userMsgId) aiBubble.dataset.userMsgId = json.userMsgId;
             setLastUserMsgId(json.userMsgId);
             continue;
           }
@@ -2684,10 +2685,32 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 });
 
-// ponytail: stub — implementación real en Task 9. Evita ReferenceError
-// si el botón "Responder" se clickea antes de que ese task aterrice.
-function handleQuizResolve(msgRow, text) {
-  console.warn('handleQuizResolve not yet implemented');
+async function handleQuizResolve(msgRow, text) {
+  const userMsgId = msgRow.dataset.userMsgId;
+  if (!userMsgId) {
+    addMessage('No se pudo identificar el mensaje original del cuestionario.', 'ai');
+    return;
+  }
+
+  showTyping();
+  try {
+    const res = await fetch('/api/chat/tutor/quiz/resolve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ sessionId, userMsgId }),
+    });
+    const data = await res.json();
+    hideTyping();
+    if (!res.ok) {
+      addMessage('Error: ' + (data.error || 'no se pudo resolver el cuestionario'), 'ai');
+      return;
+    }
+    addMessage(data.response, 'ai');
+  } catch (err) {
+    hideTyping();
+    addMessage('Error de conexión al resolver el cuestionario.', 'ai');
+  }
 }
 
 function triggerVisibleMessage(text) {
