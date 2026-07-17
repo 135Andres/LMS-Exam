@@ -160,3 +160,82 @@ describe('compactSession — retry en truncamiento', () => {
     expect(chatModelMock.setSummaryCursor).not.toHaveBeenCalled();
   });
 });
+
+describe('compactSession — auditoría de confianza y cobertura', () => {
+  let warnSpy: ReturnType<typeof vi.spyOn>;
+  let infoSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(async () => {
+    generateFromAIMock.mockReset();
+    chatModelMock.getSummaryCursor.mockReset().mockReturnValue(null);
+    chatModelMock.getMessagesSince.mockReset().mockReturnValue(NEW_MESSAGES);
+    chatModelMock.setSummaryCursor.mockReset();
+    chatModelMock.getLastAssistantModel.mockReset().mockReturnValue('nvidia/thinkingmachines/inkling');
+    sessionSummaryMock.getSummary.mockReset().mockReturnValue(null);
+    sessionSummaryMock.saveSummary.mockReset();
+    knowledgeModelMock.existsByHash.mockReset().mockReturnValue(false);
+    knowledgeModelMock.create.mockReset();
+    const { logger } = await import('../../utils/logger.js');
+    // vi.spyOn reutiliza la misma instancia de mock si el módulo ya estaba
+    // espiado (import cacheado entre tests) — mockClear evita que las
+    // llamadas de un test anterior contaminen el conteo del siguiente.
+    warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined as any);
+    infoSpy = vi.spyOn(logger, 'info').mockImplementation(() => undefined as any);
+    warnSpy.mockClear();
+    infoSpy.mockClear();
+  });
+
+  it('loguea un warning si reviewedMessageCount es menor a los mensajes reales (posible contenido saltado)', async () => {
+    generateFromAIMock.mockResolvedValueOnce(aiResponse(JSON.stringify({
+      summary: 'resumen parcial', confidence: 'high', reviewedMessageCount: 3, kbCandidates: [],
+    })));
+
+    await compactSession('s1', 'u1', true);
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringMatching(/cobertura|reviewedMessageCount|menos mensajes/i),
+      expect.objectContaining({ sessionId: 's1', expected: 6, reviewedMessageCount: 3 }),
+    );
+    // Un mismatch de cobertura NO bloquea el guardado — solo se audita (Fase 3 corrige).
+    expect(sessionSummaryMock.saveSummary).toHaveBeenCalledWith('s1', 'resumen parcial');
+  });
+
+  it('loguea un warning si confidence no es "high"', async () => {
+    generateFromAIMock.mockResolvedValueOnce(aiResponse(JSON.stringify({
+      summary: 'resumen dudoso', confidence: 'low', reviewedMessageCount: 6, kbCandidates: [],
+    })));
+
+    await compactSession('s1', 'u1', true);
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringMatching(/confianza baja|confidence/i),
+      expect.objectContaining({ sessionId: 's1', confidence: 'low' }),
+    );
+  });
+
+  it('loguea un warning si reviewedMessageCount no vino en la respuesta', async () => {
+    generateFromAIMock.mockResolvedValueOnce(aiResponse(JSON.stringify({
+      summary: 'resumen sin conteo', confidence: 'high', kbCandidates: [],
+    })));
+
+    await compactSession('s1', 'u1', true);
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringMatching(/reviewedMessageCount ausente/i),
+      expect.objectContaining({ sessionId: 's1' }),
+    );
+  });
+
+  it('no loguea ningún warning de auditoría cuando confidence es high y el conteo coincide', async () => {
+    generateFromAIMock.mockResolvedValueOnce(aiResponse(JSON.stringify({
+      summary: 'resumen completo', confidence: 'high', reviewedMessageCount: 6, kbCandidates: [],
+    })));
+
+    await compactSession('s1', 'u1', true);
+
+    expect(warnSpy).not.toHaveBeenCalled();
+    expect(infoSpy).toHaveBeenCalledWith('Sesión compactada', expect.objectContaining({
+      confidence: 'high', reviewedMessageCount: 6,
+    }));
+  });
+});

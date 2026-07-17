@@ -34,6 +34,8 @@ function resolveCompactionModel(sessionId: string): string {
 
 interface CompactionResult {
   summary: string;
+  confidence?: 'high' | 'medium' | 'low';
+  reviewedMessageCount?: number;
   kbCandidates?: Array<{ content: string; subject: string; summary?: string }>;
 }
 
@@ -87,6 +89,20 @@ export async function compactSession(sessionId: string, userId: string, force = 
     const parsed = JSON.parse(result.content) as CompactionResult;
     if (!parsed.summary) return;
 
+    if (typeof parsed.reviewedMessageCount !== 'number') {
+      logger.warn('reviewedMessageCount ausente en la respuesta del compactador', { sessionId, model });
+    } else if (parsed.reviewedMessageCount < newMessages.length) {
+      logger.warn('Posible cobertura incompleta: el compactador reportó menos mensajes revisados que los enviados', {
+        sessionId, model, expected: newMessages.length, reviewedMessageCount: parsed.reviewedMessageCount,
+      });
+    }
+
+    if (parsed.confidence && parsed.confidence !== 'high') {
+      logger.warn('Compactación con confianza baja/media reportada por el modelo', {
+        sessionId, model, confidence: parsed.confidence,
+      });
+    }
+
     SessionSummaryService.saveSummary(sessionId, parsed.summary);
     ChatModel.setSummaryCursor(sessionId, newMessages[newMessages.length - 1].created_at);
 
@@ -108,6 +124,7 @@ export async function compactSession(sessionId: string, userId: string, force = 
 
     logger.info('Sesión compactada', {
       sessionId, model, messagesCompacted: newMessages.length, kbCandidates: parsed.kbCandidates?.length || 0,
+      confidence: parsed.confidence, reviewedMessageCount: parsed.reviewedMessageCount,
     });
   } catch (err) {
     logger.warn('Error compactando sesión', { sessionId, model, error: (err as Error).message });
