@@ -1,9 +1,10 @@
 import type { Request, Response } from 'express';
-import { UserModel } from '../models/user.model.js';
+import { UserModel, type UserSettingsPatch } from '../models/user.model.js';
 import { ChatModel } from '../models/chat.model.js';
 import { getDb } from '../db/connection.js';
 import { NotFoundError, ValidationError } from '../utils/errors.js';
 import { ProfileService } from '../services/profile.service.js';
+import { ImportedMemoryService } from '../services/imported-memory.service.js';
 import { logger } from '../utils/logger.js';
 
 export function getProfile(req: Request, res: Response): void {
@@ -24,6 +25,7 @@ export function getProfile(req: Request, res: Response): void {
       total_api_cost: user.total_api_cost,
       has_completed_setup: user.has_completed_setup,
       onboarding_status: user.onboarding_status || 'pending',
+      avatar_data: user.avatar_data || null,
     },
   });
 }
@@ -32,6 +34,31 @@ export function updateUsername(req: Request, res: Response): void {
   const { username } = req.body as { username: string };
   UserModel.setUsername(req.user!.id, username);
   res.json({ username });
+}
+
+export function getSettings(req: Request, res: Response): void {
+  const settings = UserModel.getSettings(req.user!.id);
+  if (!settings) throw new NotFoundError('Usuario no encontrado');
+  res.json({ settings });
+}
+
+export function updateSettings(req: Request, res: Response): void {
+  const patch = req.validatedBody as UserSettingsPatch;
+  UserModel.updateSettings(req.user!.id, patch);
+  const settings = UserModel.getSettings(req.user!.id);
+  res.json({ settings });
+}
+
+export function updateAvatar(req: Request, res: Response): void {
+  const { avatar } = req.validatedBody as { avatar: string };
+  UserModel.setAvatar(req.user!.id, avatar);
+  res.json({ avatar_data: avatar });
+}
+
+export function importMemory(req: Request, res: Response): void {
+  const { text } = req.validatedBody as { text: string };
+  ImportedMemoryService.saveMemory(req.user!.id, text.trim());
+  res.json({ success: true });
 }
 
 interface DailyInsight {
@@ -107,6 +134,7 @@ export function getDashboardSummary(req: Request, res: Response): void {
       name: user.username || user.email,
       email: user.email,
       role: user.role,
+      avatar_data: user.avatar_data || null,
     },
     chatsCount,
     examsCount,

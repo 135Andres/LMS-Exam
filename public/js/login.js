@@ -1,3 +1,6 @@
+import { initI18n, t } from './lib/i18n.js';
+initI18n();
+
 const API_BASE = '';
 const screen1 = document.getElementById('screen1');
 const screen2 = document.getElementById('screen2');
@@ -193,7 +196,7 @@ async function validateOtp(code) {
   } catch (err) {
     otpAttempts--;
     const attemptsEl = document.getElementById('otpAttempts');
-    attemptsEl.textContent = `${otpAttempts} intento${otpAttempts !== 1 ? 's' : ''} restante${otpAttempts !== 1 ? 's' : ''}`;
+    attemptsEl.textContent = `${otpAttempts} ${otpAttempts === 1 ? t('attemptSingular') : t('attemptPlural')}`;
 
     document.querySelectorAll('.otp-segments span').forEach(s => {
       s.classList.add('error');
@@ -256,18 +259,18 @@ function triggerOtpFlood(reason) {
 
 function setEmailLoading(loading) {
   btnContinue.disabled = loading;
-  btnContinue.textContent = loading ? 'Enviando...' : 'Continuar';
+  btnContinue.textContent = loading ? t('sending') : t('continueBtn');
 }
 
 async function handleRequestOtp() {
   const email = emailInput.value.trim().toLowerCase();
 
   if (!email || !email.includes('@')) {
-    formTitle.textContent = 'Correo inválido';
+    formTitle.textContent = t('invalidEmail');
     formTitle.style.color = '#e53935';
     setTimeout(() => {
       formTitle.style.color = '#1a1a1a';
-      formTitle.textContent = 'Inicia sesión';
+      formTitle.textContent = t('loginTitle');
     }, 2000);
     return;
   }
@@ -281,11 +284,11 @@ async function handleRequestOtp() {
     showOtpScreen(email);
   } catch (err) {
     if (err.status === 429) {
-      formTitle.textContent = 'Demasiadas solicitudes. Espera un momento.';
+      formTitle.textContent = t('tooManyRequests');
       formTitle.style.color = '#e53935';
       setTimeout(() => {
         formTitle.style.color = '#1a1a1a';
-        formTitle.textContent = 'Inicia sesión';
+        formTitle.textContent = t('loginTitle');
       }, 3000);
     } else {
       state.email = email;

@@ -28,6 +28,8 @@ backend/src/data/reports.json
 backend/data/profiles/
 # Resúmenes de conversación (compactador de contexto)
 backend/data/session-summaries/
+# Memoria importada de otros proveedores de IA (modal de Settings)
+backend/data/imported-memory/
 
 #  LOGS
 logs/

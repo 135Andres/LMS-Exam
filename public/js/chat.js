@@ -1,4 +1,6 @@
-import { formatTime, escapeHtml, svgIcon, formatAIResponse } from './lib/utils.js';
+import { formatTime, escapeHtml, svgIcon, formatAIResponse, renderAvatarInto } from './lib/utils.js';
+import { initSettingsModal, notifyIfEnabled } from './lib/settings-modal.js';
+import { initI18n, t } from './lib/i18n.js';
 
 async function checkSession() {
   try {
@@ -52,9 +54,9 @@ let reExplicarModeActive = false;
 let reExplicarTargetRow = null;
 
 const SLASH_COMMANDS = [
-  { primary: '/resumen', aliases: ['/resumen', '/resume'], desc: 'Fuerza un resumen de la conversación hasta ahora' },
-  { primary: '/exportar', aliases: ['/exportar', '/export'], desc: 'Descarga la conversación como Markdown' },
-  { primary: '/help', aliases: ['/help', '/ayuda'], desc: 'Muestra esta lista de comandos' },
+  { primary: '/resumen', aliases: ['/resumen', '/resume'], descKey: 'slashSummaryDesc' },
+  { primary: '/exportar', aliases: ['/exportar', '/export'], descKey: 'slashExportDesc' },
+  { primary: '/help', aliases: ['/help', '/ayuda'], descKey: 'slashHelpDesc' },
 ];
 
 let slashMenuActive = false;
@@ -135,13 +137,13 @@ function groupSessionsByDate(sessions) {
   yesterday.setDate(yesterday.getDate() - 1);
   const lastWeek = new Date(today);
   lastWeek.setDate(lastWeek.getDate() - 7);
-  const groups = { 'Hoy': [], 'Ayer': [], 'Últimos 7 días': [], 'Anterior': [] };
+  const groups = { [t('today')]: [], [t('yesterday')]: [], [t('last7Days')]: [], [t('earlier')]: [] };
   sessions.forEach(s => {
     const date = new Date(s.created_at);
-    if (date >= today) groups['Hoy'].push(s);
-    else if (date >= yesterday) groups['Ayer'].push(s);
-    else if (date >= lastWeek) groups['Últimos 7 días'].push(s);
-    else groups['Anterior'].push(s);
+    if (date >= today) groups[t('today')].push(s);
+    else if (date >= yesterday) groups[t('yesterday')].push(s);
+    else if (date >= lastWeek) groups[t('last7Days')].push(s);
+    else groups[t('earlier')].push(s);
   });
   return groups;
 }
@@ -151,13 +153,13 @@ function renderSidebarSessions(sessions) {
   if (!container) return;
   const isGenerating = !!document.getElementById('typingIndicator');
   const showingArchived = document.getElementById('sidebar')?.dataset.mode === 'archived';
-  const groups = showingArchived ? { 'Archivados': sessions } : groupSessionsByDate(sessions);
+  const groups = showingArchived ? { [t('archived')]: sessions } : groupSessionsByDate(sessions);
   let html = '';
   for (const [label, items] of Object.entries(groups)) {
     if (items.length === 0) continue;
     html += `<div class="sidebar-date-group"><div class="sidebar-date-label">${label}</div>`;
     items.forEach(s => {
-      const raw = s.title || s.preview || 'Chat';
+      const raw = s.title || s.preview || t('chatFallback');
       const preview = raw.slice(0, 40) + (raw.length > 40 ? '…' : '');
       const isActive = s.session_id === sessionId;
       let icon = 'chatText';
@@ -177,7 +179,7 @@ function renderSidebarSessions(sessions) {
     html += `</div>`;
   }
   if (!html) {
-    html = `<div class="sidebar-date-group"><div class="sidebar-date-label">Sin chats aún</div></div>`;
+    html = `<div class="sidebar-date-group"><div class="sidebar-date-label">${escapeHtml(t('noChatsYet'))}</div></div>`;
   }
   container.innerHTML = html;
   // La vista de archivados no refleja necesariamente la sesión activa —
@@ -207,7 +209,7 @@ function updateTopBarTitle(sessions) {
   const input = document.getElementById('chatTitleInput');
   if (input && !input.classList.contains('hidden')) return; // no pisar mientras el usuario edita
   const active = sessions.find(s => s.session_id === sessionId);
-  const raw = active?.title || active?.preview || 'Nuevo chat';
+  const raw = active?.title || active?.preview || t('newChatTitle');
   setChatTitleRaw(raw.length > 50 ? raw.slice(0, 50) + '…' : raw);
 }
 
@@ -331,7 +333,7 @@ async function unarchiveSession(sid) {
 }
 
 async function deleteSession(sid) {
-  if (!sid || !confirm('¿Eliminar este chat permanentemente?')) return;
+  if (!sid || !confirm(t('confirmDeleteChat'))) return;
   try {
     await fetch('/api/chat/delete', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin',
@@ -356,13 +358,13 @@ function toggleArchivedView() {
   const btn = document.getElementById('showArchivedBtn');
   if (isArchived) {
     sidebar.dataset.mode = '';
-    if (brand) brand.textContent = 'LMS Exams';
-    if (btn) btn.innerHTML = `${svgIcon('archive', 14)} Chats archivados`;
+    if (brand) brand.textContent = t('brand');
+    if (btn) btn.innerHTML = `${svgIcon('archive', 14)} ${escapeHtml(t('archivedChats'))}`;
     refreshSidebarSessions();
   } else {
     sidebar.dataset.mode = 'archived';
-    if (brand) brand.textContent = 'Archivados';
-    if (btn) btn.innerHTML = `${svgIcon('chevronUp', 14)} Volver a chats`;
+    if (brand) brand.textContent = t('archived');
+    if (btn) btn.innerHTML = `${svgIcon('chevronUp', 14)} ${escapeHtml(t('backToChats'))}`;
     fetchArchivedSessions();
   }
   document.getElementById('userDropdown')?.classList.remove('open');
@@ -443,9 +445,9 @@ function setMode(mode) {
 
   const toggleBtn = document.getElementById('modeToggleBtn');
   toggleBtn.classList.toggle('exam-active', examActive);
-  toggleBtn.textContent = examActive ? 'Cambiar a Chat' : 'Cambiar a Examen';
+  toggleBtn.textContent = examActive ? t('switchToChat') : t('switchToExam');
 
-  document.getElementById('sidebarNewChatLabel').textContent = examActive ? 'Nuevo Examen' : 'Nuevo Chat';
+  document.getElementById('sidebarNewChatLabel').textContent = examActive ? t('newExam') : t('newChat');
 }
 
 function populateTopBarModels() {
@@ -482,11 +484,11 @@ function newChat() {
 
   sessionId = crypto.randomUUID();
   sessionStorage.setItem('chatSessionId', sessionId);
-  setChatTitleRaw('Nuevo chat');
+  setChatTitleRaw(t('newChatTitle'));
 
   document.getElementById('chatMessages').classList.add('open');
   sessionState.chatCreated = formatTime();
-  addMessage('Hola, soy tu tutor. ¿En qué puedo ayudarte?', 'ai');
+  addMessage(t('tutorGreeting'), 'ai');
   updateSessionInfo();
   refreshSidebarSessions();
 }
@@ -533,7 +535,7 @@ function setupStopwatch() {
 
   function start() {
     widget.classList.add('running');
-    startBtn.textContent = 'Pausar';
+    startBtn.textContent = t('stopwatchPause');
     interval = setInterval(tick, 1000);
   }
 
@@ -541,14 +543,14 @@ function setupStopwatch() {
     clearInterval(interval);
     interval = null;
     widget.classList.remove('running');
-    startBtn.textContent = 'Reanudar';
+    startBtn.textContent = t('stopwatchResume');
   }
 
   startBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     if (interval) { stop(); return; }
     if (seconds === 0 && mode === 'down') mode = 'up'; // contador ya llegó a 0: reinicia como cronómetro normal
-    if (mode === 'up' && seconds === 0) startBtn.textContent = 'Pausar';
+    if (mode === 'up' && seconds === 0) startBtn.textContent = t('stopwatchPause');
     start();
   });
 
@@ -614,15 +616,15 @@ function setupChatInput() {
         <div class="input-resize-handle"></div>
         <div class="reexplicar-bar hidden" id="reexplicarBar">
           <div class="reexplicar-header">
-            <span>Modo re-explicar — escribe cómo quieres que te lo expliquen</span>
+            <span>${escapeHtml(t('reexplainModeLabel'))}</span>
             <button class="reexplicar-close" id="reexplicarClose" type="button">&times;</button>
           </div>
           <div class="reexplicar-suggestions" id="reexplicarSuggestions"></div>
         </div>
-        <textarea id="messageInput" placeholder="Message..." rows="1"></textarea>
+        <textarea id="messageInput" placeholder="${escapeHtml(t('messagePlaceholder'))}" rows="1"></textarea>
         <div id="chatLinksList"></div>
         <div class="link-mode-bar" id="linkModeBar">
-          <span>Modo enlace — Escribe una URL y presiona Enter</span>
+          <span>${escapeHtml(t('linkModePlaceholder'))}</span>
           <button class="link-mode-close" id="linkModeClose">&times;</button>
         </div>
       </div>
@@ -632,19 +634,19 @@ function setupChatInput() {
         <div class="plus-menu" id="plusMenu">
           <button class="plus-menu-item" data-action="image">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
-            <span>Imagen</span>
+            <span>${escapeHtml(t('plusMenuImage'))}</span>
           </button>
           <button class="plus-menu-item" data-action="link">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 1 1 0 10h-2"/><line x1="8" x2="16" y1="12" y2="12"/></svg>
-            <span>Enlace</span>
+            <span>${escapeHtml(t('plusMenuLink'))}</span>
           </button>
           <button class="plus-menu-item" data-action="file">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/></svg>
-            <span>Documento</span>
+            <span>${escapeHtml(t('plusMenuDocument'))}</span>
           </button>
           <button class="plus-menu-item" data-action="camera">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"/><circle cx="12" cy="13" r="3"/></svg>
-            <span>Cámara</span>
+            <span>${escapeHtml(t('plusMenuCamera'))}</span>
           </button>
         </div>
       </div>
@@ -722,12 +724,12 @@ function setupChatInput() {
     linkModeActive = false;
     linkModeBar.style.display = 'none';
     const inp = document.getElementById('messageInput');
-    if (inp) inp.placeholder = 'Message...';
+    if (inp) inp.placeholder = t('messagePlaceholder');
   }
 
   function enterLinkMode() {
     linkModeActive = true;
-    linkModeBar.querySelector('span').textContent = 'Modo enlace — Escribe una URL y presiona Enter';
+    linkModeBar.querySelector('span').textContent = t('linkModePlaceholder');
     linkModeBar.style.display = 'flex';
     renderLinksList();
     const inp = document.getElementById('messageInput');
@@ -898,17 +900,17 @@ function setupChatInput() {
         if (url) {
           if (activeLinks.includes(url)) {
             const label = linkModeBar.querySelector('span');
-            label.textContent = 'Ese enlace ya está en la lista';
+            label.textContent = t('linkAlreadyAdded');
             msgInput.value = '';
             setTimeout(() => {
-              label.textContent = 'Modo enlace — Escribe una URL y presiona Enter';
+              label.textContent = t('linkModePlaceholder');
             }, 1500);
           } else {
             activeLinks.push(url);
             msgInput.value = '';
             renderLinksList();
             const label = linkModeBar.querySelector('span');
-            label.textContent = 'Modo enlace — Escribe una URL y presiona Enter';
+            label.textContent = t('linkModePlaceholder');
           }
         }
       } else {
@@ -1018,7 +1020,7 @@ async function initHeroView() {
   // de la sesión anterior que quedó en sessionStorage.
   sessionId = crypto.randomUUID();
   sessionStorage.setItem('chatSessionId', sessionId);
-  setChatTitleRaw('Nuevo chat');
+  setChatTitleRaw(t('newChatTitle'));
 
   // El ancho final de la fila depende de si hay chip de nombre o no — hay
   // que esperar a que ese layout esté resuelto en el DOM ANTES de revelar
@@ -1058,7 +1060,7 @@ function renderHeroNameChip(initialName) {
   if (!chip) return;
 
   let name = initialName || '';
-  btn.textContent = name || 'Agregar nombre';
+  btn.textContent = name || t('addName');
   chip.classList.remove('hidden');
   chip.classList.toggle('has-name', !!name);
   plus.classList.toggle('hidden', !!name);
@@ -1139,7 +1141,7 @@ function submitHeroAsk() {
       msgInput.value = text;
       handleSend();
     } else {
-      addMessage('Hola, soy tu tutor. ¿En qué puedo ayudarte?', 'ai');
+      addMessage(t('tutorGreeting'), 'ai');
     }
   });
 }
@@ -1224,13 +1226,13 @@ function stripQuizMarker(text) {
 function appendQuizButtons(actions, msgRow) {
   const responderBtn = document.createElement('button');
   responderBtn.className = 'msg-action msg-action-quiz msg-action-quiz-responder';
-  responderBtn.textContent = 'Responder';
+  responderBtn.textContent = t('respondBtn');
   responderBtn.addEventListener('click', () => handleQuizResolve(msgRow));
   actions.appendChild(responderBtn);
 
   const explicarBtn = document.createElement('button');
   explicarBtn.className = 'msg-action msg-action-quiz msg-action-quiz-explicar';
-  explicarBtn.textContent = 'Explicar';
+  explicarBtn.textContent = t('explainBtn');
   explicarBtn.addEventListener('click', () => handleQuizExplain());
   actions.appendChild(explicarBtn);
 }
@@ -1244,7 +1246,7 @@ function appendNextStepButton(actions, quizMarker) {
   if (!quizExplainActive || quizMarker === 'QUIZ_EXPLAIN_DONE') return;
   const nextStepBtn = document.createElement('button');
   nextStepBtn.className = 'msg-action msg-action-quiz';
-  nextStepBtn.textContent = 'Siguiente paso';
+  nextStepBtn.textContent = t('nextStepBtn');
   nextStepBtn.addEventListener('click', () => handleQuizNextStep());
   actions.appendChild(nextStepBtn);
 }
@@ -1319,14 +1321,14 @@ function addMessage(text, sender, attachments, msgId, isPinned) {
 
   const copyBtn = document.createElement('button');
   copyBtn.className = 'msg-action';
-  copyBtn.title = 'Copiar';
+  copyBtn.title = t('copy');
   copyBtn.innerHTML = svgIcon('copy');
   copyBtn.addEventListener('click', () => handleCopy(text, copyBtn));
   actions.appendChild(copyBtn);
 
   const pinBtn = document.createElement('button');
   pinBtn.className = 'msg-action';
-  pinBtn.title = isPinned ? 'Quitar de fijados' : 'Fijar mensaje';
+  pinBtn.title = isPinned ? t('unpinMessage') : t('pinMessage');
   pinBtn.innerHTML = svgIcon(isPinned ? 'pinFilled' : 'pin');
   pinBtn.addEventListener('click', () => togglePinMessage(msgRow, pinBtn));
   actions.appendChild(pinBtn);
@@ -1334,21 +1336,21 @@ function addMessage(text, sender, attachments, msgId, isPinned) {
   if (sender === 'user') {
     const editBtn = document.createElement('button');
     editBtn.className = 'msg-action';
-    editBtn.title = 'Editar';
+    editBtn.title = t('edit');
     editBtn.innerHTML = svgIcon('edit');
     editBtn.addEventListener('click', () => handleEdit(msgRow));
     actions.appendChild(editBtn);
 
     const retryBtn = document.createElement('button');
     retryBtn.className = 'msg-action';
-    retryBtn.title = 'Reintentar';
+    retryBtn.title = t('retry');
     retryBtn.innerHTML = svgIcon('retry');
     retryBtn.addEventListener('click', () => handleRetry(msgRow));
     actions.appendChild(retryBtn);
   } else {
     const reportBtn = document.createElement('button');
     reportBtn.className = 'msg-action';
-    reportBtn.title = 'Reportar';
+    reportBtn.title = t('report');
     reportBtn.innerHTML = svgIcon('flag');
     reportBtn.dataset.reported = 'false';
     reportBtn.addEventListener('click', () => handleReport(text, msgRow, reportBtn));
@@ -1356,7 +1358,7 @@ function addMessage(text, sender, attachments, msgId, isPinned) {
 
     const reexplainBtn = document.createElement('button');
     reexplainBtn.className = 'msg-action';
-    reexplainBtn.title = 'Explícamelo diferente';
+    reexplainBtn.title = t('reexplain');
     reexplainBtn.innerHTML = svgIcon('retry');
     reexplainBtn.addEventListener('click', () => openReExplicarConfirm(msgRow));
     actions.appendChild(reexplainBtn);
@@ -1611,7 +1613,7 @@ function renderSlashMenu() {
   menu.innerHTML = slashMenuMatches.map((c, i) => `
     <div class="slash-item ${i === slashMenuIndex ? 'active' : ''}" data-index="${i}">
       <span class="slash-item-cmd">${c.primary}</span>
-      <span class="slash-item-desc">${escapeHtml(c.desc)}</span>
+      <span class="slash-item-desc">${escapeHtml(t(c.descKey))}</span>
     </div>
   `).join('');
   menu.querySelectorAll('.slash-item').forEach(el => {
@@ -1657,9 +1659,9 @@ function executeSlashCommand(primary) {
 
 function showHelpMessage() {
   const rows = SLASH_COMMANDS.map(c =>
-    `<div class="sys-cmd-row"><span class="sys-cmd-name">${c.aliases.join(', ')}</span><span class="sys-cmd-desc">${escapeHtml(c.desc)}</span></div>`
+    `<div class="sys-cmd-row"><span class="sys-cmd-name">${c.aliases.join(', ')}</span><span class="sys-cmd-desc">${escapeHtml(t(c.descKey))}</span></div>`
   ).join('');
-  addSystemMessage(`<div class="sys-help-title">Comandos disponibles</div>${rows}`);
+  addSystemMessage(`<div class="sys-help-title">${escapeHtml(t('availableCommands'))}</div>${rows}`);
 }
 
 // Mensaje de sistema: NO es respuesta de la IA (sin botones de copiar/reportar,
@@ -1704,7 +1706,7 @@ async function togglePinMessage(msgRow, btn) {
     });
     msgRow.dataset.pinned = pinned ? 'false' : 'true';
     btn.innerHTML = svgIcon(pinned ? 'pin' : 'pinFilled');
-    btn.title = pinned ? 'Fijar mensaje' : 'Quitar de fijados';
+    btn.title = pinned ? t('pinMessage') : t('unpinMessage');
     if (document.getElementById('contextPanel')?.classList.contains('open')) {
       fetchPinnedMessages().then(renderPinnedSection);
     }
@@ -1786,15 +1788,15 @@ async function runSummaryCommand() {
     if (res.status === 401) { window.location.href = 'login.html'; return; }
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      addMessage('No se pudo generar el resumen: ' + (err.error || 'error desconocido'), 'ai');
+      addMessage(t('summaryFailed') + ' ' + (err.error || t('unknownError')), 'ai');
       return;
     }
     const data = await res.json();
-    addSessionDivider('Sesión compactada');
-    addMessage(data.summary || 'Todavía no hay suficiente conversación para resumir.', 'ai');
+    addSessionDivider(t('sessionCompacted'));
+    addMessage(data.summary || t('notEnoughToSummarize'), 'ai');
   } catch (err) {
     hideTyping();
-    addMessage('Error: ' + (err.message || 'Error de conexión'), 'ai');
+    addMessage(t('errorPrefix') + ' ' + (err.message || t('connectionError')), 'ai');
   }
 }
 
@@ -1814,7 +1816,7 @@ async function runExportCommand() {
     if (res.status === 401) { window.location.href = 'login.html'; return; }
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      addMessage('No se pudo exportar la conversación: ' + (err.error || 'error desconocido'), 'ai');
+      addMessage(t('exportFailed') + ' ' + (err.error || t('unknownError')), 'ai');
       return;
     }
     const blob = await res.blob();
@@ -1824,10 +1826,10 @@ async function runExportCommand() {
     a.download = 'chat-export.md';
     a.click();
     URL.revokeObjectURL(url);
-    addSystemMessage('Conversación exportada a Markdown.');
+    addSystemMessage(t('exportedToMarkdown'));
   } catch (err) {
     hideTyping();
-    addMessage('Error: ' + (err.message || 'Error de conexión'), 'ai');
+    addMessage(t('errorPrefix') + ' ' + (err.message || t('connectionError')), 'ai');
   }
 }
 
@@ -1867,7 +1869,7 @@ function renderReExplicarSuggestions() {
     btn.addEventListener('click', () => {
       const input = document.getElementById('messageInput');
       if (!input) return;
-      input.value = 'Explícamelo ' + btn.textContent;
+      input.value = t('explainMePrefix') + ' ' + btn.textContent;
       input.focus();
     });
   });
@@ -1891,7 +1893,7 @@ function exitReExplicarMode() {
   const bar = document.getElementById('reexplicarBar');
   if (bar) bar.classList.add('hidden');
   const input = document.getElementById('messageInput');
-  if (input) input.placeholder = 'Message...';
+  if (input) input.placeholder = t('messagePlaceholder');
 }
 
 // Regenera la última respuesta de la IA (msgRow debe ser la más reciente en
@@ -1931,21 +1933,21 @@ async function runRegenerate(targetRow, instruction) {
 
     const copyBtn = document.createElement('button');
     copyBtn.className = 'msg-action';
-    copyBtn.title = 'Copiar';
+    copyBtn.title = t('copy');
     copyBtn.innerHTML = svgIcon('copy');
     copyBtn.addEventListener('click', () => handleCopy(stripQuizMarker(fullTextRef).text, copyBtn));
     actions.appendChild(copyBtn);
 
     const pinBtn = document.createElement('button');
     pinBtn.className = 'msg-action';
-    pinBtn.title = 'Fijar mensaje';
+    pinBtn.title = t('pinMessage');
     pinBtn.innerHTML = svgIcon('pin');
     pinBtn.addEventListener('click', () => togglePinMessage(msgRow, pinBtn));
     actions.appendChild(pinBtn);
 
     const reportBtn = document.createElement('button');
     reportBtn.className = 'msg-action';
-    reportBtn.title = 'Reportar';
+    reportBtn.title = t('report');
     reportBtn.innerHTML = svgIcon('flag');
     reportBtn.dataset.reported = 'false';
     reportBtn.addEventListener('click', () => handleReport(stripQuizMarker(fullTextRef).text, null, reportBtn));
@@ -1953,7 +1955,7 @@ async function runRegenerate(targetRow, instruction) {
 
     const reexplainBtn = document.createElement('button');
     reexplainBtn.className = 'msg-action';
-    reexplainBtn.title = 'Explícamelo diferente';
+    reexplainBtn.title = t('reexplain');
     reexplainBtn.innerHTML = svgIcon('retry');
     reexplainBtn.addEventListener('click', () => openReExplicarConfirm(msgRow));
     actions.appendChild(reexplainBtn);
@@ -1986,7 +1988,7 @@ async function runRegenerate(targetRow, instruction) {
     if (res.status === 401) { window.location.href = 'login.html'; return; }
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || 'Error del servidor');
+      throw new Error(err.error || t('serverError'));
     }
 
     const reader = res.body.getReader();
@@ -2010,6 +2012,7 @@ async function runRegenerate(targetRow, instruction) {
           if (json.done) {
             if (aiBubble && json.msgId) aiBubble.dataset.msgId = json.msgId;
             setLastUserMsgId(json.userMsgId);
+            notifyIfEnabled();
             continue;
           }
           if (json.reasoning) {
@@ -2071,7 +2074,7 @@ async function runRegenerate(targetRow, instruction) {
     }
   } catch (err) {
     hideTyping();
-    addMessage('Error: ' + (err.message || 'Error de conexión'), 'ai');
+    addMessage(t('errorPrefix') + ' ' + (err.message || t('connectionError')), 'ai');
   }
   updateSessionInfo();
   refreshSidebarSessions();
@@ -2105,7 +2108,7 @@ async function handleReport(aiText, msgRow, btn) {
       const timeSpan = btn.closest('.msg-footer')?.querySelector('.msg-time');
       if (timeSpan) {
         const orig = timeSpan.textContent;
-        timeSpan.textContent = 'Reportado';
+        timeSpan.textContent = t('reported');
         setTimeout(() => { timeSpan.textContent = orig; }, 2000);
       }
     }
@@ -2138,7 +2141,7 @@ async function handleSend() {
   if (pendingAttachments.length > 0) {
     const model = availableModels.find(m => m.id === selectedModelId);
     if (!model || !model.multimodal) {
-      if (!confirm('El modelo actual no soporta archivos adjuntos. ¿Cambiar a un modelo multimodal?')) {
+      if (!confirm(t('confirmSwitchModel'))) {
         clearAttachments();
         return;
       }
@@ -2185,21 +2188,21 @@ async function handleSend() {
     actions.className = 'msg-actions';
     const copyBtn = document.createElement('button');
     copyBtn.className = 'msg-action';
-    copyBtn.title = 'Copiar';
+    copyBtn.title = t('copy');
     copyBtn.innerHTML = svgIcon('copy');
     copyBtn.addEventListener('click', () => handleCopy(stripQuizMarker(fullTextRef).text, copyBtn));
     actions.appendChild(copyBtn);
 
     const pinBtn = document.createElement('button');
     pinBtn.className = 'msg-action';
-    pinBtn.title = 'Fijar mensaje';
+    pinBtn.title = t('pinMessage');
     pinBtn.innerHTML = svgIcon('pin');
     pinBtn.addEventListener('click', () => togglePinMessage(msgRow, pinBtn));
     actions.appendChild(pinBtn);
 
     const reportBtn = document.createElement('button');
     reportBtn.className = 'msg-action';
-    reportBtn.title = 'Reportar';
+    reportBtn.title = t('report');
     reportBtn.innerHTML = svgIcon('flag');
     reportBtn.dataset.reported = 'false';
     reportBtn.addEventListener('click', () => handleReport(stripQuizMarker(fullTextRef).text, null, reportBtn));
@@ -2207,7 +2210,7 @@ async function handleSend() {
 
     const reexplainBtn = document.createElement('button');
     reexplainBtn.className = 'msg-action';
-    reexplainBtn.title = 'Explícamelo diferente';
+    reexplainBtn.title = t('reexplain');
     reexplainBtn.innerHTML = svgIcon('retry');
     reexplainBtn.addEventListener('click', () => openReExplicarConfirm(msgRow));
     actions.appendChild(reexplainBtn);
@@ -2250,7 +2253,7 @@ async function handleSend() {
     if (res.status === 401) { window.location.href = 'login.html'; return; }
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || 'Error del servidor');
+      throw new Error(err.error || t('serverError'));
     }
 
     const reader = res.body.getReader();
@@ -2346,12 +2349,12 @@ async function handleSend() {
       }
       renderKaTeX();
     } else if (!aiBubble && !thinkingRow) {
-      addMessage('Lo siento, hubo un error al procesar tu mensaje. Intenta de nuevo.', 'ai');
+      addMessage(t('processingError'), 'ai');
     }
   } catch (err) {
     hideTyping();
     clearAttachments();
-    addMessage('Error: ' + (err.message || 'Error de conexión'), 'ai');
+    addMessage(t('errorPrefix') + ' ' + (err.message || t('connectionError')), 'ai');
   }
   updateSessionInfo();
   refreshSidebarSessions();
@@ -2437,6 +2440,7 @@ async function updateSessionInfo() {
         sessionState.createdAt = u.created_at || u.createdAt || '';
         sessionState.examsGenerated = u.exams_generated ?? u.examsGenerated ?? 0;
         sessionState.totalApiCost = u.total_api_cost ?? u.totalApiCost ?? 0;
+        sessionState.avatarData = u.avatar_data || null;
       }
     } catch (_) {}
 
@@ -2487,8 +2491,8 @@ async function updateSessionInfo() {
     // Update sidebar user info
     const userNameEl = document.getElementById('sidebarUserName');
     const avatarEl = document.getElementById('sidebarUserAvatar');
-    if (userNameEl) userNameEl.textContent = sessionState.name || sessionState.email || 'Usuario';
-    if (avatarEl) avatarEl.textContent = (sessionState.name || sessionState.email || '?')[0].toUpperCase();
+    if (userNameEl) userNameEl.textContent = sessionState.name || sessionState.email || t('user');
+    if (avatarEl) renderAvatarInto(avatarEl, sessionState.avatarData, sessionState.name || sessionState.email);
 
     sessionState.lastActivity = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
 
@@ -2572,6 +2576,7 @@ function closeContextPanel() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+  initI18n();
   updateSessionInfo();
   setInterval(updateSessionInfo, 10000);
 
@@ -2579,8 +2584,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('contextPanelClose').addEventListener('click', closeContextPanel);
   // "LMS Exams" ya no navega a ningún lado — chat.html es la página raíz ahora,
   // el logo es solo decoración.
-  document.getElementById('settingsBtn').addEventListener('click', () => {
-    console.log('settings');
+  initSettingsModal();
+  window.addEventListener('lms:profile-updated', (e) => {
+    const avatarEl = document.getElementById('sidebarUserAvatar');
+    if (e.detail.avatarData !== undefined) {
+      sessionState.avatarData = e.detail.avatarData;
+      if (avatarEl) renderAvatarInto(avatarEl, e.detail.avatarData, sessionState.name || sessionState.email);
+    }
+    if (e.detail.name !== undefined) {
+      sessionState.name = e.detail.name;
+      const nameEl = document.getElementById('sidebarUserName');
+      if (nameEl) nameEl.textContent = e.detail.name;
+      if (!e.detail.avatarData && avatarEl) renderAvatarInto(avatarEl, sessionState.avatarData, e.detail.name);
+    }
   });
 
   document.getElementById('sidebarCollapseBtn').addEventListener('click', toggleSidebar);
@@ -2688,10 +2704,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 async function handleQuizResolve(msgRow) {
   const userMsgId = msgRow.dataset.userMsgId;
   if (!userMsgId) {
-    addMessage('No se pudo identificar el mensaje original del cuestionario.', 'ai');
+    addMessage(t('quizNoOriginalMsg'), 'ai');
     return;
   }
 
+  addSystemMessage(t('quizSolving'));
   showTyping();
   try {
     const res = await fetch('/api/chat/tutor/quiz/resolve', {
@@ -2703,13 +2720,13 @@ async function handleQuizResolve(msgRow) {
     const data = await res.json();
     hideTyping();
     if (!res.ok) {
-      addMessage('Error: ' + (data.error || 'no se pudo resolver el cuestionario'), 'ai');
+      addMessage(t('errorPrefix') + ' ' + (data.error || t('quizSolveFailed')), 'ai');
       return;
     }
     addMessage(data.response, 'ai');
   } catch (err) {
     hideTyping();
-    addMessage('Error de conexión al resolver el cuestionario.', 'ai');
+    addMessage(t('quizConnError'), 'ai');
   }
 }
 
@@ -2729,13 +2746,13 @@ async function handleQuizExplain() {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      addMessage('Error activando el modo Explicar: ' + (err.error || 'error desconocido'), 'ai');
+      addMessage(t('explainModeError') + ' ' + (err.error || t('unknownError')), 'ai');
       return;
     }
     quizExplainActive = true;
     triggerVisibleMessage('Quiero que vayamos por partes.');
   } catch (err) {
-    addMessage('Error activando el modo Explicar: ' + (err.message || 'error de conexión'), 'ai');
+    addMessage(t('explainModeError') + ' ' + (err.message || t('connectionError')), 'ai');
   }
 }
 

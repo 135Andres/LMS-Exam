@@ -15,6 +15,14 @@ export interface UserRow {
   onboarding_feedback_style: string;
   onboarding_strictness: string;
   onboarding_status: string;
+  // Modal de Settings
+  avatar_data: string | null;
+  language: string;
+  theme: string;
+  font: string;
+  reduced_motion: number;
+  notify_on_response: number;
+  cross_chat_enabled: number;
 }
 
 export interface ExamRow {

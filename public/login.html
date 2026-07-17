@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>LMS Exam</title>
+<script>
+(function(){try{var l=localStorage.getItem('lmsLanguage');if(l==='es'||l==='en')document.documentElement.lang=l;var t=localStorage.getItem('lmsTheme');if(t==='dark'||t==='light')document.documentElement.dataset.theme=t;}catch(e){}})();
+</script>
 <link rel="stylesheet" href="css/login.css">
 </head>
 <body>
@@ -26,21 +29,21 @@
     <div class="split-left">
       <div class="form-wrap">
         <div class="form-accent"></div>
-        <h2 class="form-title">Inicia sesión</h2>
-        <p class="form-subtitle">Introduce tu correo para continuar.</p>
-        <label class="form-label">Correo electrónico</label>
-        <input class="email-input" id="emailInput" type="email" placeholder="correo@ejemplo.com" autocomplete="email">
-        <button class="btn-continue" id="btnContinue">Continuar</button>
+        <h2 class="form-title" data-i18n="loginTitle">Inicia sesión</h2>
+        <p class="form-subtitle" data-i18n="loginSubtitle">Introduce tu correo para continuar.</p>
+        <label class="form-label" data-i18n="emailLabel">Correo electrónico</label>
+        <input class="email-input" id="emailInput" type="email" data-i18n-placeholder="emailPlaceholder" placeholder="correo@ejemplo.com" autocomplete="email">
+        <button class="btn-continue" id="btnContinue" data-i18n="continueBtn">Continuar</button>
       </div>
     </div>
   <div class="split-right">
     <div class="info-wrap">
-      <h3 class="info-name">LMS Exam</h3>
-      <p class="info-desc">Tu tutor de estudio con IA, siempre disponible.</p>
+      <h3 class="info-name" data-i18n="appName">LMS Exam</h3>
+      <p class="info-desc" data-i18n="appDesc">Tu tutor de estudio con IA, siempre disponible.</p>
       <ul class="info-features">
-        <li>★ Chat con tutor IA para resolver tus dudas al instante</li>
-        <li>✦ Exámenes generados y adaptados a tu nivel</li>
-        <li>◆ Conocimiento colectivo validado por IA entre estudiantes</li>
+        <li>★ <span data-i18n="feature1">Chat con tutor IA para resolver tus dudas al instante</span></li>
+        <li>✦ <span data-i18n="feature2">Exámenes generados y adaptados a tu nivel</span></li>
+        <li>◆ <span data-i18n="feature3">Conocimiento colectivo validado por IA entre estudiantes</span></li>
       </ul>
     </div>
   </div>
@@ -54,8 +57,8 @@
   <div class="gradient-bg"></div>
   <div class="otp-card" id="otpCard">
     <div class="otp-card-body" id="otpCardBody">
-      <p class="otp-label">Revisa tu correo</p>
-      <p class="otp-sub">Introduce el código de 6 dígitos que enviamos a <span id="otpEmail"></span></p>
+      <p class="otp-label" data-i18n="otpCheckEmail">Revisa tu correo</p>
+      <p class="otp-sub"><span data-i18n="otpSubPrefix">Introduce el código de 6 dígitos que enviamos a</span> <span id="otpEmail"></span></p>
       <div class="otp-input-wrap">
         <input type="text" id="otpInput" maxlength="6" inputmode="numeric" autocomplete="one-time-code" />
         <div class="otp-segments" aria-hidden="true">
@@ -72,6 +75,6 @@
 
 <div class="whiteout" id="whiteout"></div>
 
-<script src="js/login.js?v=3" defer></script>
+<script type="module" src="js/login.js?v=3"></script>
 </body>
 </html>

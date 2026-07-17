@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>LMS Exams — Dashboard</title>
+<script>
+(function(){try{var l=localStorage.getItem('lmsLanguage');if(l==='es'||l==='en')document.documentElement.lang=l;var t=localStorage.getItem('lmsTheme');if(t==='dark'||t==='light')document.documentElement.dataset.theme=t;}catch(e){}})();
+</script>
 <link rel="stylesheet" href="css/welcome.css">
 </head>
 <body>
@@ -11,8 +14,8 @@
 <div class="app-layout">
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-brand" id="sidebarHome">LMS Exams</span>
-      <button class="sidebar-collapse-btn" id="sidebarCollapseBtn" title="Colapsar (Ctrl+B)">
+      <span class="sidebar-brand" id="sidebarHome" data-i18n="brand">LMS Exams</span>
+      <button class="sidebar-collapse-btn" id="sidebarCollapseBtn" data-i18n-title="collapse" title="Colapsar (Ctrl+B)">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M15 18l-6-6 6-6"/>
         </svg>
@@ -21,11 +24,11 @@
     <div class="sidebar-body">
       <a href="#seccion-usuario" class="dashboard-nav-item">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-        Usuario
+        <span data-i18n="navUser">Usuario</span>
       </a>
       <a href="#seccion-materias" class="dashboard-nav-item">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-        Materias
+        <span data-i18n="navSubjects">Materias</span>
       </a>
     </div>
   </aside>
@@ -33,28 +36,60 @@
   <div class="page-content" id="pageContent">
     <nav class="top-bar visible" id="topBar">
       <div class="top-bar-left">
-        <button class="sidebar-toggle-btn" id="sidebarToggleBtn" title="Abrir sidebar">
+        <button class="sidebar-toggle-btn" id="sidebarToggleBtn" data-i18n-title="openSidebar" title="Abrir sidebar">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/>
           </svg>
         </button>
-        <span class="top-bar-title" id="homeBtn">LMS Exams</span>
+        <span class="top-bar-title" id="homeBtn" data-i18n="brand">LMS Exams</span>
+      </div>
+      <div class="top-bar-right">
+        <button class="settings-btn" id="settingsBtn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10 5H3"/><path d="M12 19H3"/><path d="M14 3v4"/><path d="M16 17v4"/><path d="M21 12h-9"/><path d="M21 19h-5"/><path d="M21 5h-7"/><path d="M8 10v4"/><path d="M8 12H3"/>
+          </svg>
+        </button>
       </div>
     </nav>
 
     <div class="dashboard-content">
       <section id="seccion-usuario">
-        <h2 class="dashboard-section-title">Usuario</h2>
-        <div class="user-card" id="userCard">Cargando...</div>
+        <h2 class="dashboard-section-title" data-i18n="navUser">Usuario</h2>
+        <div class="user-card" id="userCard" data-i18n="loading">Cargando...</div>
       </section>
 
       <section id="seccion-materias">
-        <h2 class="dashboard-section-title">Materias</h2>
+        <h2 class="dashboard-section-title" data-i18n="navSubjects">Materias</h2>
         <div class="subjects-list" id="subjectsList"></div>
       </section>
     </div>
   </div>
 </div>
+
+<div class="settings-overlay hidden" id="settingsOverlay">
+  <div class="settings-card">
+    <button class="settings-close-btn" id="settingsCloseBtn" data-i18n-title="close" title="Cerrar">✕</button>
+    <aside class="settings-sidebar" id="settingsSidebar"></aside>
+    <div class="settings-content" id="settingsContent"></div>
+  </div>
+</div>
+
+<div class="memory-import-overlay hidden" id="memoryImportOverlay">
+  <div class="memory-import-card">
+    <button class="settings-close-btn" id="memoryImportCloseBtn" data-i18n-title="close" title="Cerrar">✕</button>
+    <h3 class="memory-import-title" data-i18n="importMemoryTitle">Importa memoria a LMS Exam</h3>
+    <p class="memory-import-instruction" data-i18n="importMemoryInstr1">Copia este prompt en el chat de tu anterior proveedor de IA:</p>
+    <div class="memory-prompt-box">
+      <textarea class="memory-prompt-text" id="memoryPromptText" readonly></textarea>
+      <button class="memory-copy-btn" id="copyMemoryPromptBtn" type="button" data-i18n="copy">Copiar</button>
+    </div>
+    <p class="memory-import-instruction" data-i18n="importMemoryInstr2">Pega los resultados debajo para añadir la memoria a LMS Exam:</p>
+    <textarea class="memory-import-input" id="memoryImportInput" data-i18n-placeholder="importMemoryPlaceholder" placeholder="Pega aquí el resultado..."></textarea>
+    <button class="memory-save-btn" id="saveMemoryImportBtn" type="button" data-i18n="save">Guardar</button>
+  </div>
+</div>
+
+<input type="file" id="avatarFileInput" accept="image/*" class="hidden-file-input">
 
 <script type="module" src="js/dashboard.js"></script>
 </body>

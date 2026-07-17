@@ -9,6 +9,17 @@ interface CreateUserParams {
   role?: string;
 }
 
+export interface UserSettingsPatch {
+  language?: string;
+  theme?: string;
+  font?: string;
+  reduced_motion?: boolean;
+  notify_on_response?: boolean;
+  cross_chat_enabled?: boolean;
+}
+
+const SETTINGS_COLUMNS = ['language', 'theme', 'font', 'reduced_motion', 'notify_on_response', 'cross_chat_enabled'] as const;
+
 export const UserModel = {
   findByEmail(email: string): UserRow | undefined {
     return getDb().prepare('SELECT * FROM users WHERE email = ?').get(email) as UserRow | undefined;
@@ -38,6 +49,30 @@ export const UserModel = {
 
   setUsername(id: string, username: string): void {
     getDb().prepare('UPDATE users SET username = ? WHERE id = ?').run(username, id);
+  },
+
+  getSettings(id: string): Pick<UserRow, typeof SETTINGS_COLUMNS[number] | 'avatar_data'> | undefined {
+    return getDb().prepare(
+      `SELECT ${SETTINGS_COLUMNS.join(', ')}, avatar_data FROM users WHERE id = ?`
+    ).get(id) as Pick<UserRow, typeof SETTINGS_COLUMNS[number] | 'avatar_data'> | undefined;
+  },
+
+  // UPDATE dinámico solo de los campos presentes en el patch — whitelist
+  // fija de columnas (SETTINGS_COLUMNS), nunca interpola nombres de columna
+  // que vengan del cliente.
+  updateSettings(id: string, patch: UserSettingsPatch): void {
+    const entries = SETTINGS_COLUMNS
+      .filter(col => patch[col] !== undefined)
+      .map(col => [col, typeof patch[col] === 'boolean' ? (patch[col] ? 1 : 0) : patch[col]] as const);
+    if (entries.length === 0) return;
+
+    const setClause = entries.map(([col]) => `${col} = ?`).join(', ');
+    const values = entries.map(([, val]) => val);
+    getDb().prepare(`UPDATE users SET ${setClause} WHERE id = ?`).run(...values, id);
+  },
+
+  setAvatar(id: string, avatarDataUrl: string): void {
+    getDb().prepare('UPDATE users SET avatar_data = ? WHERE id = ?').run(avatarDataUrl, id);
   },
 
   listAll(): UserRow[] {

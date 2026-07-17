@@ -430,6 +430,19 @@ function migrate(): void {
   // (primer mensaje) como fallback, ver ChatModel.getUserSessions.
   addColumnIfMissing(db, 'chat_sessions', 'title', 'TEXT');
 
+  // Modal de Settings — foto de perfil (data URL base64, mismo patrón que
+  // los adjuntos de chat) + preferencias de cuenta. "theme" solo tiene
+  // efecto real en 'light' por ahora (el motor de modo oscuro es tarea aparte).
+  addColumnIfMissing(db, 'users', 'avatar_data', 'TEXT');
+  addColumnIfMissing(db, 'users', 'language', "TEXT DEFAULT 'es'");
+  addColumnIfMissing(db, 'users', 'theme', "TEXT DEFAULT 'light'");
+  addColumnIfMissing(db, 'users', 'font', "TEXT DEFAULT 'default'");
+  addColumnIfMissing(db, 'users', 'reduced_motion', 'INTEGER DEFAULT 0');
+  addColumnIfMissing(db, 'users', 'notify_on_response', 'INTEGER DEFAULT 0');
+  // Switch maestro sobre chat.cross-reference.service.ts — si es 0, ni se
+  // corre el filtro de palabras clave para leer otros chats.
+  addColumnIfMissing(db, 'users', 'cross_chat_enabled', 'INTEGER DEFAULT 1');
+
   logger.info('Migración completada: tablas creadas/verificadas');
   closeDb();
 }
