@@ -34,3 +34,12 @@ export const summarySchema = z.object({
 export const exportSchema = z.object({
   sessionId: uuidV4,
 });
+
+export const quizResolveSchema = z.object({
+  sessionId: uuidV4,
+  userMsgId: z.string().min(1, 'userMsgId requerido'),
+});
+
+export const quizExplainSchema = z.object({
+  sessionId: uuidV4,
+});

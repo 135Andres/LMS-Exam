@@ -11,10 +11,14 @@ import type { Attachment } from '../validators/chat.js';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { resolveQuiz } from '../services/chat/chat.quiz.service.js';
+import { ChatQuizModeService } from '../services/chat/chat.quiz-mode.service.js';
+import { ChatPersistenceService } from '../services/chat/chat.persistence.service.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const reportsDir = join(__dirname, '..', 'data');
 const reportsFile = join(reportsDir, 'reports.json');
+const persistence = new ChatPersistenceService();
 
 // No hay preview/fetch de enlaces (fetchLinkPreview nunca se implementó en el
 // frontend) — se le pasan las URLs a la IA como texto para que las tenga en
@@ -357,4 +361,59 @@ export async function getArchivedSessionsHandler(req: Request, res: Response): P
   const userId = req.user!.id;
   const sessions = ChatModel.getUserSessions(userId, true);
   res.json({ sessions });
+}
+
+export async function resolveQuizHandler(req: Request, res: Response): Promise<void> {
+  const { sessionId, userMsgId } = req.validatedBody as { sessionId: string; userMsgId: string };
+  const userId = req.user!.id;
+
+  try {
+    ChatModel.assertSessionOwnership(sessionId, userId);
+  } catch {
+    res.status(403).json({ error: 'No tienes acceso a esta sesión' });
+    return;
+  }
+
+  const original = ChatModel.getMessageById(userMsgId, userId);
+  if (!original) {
+    res.status(404).json({ error: 'Mensaje original no encontrado' });
+    return;
+  }
+
+  logger.info('Resolviendo cuestionario', { sessionId, userMsgId });
+
+  const response = await resolveQuiz(original.content);
+  persistence.saveAssistantMessageWithOutbox(userId, sessionId, response);
+
+  res.json({ response });
+}
+
+export async function startQuizExplainHandler(req: Request, res: Response): Promise<void> {
+  const { sessionId } = req.validatedBody as { sessionId: string };
+  const userId = req.user!.id;
+
+  try {
+    ChatModel.assertSessionOwnership(sessionId, userId);
+  } catch {
+    res.status(403).json({ error: 'No tienes acceso a esta sesión' });
+    return;
+  }
+
+  ChatQuizModeService.activate(sessionId);
+  res.json({ success: true });
+}
+
+export async function endQuizExplainHandler(req: Request, res: Response): Promise<void> {
+  const { sessionId } = req.validatedBody as { sessionId: string };
+  const userId = req.user!.id;
+
+  try {
+    ChatModel.assertSessionOwnership(sessionId, userId);
+  } catch {
+    res.status(403).json({ error: 'No tienes acceso a esta sesión' });
+    return;
+  }
+
+  ChatQuizModeService.deactivate(sessionId);
+  res.json({ success: true });
 }

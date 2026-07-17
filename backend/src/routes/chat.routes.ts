@@ -1,8 +1,8 @@
 import { Router } from 'express';
-import { sendChatMessageHandler, sendChatMessageStreamHandler, getChatHistoryHandler, getSessionsHandler, reportMessageHandler, archiveSessionHandler, unarchiveSessionHandler, deleteSessionHandler, getArchivedSessionsHandler, regenerateMessageStreamHandler, summarizeSessionHandler, pinMessageHandler, unpinMessageHandler, getPinnedMessagesHandler, renameSessionHandler, exportSessionHandler } from '../controllers/chat.controller.js';
+import { sendChatMessageHandler, sendChatMessageStreamHandler, getChatHistoryHandler, getSessionsHandler, reportMessageHandler, archiveSessionHandler, unarchiveSessionHandler, deleteSessionHandler, getArchivedSessionsHandler, regenerateMessageStreamHandler, summarizeSessionHandler, pinMessageHandler, unpinMessageHandler, getPinnedMessagesHandler, renameSessionHandler, exportSessionHandler, resolveQuizHandler, startQuizExplainHandler, endQuizExplainHandler } from '../controllers/chat.controller.js';
 import { authenticate } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
-import { chatMessageSchema, regenerateSchema, summarySchema, exportSchema } from '../validators/chat.js';
+import { chatMessageSchema, regenerateSchema, summarySchema, exportSchema, quizResolveSchema, quizExplainSchema } from '../validators/chat.js';
 import { AVAILABLE_MODELS } from '../config/models.js';
 
 const router = Router();
@@ -13,6 +13,9 @@ router.post('/tutor', validate(chatMessageSchema), sendChatMessageHandler);
 router.post('/tutor/stream', validate(chatMessageSchema), sendChatMessageStreamHandler);
 router.post('/tutor/regenerate', validate(regenerateSchema), regenerateMessageStreamHandler);
 router.post('/tutor/summary', validate(summarySchema), summarizeSessionHandler);
+router.post('/tutor/quiz/resolve', validate(quizResolveSchema), resolveQuizHandler);
+router.post('/tutor/quiz/explain-start', validate(quizExplainSchema), startQuizExplainHandler);
+router.post('/tutor/quiz/explain-end', validate(quizExplainSchema), endQuizExplainHandler);
 router.post('/export', validate(exportSchema), exportSessionHandler);
 router.get('/tutor/history', getChatHistoryHandler);
 router.get('/tutor/sessions', getSessionsHandler);
