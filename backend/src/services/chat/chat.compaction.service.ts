@@ -75,6 +75,10 @@ export async function compactSession(sessionId: string, userId: string, force = 
 
     // Nunca se acepta una respuesta truncada como resultado final — se
     // descarta el intento en vez de guardar un resumen a medias (spec 4.1).
+    // ponytail: el cursor NO avanza acá, así que una sesión que trunca
+    // repetido reprocesa el mismo (creciente) transcript en cada intento y
+    // puede quedar en stall permanente — lo resuelve el pipeline de 2 pistas
+    // de Fase 2 (bloques verbatim en vez de un resumen monolítico), no acá.
     if (result.finishReason === 'length') {
       logger.warn('Compactación sigue truncada tras reintento, se descarta este intento', { sessionId, model });
       return;
