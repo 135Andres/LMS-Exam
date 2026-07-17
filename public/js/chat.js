@@ -1221,11 +1221,11 @@ function stripQuizMarker(text) {
   return { text, marker: null };
 }
 
-function appendQuizButtons(actions, msgRow, text) {
+function appendQuizButtons(actions, msgRow) {
   const responderBtn = document.createElement('button');
   responderBtn.className = 'msg-action msg-action-quiz msg-action-quiz-responder';
   responderBtn.textContent = 'Responder';
-  responderBtn.addEventListener('click', () => handleQuizResolve(msgRow, text));
+  responderBtn.addEventListener('click', () => handleQuizResolve(msgRow));
   actions.appendChild(responderBtn);
 
   const explicarBtn = document.createElement('button');
@@ -1362,7 +1362,7 @@ function addMessage(text, sender, attachments, msgId, isPinned) {
     actions.appendChild(reexplainBtn);
 
     if (quizMarker === 'QUIZ_DETECTED') {
-      appendQuizButtons(actions, msgRow, text);
+      appendQuizButtons(actions, msgRow);
     }
 
     appendNextStepButton(actions, quizMarker);
@@ -2061,7 +2061,7 @@ async function runRegenerate(targetRow, instruction) {
       const { text: cleanText, marker: quizMarker } = stripQuizMarker(fullTextRef);
       const actions = aiBubble ? aiBubble.querySelector('.msg-actions') : null;
       if (actions) {
-        if (quizMarker === 'QUIZ_DETECTED') appendQuizButtons(actions, aiBubble, cleanText);
+        if (quizMarker === 'QUIZ_DETECTED') appendQuizButtons(actions, aiBubble);
         appendNextStepButton(actions, quizMarker);
       }
       if (quizMarker === 'QUIZ_EXPLAIN_DONE') {
@@ -2338,7 +2338,7 @@ async function handleSend() {
       const { text: cleanText, marker: quizMarker } = stripQuizMarker(fullTextRef);
       const actions = aiBubble ? aiBubble.querySelector('.msg-actions') : null;
       if (actions) {
-        if (quizMarker === 'QUIZ_DETECTED') appendQuizButtons(actions, aiBubble, cleanText);
+        if (quizMarker === 'QUIZ_DETECTED') appendQuizButtons(actions, aiBubble);
         appendNextStepButton(actions, quizMarker);
       }
       if (quizMarker === 'QUIZ_EXPLAIN_DONE') {
@@ -2685,7 +2685,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 });
 
-async function handleQuizResolve(msgRow, text) {
+async function handleQuizResolve(msgRow) {
   const userMsgId = msgRow.dataset.userMsgId;
   if (!userMsgId) {
     addMessage('No se pudo identificar el mensaje original del cuestionario.', 'ai');
