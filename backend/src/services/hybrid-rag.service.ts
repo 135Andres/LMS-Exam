@@ -1,6 +1,7 @@
 import { findTopK } from '../utils/vector.js';
 import { EmbeddingModel } from '../models/embedding.model.js';
 import { KnowledgeEmbeddingModel } from '../models/knowledge-embedding.model.js';
+import { SUBJECT_KEYWORDS } from './chat/chat.classifier.service.js';
 
 interface SearchResult {
   content: string;
@@ -127,18 +128,8 @@ export class HybridRAGService {
   }
 
   static detectSubject(query: string): string | undefined {
-    const subjects: Record<string, string[]> = {
-      matematicas: ['derivada', 'integral', 'limite', 'ecuacion', 'funcion', 'matriz', 'vector', 'probabilidad', 'estadistica', 'geometria', 'trigonometria', 'calculo', 'algebra'],
-      fisica: ['fuerza', 'energia', 'velocidad', 'aceleracion', 'newton', 'cinematica', 'dinamica', 'termodinamica', 'electricidad', 'magnetismo', 'optica', 'ondas'],
-      quimica: ['molecula', 'atomo', 'reaccion', 'enlace', 'acido', 'base', 'ph', 'estequiometria', 'tabla periodica', 'orbital'],
-      biologia: ['celula', 'adn', 'gen', 'proteina', 'evolucion', 'ecosistema', 'fotosintesis', 'mitosis', 'meiosis'],
-      historia: ['guerra', 'revolucion', 'imperio', 'siglo', 'tratado', 'independencia', 'constitucion'],
-      lenguaje: ['sintaxis', 'gramatica', 'verbo', 'sustantivo', 'adjetivo', 'oracion', 'texto', 'lectura', 'escritura'],
-      informatica: ['algoritmo', 'codigo', 'programa', 'variable', 'bucle', 'array', 'objeto', 'clase', 'api', 'base de datos'],
-    };
-
     const lower = query.toLowerCase();
-    for (const [subject, keywords] of Object.entries(subjects)) {
+    for (const [subject, keywords] of Object.entries(SUBJECT_KEYWORDS)) {
       if (keywords.some(k => lower.includes(k))) return subject;
     }
     return undefined;

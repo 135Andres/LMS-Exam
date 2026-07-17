@@ -1,4 +1,5 @@
 import dotenv from 'dotenv';
+import { INKLING_MODEL_ID } from './models.js';
 dotenv.config();
 
 function required(key: string): string {
@@ -27,7 +28,7 @@ export const config = {
   models: {
     generate: process.env.GENERATE_MODEL || 'nvidia/minimaxai/minimax-m3',
     polish: process.env.POLISH_MODEL || 'nvidia/minimaxai/minimax-m3',
-    chat: process.env.CHAT_MODEL || 'oc/deepseek-v4-flash-free',
+    chat: process.env.CHAT_MODEL || INKLING_MODEL_ID,
     // Validador batch de la KB colectiva.
     kbValidator: process.env.KB_VALIDATOR_MODEL || 'oc/deepseek-v4-flash-free',
     // Análisis nocturno de progreso (insights.service.ts).
@@ -74,6 +75,13 @@ export const config = {
     otpWindowMs: parseInt(process.env.RATE_LIMIT_OTP_WINDOW_MS || '3600000', 10),
     otpVerifyMax: parseInt(process.env.RATE_LIMIT_OTP_VERIFY_MAX || '5', 10),
     otpVerifyWindowMs: parseInt(process.env.RATE_LIMIT_OTP_VERIFY_WINDOW_MS || '60000', 10),
+  },
+
+  orchestrator: {
+    enabled: process.env.ORCHESTRATOR_ENABLED !== 'false',
+    // ponytail: fase 2 del plan (clasificación con LLM para casos ambiguos)
+    // no está implementada — este flag queda listo pero inerte hasta que se escriba.
+    llmClassificationFallback: process.env.ENABLE_LLM_CLASSIFICATION_FALLBACK === 'true',
   },
 };
 

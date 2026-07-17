@@ -2,14 +2,17 @@ import { callNineRouterStream, parseNineRouterStream, type StreamChunk } from '.
 import { FALLBACK_MODEL } from '../ai/index.js';
 import { logger } from '../../utils/logger.js';
 import { ChatModel } from '../../models/chat.model.js';
+import { UserModel } from '../../models/user.model.js';
 import { EmbeddingModel } from '../../models/embedding.model.js';
 import { detectAndSuggestKnowledge } from '../knowledge-detection.service.js';
 import { compactSession } from './chat.compaction.service.js';
+import { mightReferenceOtherChat, buildCrossChatContext } from './chat.cross-reference.service.js';
 import type { ChatPersistenceService } from './chat.persistence.service.js';
 import type { ChatEmbeddingService } from './chat.embedding.service.js';
 import type { ChatRAGService } from './chat.rag.service.js';
 import type { ChatProfileDetectionService } from './chat.profile-detection.service.js';
 import type { ChatModelRouter } from './chat.model-router.js';
+import { buildEffortInstruction, type ChatOrchestratorService } from './chat.orchestrator.service.js';
 import type { ChatPromptService, Attachment } from './chat.prompt.service.js';
 
 const TIMEOUT_MS = 30000;
@@ -52,6 +55,7 @@ export class ChatStreamingService {
     private profileDetectionService: ChatProfileDetectionService,
     private modelRouter: ChatModelRouter,
     private promptService: ChatPromptService,
+    private orchestrator: ChatOrchestratorService,
   ) {}
 
   async *execute(
@@ -61,10 +65,8 @@ export class ChatStreamingService {
     userId: string,
     sessionId: string,
   ): AsyncGenerator<StreamChunk> {
-    const resolved = this.modelRouter.resolve(modelId);
-    this.modelRouter.validateMultimodal(resolved, attachments);
-
-    await ensureContextForModel(sessionId, userId, resolved.model);
+    // Se toma ANTES de persistir el mensaje actual — de lo contrario aparecería
+    // duplicado (una vez en `history`, otra vez en `content`).
     const history = buildRawTail(sessionId);
 
     const { msgId: userMsgId, outboxId } = this.persistence.saveUserMessageWithOutbox(userId, sessionId, message);
@@ -75,11 +77,30 @@ export class ChatStreamingService {
       ? await this.ragService.buildContext(userId, userMsgId, queryVector, message)
       : { context: '', hadCollectiveMatch: false };
 
+    // Si el usuario forzó un modelo desde el selector, se respeta esa elección
+    // manual y no se orquesta.
+    const decision = modelId ? undefined : this.orchestrator.decide(message, ragContext.length, attachments);
+    const resolved = this.modelRouter.resolve(decision?.model ?? modelId);
+    this.modelRouter.validateMultimodal(resolved, attachments);
+
+    // Corre después de calcular `history` a propósito, ver comentario análogo
+    // en chat.completion.service.ts.
+    await ensureContextForModel(sessionId, userId, resolved.model);
+
     this.profileDetectionService.detectAndApply(message, userId).catch(err =>
       logger.warn('Profile detection async failed', { error: (err as Error).message })
     );
 
-    const systemPrompt = this.promptService.buildSystemPrompt(resolved.label, ragContext, userId, undefined, sessionId);
+    // Solo se lee OTRO chat si el estudiante lo pide explícitamente (ver
+    // chat.cross-reference.service.ts) — nunca por defecto. Además respeta
+    // el switch maestro del usuario (Settings → Capacidades → Cross-Chats).
+    const crossChatEnabled = UserModel.findById(userId)?.cross_chat_enabled !== 0;
+    const crossChatContext = crossChatEnabled && mightReferenceOtherChat(message)
+      ? await buildCrossChatContext(message, userId, sessionId)
+      : '';
+
+    let systemPrompt = this.promptService.buildSystemPrompt(resolved.label, ragContext, userId, undefined, sessionId, crossChatContext);
+    if (decision?.effort !== undefined) systemPrompt += buildEffortInstruction(decision.effort);
     const content = this.promptService.buildContent(message, attachments);
 
     const controller = new AbortController();
@@ -158,17 +179,20 @@ export class ChatStreamingService {
       throw new Error('NOT_LAST_EXCHANGE');
     }
 
-    const resolved = this.modelRouter.resolve(modelId);
-    ChatModel.deleteMessage(last.id, userId);
-
-    await ensureContextForModel(sessionId, userId, resolved.model);
-    const history = buildRawTail(sessionId);
     const queryVector = EmbeddingModel.getVectorByMessageId(prev.id);
     const { context: ragContext, hadCollectiveMatch } = queryVector
       ? await this.ragService.buildContext(userId, prev.id, queryVector, prev.content)
       : { context: '', hadCollectiveMatch: false };
 
-    const systemPrompt = this.promptService.buildSystemPrompt(resolved.label, ragContext, userId, instruction ?? '', sessionId);
+    const decision = modelId ? undefined : this.orchestrator.decide(prev.content, ragContext.length);
+    const resolved = this.modelRouter.resolve(decision?.model ?? modelId);
+    ChatModel.deleteMessage(last.id, userId);
+
+    await ensureContextForModel(sessionId, userId, resolved.model);
+    const history = buildRawTail(sessionId);
+
+    let systemPrompt = this.promptService.buildSystemPrompt(resolved.label, ragContext, userId, instruction ?? '', sessionId);
+    if (decision?.effort !== undefined) systemPrompt += buildEffortInstruction(decision.effort);
     const content = this.promptService.buildContent(prev.content);
 
     const controller = new AbortController();

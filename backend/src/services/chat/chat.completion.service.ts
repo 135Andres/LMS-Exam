@@ -8,6 +8,7 @@ import type { ChatEmbeddingService } from './chat.embedding.service.js';
 import type { ChatRAGService } from './chat.rag.service.js';
 import type { ChatProfileDetectionService } from './chat.profile-detection.service.js';
 import type { ChatModelRouter } from './chat.model-router.js';
+import { buildEffortInstruction, type ChatOrchestratorService } from './chat.orchestrator.service.js';
 import type { ChatPromptService, Attachment } from './chat.prompt.service.js';
 
 const TIMEOUT_MS = 30000;
@@ -42,6 +43,7 @@ export class ChatCompletionService {
     private profileDetectionService: ChatProfileDetectionService,
     private modelRouter: ChatModelRouter,
     private promptService: ChatPromptService,
+    private orchestrator: ChatOrchestratorService,
   ) {}
 
   async execute(
@@ -51,17 +53,8 @@ export class ChatCompletionService {
     userId: string,
     sessionId: string,
   ): Promise<{ response: string }> {
-    const resolved = this.modelRouter.resolve(modelId);
-    this.modelRouter.validateMultimodal(resolved, attachments);
-
-    logger.info('Enviando mensaje al tutor IA', {
-      messageLength: message.length,
-      model: resolved.model,
-      modelId: modelId || 'default',
-      attachmentsCount: attachments?.length || 0,
-    });
-
-    await ensureContextForModel(sessionId, userId, resolved.model);
+    // Se toma ANTES de persistir el mensaje actual — de lo contrario aparecería
+    // duplicado (una vez en `history`, otra vez en `content`).
     const history = buildRawTail(sessionId);
 
     const { msgId: userMsgId, outboxId } = this.persistence.saveUserMessageWithOutbox(userId, sessionId, message);
@@ -72,11 +65,31 @@ export class ChatCompletionService {
       ? await this.ragService.buildContext(userId, userMsgId, queryVector, message)
       : { context: '', hadCollectiveMatch: false };
 
+    // Si el usuario forzó un modelo desde el selector, se respeta esa elección
+    // manual y no se orquesta.
+    const decision = modelId ? undefined : this.orchestrator.decide(message, ragContext.length, attachments);
+    const resolved = this.modelRouter.resolve(decision?.model ?? modelId);
+    this.modelRouter.validateMultimodal(resolved, attachments);
+
+    logger.info('Enviando mensaje al tutor IA', {
+      messageLength: message.length,
+      model: resolved.model,
+      modelId: modelId || 'default',
+      attachmentsCount: attachments?.length || 0,
+    });
+
+    // Corre después de calcular `history` a propósito: si el modelo cambió,
+    // esta compactación bloqueante ya no alcanza a angostar el `history` de
+    // ESTE turno (sí lo hará para el próximo) — trade-off aceptado para no
+    // acoplar la resolución del modelo a la construcción del historial.
+    await ensureContextForModel(sessionId, userId, resolved.model);
+
     this.profileDetectionService.detectAndApply(message, userId).catch(err =>
       logger.warn('Profile detection async failed', { error: (err as Error).message })
     );
 
-    const systemPrompt = this.promptService.buildSystemPrompt(resolved.label, ragContext, userId, undefined, sessionId);
+    let systemPrompt = this.promptService.buildSystemPrompt(resolved.label, ragContext, userId, undefined, sessionId);
+    if (decision?.effort !== undefined) systemPrompt += buildEffortInstruction(decision.effort);
     const content = this.promptService.buildContent(message, attachments);
 
     const controller = new AbortController();

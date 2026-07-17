@@ -8,7 +8,14 @@ export interface ChatModelOption {
   multimodal: boolean;
 }
 
+// Sin credenciales activas en 9router al momento de escribir esto (probeado:
+// 404 "No active credentials for provider: thinkingmachines"). El id es
+// correcto — generateFromAI ya cae a FALLBACK_MODEL si falla, así que activar
+// las credenciales en 9router es lo único que falta para que funcione.
+export const INKLING_MODEL_ID = 'thinkingmachines/inkling';
+
 export const AVAILABLE_MODELS: ChatModelOption[] = [
+  { id: INKLING_MODEL_ID, label: 'Inkling', multimodal: true },
   { id: 'oc/deepseek-v4-flash-free', label: 'DeepSeek Flash', multimodal: false },
   { id: 'ag/gemini-3-flash', label: 'Gemini Flash', multimodal: true },
   { id: 'ag/gemini-3.1-pro-low', label: 'Gemini Pro', multimodal: true },

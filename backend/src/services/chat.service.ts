@@ -3,6 +3,7 @@ import { ChatEmbeddingService } from './chat/chat.embedding.service.js';
 import { ChatRAGService } from './chat/chat.rag.service.js';
 import { ChatProfileDetectionService, isProfileEditIntent } from './chat/chat.profile-detection.service.js';
 import { ChatModelRouter } from './chat/chat.model-router.js';
+import { ChatOrchestratorService } from './chat/chat.orchestrator.service.js';
 import { ChatPromptService, type Attachment } from './chat/chat.prompt.service.js';
 import { ChatStreamingService } from './chat/chat.streaming.service.js';
 import { ChatCompletionService } from './chat/chat.completion.service.js';
@@ -14,13 +15,14 @@ const embeddingService = new ChatEmbeddingService();
 const ragService = new ChatRAGService();
 const profileDetectionService = new ChatProfileDetectionService();
 const modelRouter = new ChatModelRouter();
+const orchestrator = new ChatOrchestratorService();
 const promptService = new ChatPromptService();
 
 const streamingService = new ChatStreamingService(
-  persistence, embeddingService, ragService, profileDetectionService, modelRouter, promptService,
+  persistence, embeddingService, ragService, profileDetectionService, modelRouter, promptService, orchestrator,
 );
 const completionService = new ChatCompletionService(
-  persistence, embeddingService, ragService, profileDetectionService, modelRouter, promptService,
+  persistence, embeddingService, ragService, profileDetectionService, modelRouter, promptService, orchestrator,
 );
 
 export function buildContent(message: string, attachments?: Attachment[]): Array<Record<string, unknown>> {
