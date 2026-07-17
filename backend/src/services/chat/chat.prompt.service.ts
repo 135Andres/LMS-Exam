@@ -1,7 +1,8 @@
-import { SYSTEM_PROMPT_TUTOR, SYSTEM_PROMPT_TUTOR_ADMIN_OVERRIDE } from '../../prompts/system.js';
+import { SYSTEM_PROMPT_TUTOR, SYSTEM_PROMPT_TUTOR_ADMIN_OVERRIDE, SYSTEM_PROMPT_QUIZ_EXPLAIN } from '../../prompts/system.js';
 import { ProfileService } from '../profile.service.js';
 import { UserModel } from '../../models/user.model.js';
 import { SessionSummaryService } from '../session-summary.service.js';
+import { ChatQuizModeService } from './chat.quiz-mode.service.js';
 
 export interface Attachment {
   type: 'image' | 'audio' | 'file';
@@ -11,7 +12,10 @@ export interface Attachment {
 
 export class ChatPromptService {
   buildSystemPrompt(modelLabel: string, ragContext: string, userId: string, regenerateInstruction?: string, sessionId?: string, crossChatContext?: string): string {
-    let prompt = SYSTEM_PROMPT_TUTOR.replace(/\{MODEL_NAME\}/g, modelLabel);
+    const basePrompt = sessionId && ChatQuizModeService.isActive(sessionId)
+      ? SYSTEM_PROMPT_QUIZ_EXPLAIN
+      : SYSTEM_PROMPT_TUTOR;
+    let prompt = basePrompt.replace(/\{MODEL_NAME\}/g, modelLabel);
 
     if (sessionId) {
       const summary = SessionSummaryService.getSummary(sessionId);
