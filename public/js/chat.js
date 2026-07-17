@@ -1235,6 +1235,20 @@ function appendQuizButtons(actions, msgRow, text) {
   actions.appendChild(explicarBtn);
 }
 
+// Modo "Explicar": mientras está activo, cada mensaje de IA subsecuente
+// (que no sea el que trae [[QUIZ_EXPLAIN_DONE]]) recibe un botón "Siguiente
+// paso" que pide el próximo ejercicio.
+let quizExplainActive = false;
+
+function appendNextStepButton(actions, quizMarker) {
+  if (!quizExplainActive || quizMarker === 'QUIZ_EXPLAIN_DONE') return;
+  const nextStepBtn = document.createElement('button');
+  nextStepBtn.className = 'msg-action msg-action-quiz';
+  nextStepBtn.textContent = 'Siguiente paso';
+  nextStepBtn.addEventListener('click', () => handleQuizNextStep());
+  actions.appendChild(nextStepBtn);
+}
+
 function addMessage(text, sender, attachments, msgId, isPinned) {
   const chatMessages = document.getElementById('chatMessages');
 
@@ -1350,6 +1364,8 @@ function addMessage(text, sender, attachments, msgId, isPinned) {
     if (quizMarker === 'QUIZ_DETECTED') {
       appendQuizButtons(actions, msgRow, text);
     }
+
+    appendNextStepButton(actions, quizMarker);
 
     if (quizMarker === 'QUIZ_EXPLAIN_DONE') {
       handleQuizExplainDone();
@@ -2043,9 +2059,10 @@ async function runRegenerate(targetRow, instruction) {
     hideTyping();
     if (fullTextRef) {
       const { text: cleanText, marker: quizMarker } = stripQuizMarker(fullTextRef);
-      if (quizMarker === 'QUIZ_DETECTED' && aiBubble) {
-        const actions = aiBubble.querySelector('.msg-actions');
-        if (actions) appendQuizButtons(actions, aiBubble, cleanText);
+      const actions = aiBubble ? aiBubble.querySelector('.msg-actions') : null;
+      if (actions) {
+        if (quizMarker === 'QUIZ_DETECTED') appendQuizButtons(actions, aiBubble, cleanText);
+        appendNextStepButton(actions, quizMarker);
       }
       if (quizMarker === 'QUIZ_EXPLAIN_DONE') {
         handleQuizExplainDone();
@@ -2318,9 +2335,10 @@ async function handleSend() {
 
     if (fullTextRef) {
       const { text: cleanText, marker: quizMarker } = stripQuizMarker(fullTextRef);
-      if (quizMarker === 'QUIZ_DETECTED' && aiBubble) {
-        const actions = aiBubble.querySelector('.msg-actions');
-        if (actions) appendQuizButtons(actions, aiBubble, cleanText);
+      const actions = aiBubble ? aiBubble.querySelector('.msg-actions') : null;
+      if (actions) {
+        if (quizMarker === 'QUIZ_DETECTED') appendQuizButtons(actions, aiBubble, cleanText);
+        appendNextStepButton(actions, quizMarker);
       }
       if (quizMarker === 'QUIZ_EXPLAIN_DONE') {
         handleQuizExplainDone();
@@ -2666,16 +2684,43 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 });
 
-// ponytail: stubs — implementación real en Tasks 8/9. Evitan ReferenceError
-// si un botón de cuestionario se clickea antes de que esos tasks aterricen.
+// ponytail: stub — implementación real en Task 9. Evita ReferenceError
+// si el botón "Responder" se clickea antes de que ese task aterrice.
 function handleQuizResolve(msgRow, text) {
   console.warn('handleQuizResolve not yet implemented');
 }
 
-function handleQuizExplain() {
-  console.warn('handleQuizExplain not yet implemented');
+function triggerVisibleMessage(text) {
+  const input = document.getElementById('messageInput');
+  input.value = text;
+  handleSend();
+}
+
+async function handleQuizExplain() {
+  try {
+    await fetch('/api/chat/tutor/quiz/explain-start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ sessionId }),
+    });
+    quizExplainActive = true;
+    triggerVisibleMessage('Quiero que vayamos por partes.');
+  } catch (err) {
+    addMessage('Error activando el modo Explicar: ' + (err.message || 'error de conexión'), 'ai');
+  }
 }
 
 function handleQuizExplainDone() {
-  console.warn('handleQuizExplainDone not yet implemented');
+  quizExplainActive = false;
+  fetch('/api/chat/tutor/quiz/explain-end', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'same-origin',
+    body: JSON.stringify({ sessionId }),
+  }).catch(() => {});
+}
+
+function handleQuizNextStep() {
+  triggerVisibleMessage('Siguiente paso.');
 }
