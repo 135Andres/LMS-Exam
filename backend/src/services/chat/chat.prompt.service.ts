@@ -2,6 +2,7 @@ import { SYSTEM_PROMPT_TUTOR, SYSTEM_PROMPT_TUTOR_ADMIN_OVERRIDE, SYSTEM_PROMPT_
 import { ProfileService } from '../profile.service.js';
 import { UserModel } from '../../models/user.model.js';
 import { SessionSummaryService } from '../session-summary.service.js';
+import { ImportedMemoryService } from '../imported-memory.service.js';
 import { ChatQuizModeService } from './chat.quiz-mode.service.js';
 
 export interface Attachment {
@@ -34,7 +35,12 @@ export class ChatPromptService {
 
     const profile = ProfileService.getProfile(userId);
     if (profile) {
-      prompt += `\n\n--- Preferencias del estudiante (obligatorias, tienen prioridad — ver directriz 12) ---\n${profile}\n---`;
+      prompt += `\n\n--- Preferencias del estudiante (obligatorias, tienen prioridad sobre el tono por defecto) ---\n${profile}\n---`;
+    }
+
+    const importedMemory = ImportedMemoryService.getMemory(userId);
+    if (importedMemory) {
+      prompt += `\n\n--- Memoria importada de otro proveedor de IA (contexto de conversaciones previas en otra plataforma) ---\n${importedMemory}\n---`;
     }
 
     if (regenerateInstruction !== undefined) {
