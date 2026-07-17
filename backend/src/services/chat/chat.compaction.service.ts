@@ -87,7 +87,6 @@ export async function compactSession(sessionId: string, userId: string, force = 
     }
 
     const parsed = JSON.parse(result.content) as CompactionResult;
-    if (!parsed.summary) return;
 
     if (typeof parsed.reviewedMessageCount !== 'number') {
       logger.warn('reviewedMessageCount ausente en la respuesta del compactador', { sessionId, model });
@@ -102,6 +101,8 @@ export async function compactSession(sessionId: string, userId: string, force = 
         sessionId, model, confidence: parsed.confidence,
       });
     }
+
+    if (!parsed.summary) return;
 
     SessionSummaryService.saveSummary(sessionId, parsed.summary);
     ChatModel.setSummaryCursor(sessionId, newMessages[newMessages.length - 1].created_at);

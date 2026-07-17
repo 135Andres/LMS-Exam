@@ -238,4 +238,23 @@ describe('compactSession — auditoría de confianza y cobertura', () => {
       confidence: 'high', reviewedMessageCount: 6,
     }));
   });
+
+  it('audita cobertura/confianza incluso cuando el resumen viene vacío y no se guarda nada', async () => {
+    generateFromAIMock.mockResolvedValueOnce(aiResponse(JSON.stringify({
+      summary: '', confidence: 'low', reviewedMessageCount: 2, kbCandidates: [],
+    })));
+
+    await compactSession('s1', 'u1', true);
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringMatching(/cobertura|reviewedMessageCount|menos mensajes/i),
+      expect.objectContaining({ sessionId: 's1', expected: 6, reviewedMessageCount: 2 }),
+    );
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringMatching(/confianza baja|confidence/i),
+      expect.objectContaining({ sessionId: 's1', confidence: 'low' }),
+    );
+    expect(sessionSummaryMock.saveSummary).not.toHaveBeenCalled();
+    expect(chatModelMock.setSummaryCursor).not.toHaveBeenCalled();
+  });
 });
