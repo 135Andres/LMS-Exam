@@ -63,6 +63,7 @@ export interface AIResponse {
     promptTokens: number;
     completionTokens: number;
   };
+  finishReason?: string;
 }
 
 export interface ExamQuestion {

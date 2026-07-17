@@ -34,7 +34,7 @@ export interface NineRouterMessage {
 }
 
 interface NineRouterResponse {
-  choices?: Array<{ message?: { content?: string; reasoning_content?: string } }>;
+  choices?: Array<{ message?: { content?: string; reasoning_content?: string }; finish_reason?: string }>;
   usage?: {
     prompt_tokens?: number;
     completion_tokens?: number;
@@ -55,6 +55,7 @@ function parseNineRouterNonStreamResponse(raw: string): NineRouterResponse {
 
   let content = '';
   let reasoning = '';
+  let finishReason: string | undefined;
   let usage: NineRouterResponse['usage'];
 
   for (const line of trimmed.split('\n')) {
@@ -68,11 +69,12 @@ function parseNineRouterNonStreamResponse(raw: string): NineRouterResponse {
       const msg = chunk.choices?.[0]?.message;
       if (msg?.content) content += msg.content;
       if (msg?.reasoning_content) reasoning += msg.reasoning_content;
+      if (chunk.choices?.[0]?.finish_reason) finishReason = chunk.choices[0].finish_reason;
       if (chunk.usage) usage = chunk.usage;
     } catch { /* skip malformed chunk */ }
   }
 
-  return { choices: [{ message: { content, reasoning_content: reasoning } }], usage };
+  return { choices: [{ message: { content, reasoning_content: reasoning }, finish_reason: finishReason }], usage };
 }
 
 export async function* parseNineRouterStream(body: ReadableStream<Uint8Array>): AsyncGenerator<StreamChunk> {
@@ -207,12 +209,14 @@ export async function callNineRouter(
   const data = parseNineRouterNonStreamResponse(raw);
 
   const content = data.choices?.[0]?.message?.content || '';
+  const finishReason = data.choices?.[0]?.finish_reason;
   const usage = data.usage || {};
 
   logger.debug('9router response received', {
     elapsed,
     promptTokens: usage.prompt_tokens,
     completionTokens: usage.completion_tokens,
+    finishReason,
   });
 
   return {
@@ -221,6 +225,7 @@ export async function callNineRouter(
       promptTokens: usage.prompt_tokens || 0,
       completionTokens: usage.completion_tokens || 0,
     },
+    finishReason,
   };
 }
 
