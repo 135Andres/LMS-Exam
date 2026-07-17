@@ -1,21 +1,44 @@
 import { randomUUID } from 'node:crypto';
 import { generateFromAI } from '../ai/index.js';
-import { config } from '../../config/index.js';
 import { logger } from '../../utils/logger.js';
 import { ChatModel } from '../../models/chat.model.js';
 import { KnowledgeModel, hashKnowledgeContent } from '../../models/knowledge.model.js';
 import { SessionSummaryService } from '../session-summary.service.js';
 import { SYSTEM_PROMPT_COMPACTOR } from '../../prompts/system.js';
+import { INKLING_MODEL_ID } from '../../config/models.js';
 
 // Umbral para compactación automática en segundo plano (además del disparador
 // explícito por cambio de modelo, que siempre compacta sin importar cuántos
 // mensajes nuevos haya).
 const MIN_MESSAGES_TO_COMPACT = 6;
 
+// El modelo activo de la sesión ya demostró que entiende el vocabulario y
+// nivel específico del estudiante — compactar con un modelo distinto agrega
+// una traducción innecesaria. Cuando la familia activa no tiene variante
+// liviana propia, se usa Gemini Flash como compactador cross-familia.
+const COMPACTION_MODEL_MAP: Record<string, string> = {
+  'ag/gemini-3-flash': 'ag/gemini-3-flash',
+  'ag/gemini-3.1-pro-low': 'ag/gemini-3-flash',
+  'ag/claude-sonnet-4-6': 'ag/gemini-3-flash',
+  'nvidia/z-ai/glm-5.2': 'nvidia/z-ai/glm-5.2',
+  [INKLING_MODEL_ID]: INKLING_MODEL_ID,
+  'oc/deepseek-v4-flash-free': 'oc/deepseek-v4-flash-free',
+};
+
+function resolveCompactionModel(sessionId: string): string {
+  const lastModel = ChatModel.getLastAssistantModel(sessionId);
+  if (lastModel && COMPACTION_MODEL_MAP[lastModel]) return COMPACTION_MODEL_MAP[lastModel];
+  // Sesión nueva sin modelo previo aún — Inkling es el default del chat.
+  return INKLING_MODEL_ID;
+}
+
 interface CompactionResult {
   summary: string;
   kbCandidates?: Array<{ content: string; subject: string; summary?: string }>;
 }
+
+const INITIAL_MAX_TOKENS = 3000;
+const RETRY_MAX_TOKENS = 6000;
 
 // Compacta lo nuevo desde el último corte (cursor) de una sesión: actualiza el
 // resumen incremental en session-summary.service.ts y encola temas
@@ -32,15 +55,30 @@ export async function compactSession(sessionId: string, userId: string, force = 
   const priorSummary = SessionSummaryService.getSummary(sessionId) || '(sin resumen previo, es el inicio de la conversación)';
   const transcript = newMessages.map(m => `[${m.role}] ${m.content}`).join('\n\n');
   const userPrompt = `--- Resumen previo ---\n${priorSummary}\n\n--- Mensajes nuevos ---\n${transcript}`;
+  const model = resolveCompactionModel(sessionId);
 
   try {
-    const result = await generateFromAI('nineRouter', SYSTEM_PROMPT_COMPACTOR, userPrompt, null, {
-      model: config.models.insights,
+    let result = await generateFromAI('nineRouter', SYSTEM_PROMPT_COMPACTOR, userPrompt, null, {
+      model,
       temperature: 0.3,
-      // deepseek-v4-flash-free razona pesado en reasoning_content antes del
-      // JSON final (ver kb-validator.service.ts/insights.service.ts).
-      max_tokens: 3000,
+      max_tokens: INITIAL_MAX_TOKENS,
     });
+
+    if (result.finishReason === 'length') {
+      logger.warn('Compactación truncada por max_tokens, reintentando con presupuesto mayor', { sessionId, model });
+      result = await generateFromAI('nineRouter', SYSTEM_PROMPT_COMPACTOR, userPrompt, null, {
+        model,
+        temperature: 0.3,
+        max_tokens: RETRY_MAX_TOKENS,
+      });
+    }
+
+    // Nunca se acepta una respuesta truncada como resultado final — se
+    // descarta el intento en vez de guardar un resumen a medias (spec 4.1).
+    if (result.finishReason === 'length') {
+      logger.warn('Compactación sigue truncada tras reintento, se descarta este intento', { sessionId, model });
+      return;
+    }
 
     const parsed = JSON.parse(result.content) as CompactionResult;
     if (!parsed.summary) return;
@@ -65,9 +103,9 @@ export async function compactSession(sessionId: string, userId: string, force = 
     }
 
     logger.info('Sesión compactada', {
-      sessionId, messagesCompacted: newMessages.length, kbCandidates: parsed.kbCandidates?.length || 0,
+      sessionId, model, messagesCompacted: newMessages.length, kbCandidates: parsed.kbCandidates?.length || 0,
     });
   } catch (err) {
-    logger.warn('Error compactando sesión', { sessionId, error: (err as Error).message });
+    logger.warn('Error compactando sesión', { sessionId, model, error: (err as Error).message });
   }
 }
