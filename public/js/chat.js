@@ -1210,6 +1210,31 @@ function playHeroToChatMorph(onComplete) {
   });
 }
 
+const QUIZ_MARKERS = ['[[QUIZ_DETECTED]]', '[[QUIZ_EXPLAIN_DONE]]'];
+
+function stripQuizMarker(text) {
+  for (const marker of QUIZ_MARKERS) {
+    if (text.includes(marker)) {
+      return { text: text.replace(marker, '').trimEnd(), marker: marker.slice(2, -2) };
+    }
+  }
+  return { text, marker: null };
+}
+
+function appendQuizButtons(actions, msgRow, text) {
+  const responderBtn = document.createElement('button');
+  responderBtn.className = 'msg-action msg-action-quiz msg-action-quiz-responder';
+  responderBtn.textContent = 'Responder';
+  responderBtn.addEventListener('click', () => handleQuizResolve(msgRow, text));
+  actions.appendChild(responderBtn);
+
+  const explicarBtn = document.createElement('button');
+  explicarBtn.className = 'msg-action msg-action-quiz msg-action-quiz-explicar';
+  explicarBtn.textContent = 'Explicar';
+  explicarBtn.addEventListener('click', () => handleQuizExplain());
+  actions.appendChild(explicarBtn);
+}
+
 function addMessage(text, sender, attachments, msgId, isPinned) {
   const chatMessages = document.getElementById('chatMessages');
 
@@ -1250,6 +1275,13 @@ function addMessage(text, sender, attachments, msgId, isPinned) {
   // Message bubble
   const bubble = document.createElement('div');
   bubble.classList.add(sender === 'user' ? 'bubble-user' : 'bubble-ai');
+
+  let quizMarker = null;
+  if (sender === 'ai') {
+    const stripped = stripQuizMarker(text);
+    text = stripped.text;
+    quizMarker = stripped.marker;
+  }
 
   const textDiv = document.createElement('div');
   textDiv.className = 'bubble-text';
@@ -1314,6 +1346,14 @@ function addMessage(text, sender, attachments, msgId, isPinned) {
     reexplainBtn.innerHTML = svgIcon('retry');
     reexplainBtn.addEventListener('click', () => openReExplicarConfirm(msgRow));
     actions.appendChild(reexplainBtn);
+
+    if (quizMarker === 'QUIZ_DETECTED') {
+      appendQuizButtons(actions, msgRow, text);
+    }
+
+    if (quizMarker === 'QUIZ_EXPLAIN_DONE') {
+      handleQuizExplainDone();
+    }
   }
 
   footer.appendChild(timeSpan);
@@ -1877,7 +1917,7 @@ async function runRegenerate(targetRow, instruction) {
     copyBtn.className = 'msg-action';
     copyBtn.title = 'Copiar';
     copyBtn.innerHTML = svgIcon('copy');
-    copyBtn.addEventListener('click', () => handleCopy(fullTextRef, copyBtn));
+    copyBtn.addEventListener('click', () => handleCopy(stripQuizMarker(fullTextRef).text, copyBtn));
     actions.appendChild(copyBtn);
 
     const pinBtn = document.createElement('button');
@@ -1892,7 +1932,7 @@ async function runRegenerate(targetRow, instruction) {
     reportBtn.title = 'Reportar';
     reportBtn.innerHTML = svgIcon('flag');
     reportBtn.dataset.reported = 'false';
-    reportBtn.addEventListener('click', () => handleReport(fullTextRef, null, reportBtn));
+    reportBtn.addEventListener('click', () => handleReport(stripQuizMarker(fullTextRef).text, null, reportBtn));
     actions.appendChild(reportBtn);
 
     const reexplainBtn = document.createElement('button');
@@ -1990,7 +2030,7 @@ async function runRegenerate(targetRow, instruction) {
               textDiv = b.textDiv;
             }
             fullTextRef += json.content;
-            textDiv.innerHTML = formatAIResponse(fullTextRef);
+            textDiv.innerHTML = formatAIResponse(stripQuizMarker(fullTextRef).text);
             chatMessages.scrollTop = 0;
           }
         } catch (e) {
@@ -2001,7 +2041,17 @@ async function runRegenerate(targetRow, instruction) {
     }
 
     hideTyping();
-    if (fullTextRef) renderKaTeX();
+    if (fullTextRef) {
+      const { text: cleanText, marker: quizMarker } = stripQuizMarker(fullTextRef);
+      if (quizMarker === 'QUIZ_DETECTED' && aiBubble) {
+        const actions = aiBubble.querySelector('.msg-actions');
+        if (actions) appendQuizButtons(actions, aiBubble, cleanText);
+      }
+      if (quizMarker === 'QUIZ_EXPLAIN_DONE') {
+        handleQuizExplainDone();
+      }
+      renderKaTeX();
+    }
   } catch (err) {
     hideTyping();
     addMessage('Error: ' + (err.message || 'Error de conexión'), 'ai');
@@ -2120,7 +2170,7 @@ async function handleSend() {
     copyBtn.className = 'msg-action';
     copyBtn.title = 'Copiar';
     copyBtn.innerHTML = svgIcon('copy');
-    copyBtn.addEventListener('click', () => handleCopy(fullTextRef, copyBtn));
+    copyBtn.addEventListener('click', () => handleCopy(stripQuizMarker(fullTextRef).text, copyBtn));
     actions.appendChild(copyBtn);
 
     const pinBtn = document.createElement('button');
@@ -2135,7 +2185,7 @@ async function handleSend() {
     reportBtn.title = 'Reportar';
     reportBtn.innerHTML = svgIcon('flag');
     reportBtn.dataset.reported = 'false';
-    reportBtn.addEventListener('click', () => handleReport(fullTextRef, null, reportBtn));
+    reportBtn.addEventListener('click', () => handleReport(stripQuizMarker(fullTextRef).text, null, reportBtn));
     actions.appendChild(reportBtn);
 
     const reexplainBtn = document.createElement('button');
@@ -2253,7 +2303,7 @@ async function handleSend() {
               textDiv = b.textDiv;
             }
             fullTextRef += json.content;
-            textDiv.innerHTML = formatAIResponse(fullTextRef);
+            textDiv.innerHTML = formatAIResponse(stripQuizMarker(fullTextRef).text);
             chatMessages.scrollTop = 0;
           }
         } catch (e) {
@@ -2267,6 +2317,14 @@ async function handleSend() {
     clearAttachments();
 
     if (fullTextRef) {
+      const { text: cleanText, marker: quizMarker } = stripQuizMarker(fullTextRef);
+      if (quizMarker === 'QUIZ_DETECTED' && aiBubble) {
+        const actions = aiBubble.querySelector('.msg-actions');
+        if (actions) appendQuizButtons(actions, aiBubble, cleanText);
+      }
+      if (quizMarker === 'QUIZ_EXPLAIN_DONE') {
+        handleQuizExplainDone();
+      }
       renderKaTeX();
     } else if (!aiBubble && !thinkingRow) {
       addMessage('Lo siento, hubo un error al procesar tu mensaje. Intenta de nuevo.', 'ai');
@@ -2600,3 +2658,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     handleSend();
   }
 });
+
+// ponytail: stubs — implementación real en Tasks 8/9. Evitan ReferenceError
+// si un botón de cuestionario se clickea antes de que esos tasks aterricen.
+function handleQuizResolve(msgRow, text) {
+  console.warn('handleQuizResolve not yet implemented');
+}
+
+function handleQuizExplain() {
+  console.warn('handleQuizExplain not yet implemented');
+}
+
+function handleQuizExplainDone() {
+  console.warn('handleQuizExplainDone not yet implemented');
+}
