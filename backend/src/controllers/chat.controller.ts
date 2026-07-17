@@ -383,10 +383,15 @@ export async function resolveQuizHandler(req: Request, res: Response): Promise<v
 
   logger.info('Resolviendo cuestionario', { sessionId, userMsgId });
 
-  const response = await resolveQuiz(original.content);
-  persistence.saveAssistantMessageWithOutbox(userId, sessionId, response);
-
-  res.json({ response });
+  try {
+    const response = await resolveQuiz(original.content);
+    persistence.saveAssistantMessageWithOutbox(userId, sessionId, response);
+    res.json({ response });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Error desconocido';
+    logger.error('Error resolviendo cuestionario', { sessionId, userMsgId, error: msg });
+    res.status(500).json({ error: 'Error interno al resolver el cuestionario' });
+  }
 }
 
 export async function startQuizExplainHandler(req: Request, res: Response): Promise<void> {
