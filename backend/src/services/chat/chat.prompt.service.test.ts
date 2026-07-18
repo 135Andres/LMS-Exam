@@ -88,4 +88,19 @@ describe('ChatPromptService inyección de bloques de conocimiento', () => {
     expect(prompt).toContain('BLOQUE_NUEVO');
     expect(prompt).not.toContain('BLOQUE_VIEJO');
   });
+
+  it('trunca (en vez de omitir) un bloque cuyo propio contenido excede el presupuesto', () => {
+    const hugeContent = 'Y'.repeat(10000);
+    const blocks = [
+      makeBlock({ id: 'block_huge', title: 'BLOQUE_ENORME', content: hugeContent, extractedAt: '2026-01-01T00:00:00.000Z' }),
+    ];
+    vi.spyOn(SessionSummaryService, 'getBlocks').mockReturnValue(blocks);
+    const service = new ChatPromptService();
+    const prompt = service.buildSystemPrompt('Modelo X', '', 'user-1', undefined, SESSION_ID);
+    expect(prompt).toContain('Contenido técnico ya extraído');
+    expect(prompt).toContain('BLOQUE_ENORME');
+    expect(prompt).not.toContain(hugeContent);
+    expect(prompt).toContain('Y'.repeat(100));
+    expect(prompt).toContain('(truncado)');
+  });
 });

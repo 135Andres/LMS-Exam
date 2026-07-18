@@ -34,8 +34,16 @@ export class ChatPromptService {
         const included: string[] = [];
         let usedChars = 0;
         for (const block of sorted) {
+          const remaining = MAX_BLOCKS_CONTEXT_CHARS - usedChars;
+          if (remaining <= 0) break;
           const text = `### ${block.title}\n${block.content}`;
-          if (usedChars + text.length > MAX_BLOCKS_CONTEXT_CHARS) break;
+          if (text.length > remaining) {
+            const marker = '... (truncado)';
+            const truncated = text.slice(0, Math.max(0, remaining - marker.length)) + marker;
+            included.push(truncated);
+            usedChars += truncated.length;
+            break;
+          }
           included.push(text);
           usedChars += text.length;
         }
