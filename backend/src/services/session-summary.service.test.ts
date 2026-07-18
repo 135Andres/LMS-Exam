@@ -37,6 +37,28 @@ describe('SessionSummaryService', () => {
     expect(index.blocks).toEqual([]);
   });
 
+  it('getNarrative al migrar preserva blocks preexistentes en index.json (no lo pisa con uno vacío)', () => {
+    const block = SessionSummaryService.addBlock(SESSION_ID, {
+      subject: 'matematicas',
+      extractedFromMessages: ['msg-1'],
+      extractedAt: new Date().toISOString(),
+      extractionModel: 'test-model',
+      confidence: 'high',
+      title: 'Bloque preexistente',
+      content: 'contenido verbatim',
+    });
+    fs.writeFileSync(legacyPath(SESSION_ID), 'resumen viejo', 'utf-8');
+
+    const narrative = SessionSummaryService.getNarrative(SESSION_ID);
+
+    expect(narrative).toBe('resumen viejo');
+    expect(fs.existsSync(legacyPath(SESSION_ID))).toBe(false);
+    expect(fs.existsSync(path.join(sessionDir(SESSION_ID), 'narrative.md'))).toBe(true);
+
+    const blocks = SessionSummaryService.getBlocks(SESSION_ID);
+    expect(blocks.map(b => b.id)).toContain(block.id);
+  });
+
   it('saveNarrative + getNarrative', () => {
     SessionSummaryService.saveNarrative(SESSION_ID, 'contenido nuevo', { model: 'test-model', confidence: 'high' });
     expect(SessionSummaryService.getNarrative(SESSION_ID)).toBe('contenido nuevo');

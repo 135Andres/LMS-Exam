@@ -69,7 +69,7 @@ function migrateLegacyIfNeeded(sessionId: string): void {
     const content = fs.readFileSync(legacy, 'utf-8');
     fs.mkdirSync(sessionDir(sessionId), { recursive: true });
     fs.writeFileSync(narrativePath(sessionId), content, 'utf-8');
-    writeIndex(sessionId, emptyIndex());
+    writeIndex(sessionId, readIndex(sessionId));
     fs.unlinkSync(legacy);
     logger.info('Resumen de sesión migrado a carpeta por sesión', { sessionId });
   } catch (err) {
