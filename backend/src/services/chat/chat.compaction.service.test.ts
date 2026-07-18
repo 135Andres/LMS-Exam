@@ -36,6 +36,11 @@ vi.mock('../session-summary.service.js', () => ({
 
 vi.mock('./chat.segmentation.service.js', () => ({
   segmentMessages: (...args: unknown[]) => segmentMessagesMock(...args),
+  VERIFICABLE_MARKERS: [
+    /\$\$?[^$]+\$\$?/,
+    /```/,
+    /\b(por lo tanto|entonces|demostraci[oó]n|derivaci[oó]n|paso a paso|definici[oó]n de)\b/i,
+  ],
 }));
 
 vi.mock('./chat.block-extraction.service.js', () => ({
@@ -257,5 +262,60 @@ describe('compactSession — orquestación de 4 pasos (Fase 2)', () => {
     expect(userPromptSent).toContain('block_abc');
     expect(userPromptSent).toContain('Integrales');
     expect(userPromptSent).toContain('hola'); // mensaje narrativo sí va en el prompt
+  });
+});
+
+describe('compactSession — alucinación de ausencia (Fase 2 paso 6)', () => {
+  const CODE_MESSAGES = [
+    { id: 'c1', role: 'user', content: 'ayuda con este código', created_at: '2026-07-17T10:00:00Z' },
+    { id: 'c2', role: 'assistant', content: 'aquí está:\n```python\nprint(1)\n```', created_at: '2026-07-17T10:00:05Z' },
+  ];
+
+  function allNarrativoFor(messages: typeof CODE_MESSAGES) {
+    return messages.map(m => ({ messageId: m.id, class: 'narrativo' as const, confidence: 'high' as const, method: 'heuristic' as const }));
+  }
+
+  const ABSENT_RESULT = JSON.stringify({ summary: 'No hay contenido académico relevante en esta conversación.', confidence: 'high' });
+
+  beforeEach(() => {
+    generateFromAIMock.mockReset();
+    chatModelMock.getSummaryCursor.mockReset().mockReturnValue(null);
+    chatModelMock.getMessagesSince.mockReset().mockReturnValue(CODE_MESSAGES);
+    chatModelMock.setSummaryCursor.mockReset();
+    chatModelMock.getLastAssistantModel.mockReset().mockReturnValue('nvidia/thinkingmachines/inkling');
+    sessionSummaryMock.getNarrative.mockReset().mockReturnValue(null);
+    sessionSummaryMock.saveNarrative.mockReset();
+    segmentMessagesMock.mockReset().mockResolvedValue(allNarrativoFor(CODE_MESSAGES));
+    extractBlocksMock.mockReset().mockResolvedValue([]);
+    verifyCompactionMock.mockReset().mockResolvedValue({ missing: [] });
+    pickVerifierModelMock.mockReset().mockReturnValue('ag/gemini-3-flash');
+  });
+
+  it('reintenta cuando la narrativa dice "sin contenido académico" pero newMessages trae un bloque de código, y guarda el reintento si corrige', async () => {
+    generateFromAIMock
+      .mockResolvedValueOnce(aiResponse(ABSENT_RESULT, 'stop'))
+      .mockResolvedValueOnce(aiResponse(VALID_RESULT, 'stop'));
+
+    await compactSession('s1', 'u1', true);
+
+    expect(generateFromAIMock).toHaveBeenCalledTimes(2);
+    expect(sessionSummaryMock.saveNarrative).toHaveBeenCalledWith('s1', 'El estudiante preguntó sobre integrales.', expect.any(Object));
+    expect(chatModelMock.setSummaryCursor).toHaveBeenCalledWith('s1', CODE_MESSAGES[1].created_at);
+  });
+
+  it('si la alucinación de ausencia persiste tras el reintento, descarta el intento sin perder los bloques ya extraídos', async () => {
+    extractBlocksMock.mockResolvedValue([
+      { id: 'block_1', subject: 'informatica', extractedFromMessages: ['c2'], extractedAt: 'x', extractionModel: 'm', confidence: 'high', title: 't', content: 'c' },
+    ]);
+    generateFromAIMock
+      .mockResolvedValueOnce(aiResponse(ABSENT_RESULT, 'stop'))
+      .mockResolvedValueOnce(aiResponse(ABSENT_RESULT, 'stop'));
+
+    await compactSession('s1', 'u1', true);
+
+    expect(generateFromAIMock).toHaveBeenCalledTimes(2);
+    expect(extractBlocksMock).toHaveBeenCalled();
+    expect(sessionSummaryMock.saveNarrative).not.toHaveBeenCalled();
+    expect(chatModelMock.setSummaryCursor).not.toHaveBeenCalled();
   });
 });

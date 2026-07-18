@@ -2,7 +2,7 @@ import { generateFromAI } from '../ai/index.js';
 import { logger } from '../../utils/logger.js';
 import { ChatModel } from '../../models/chat.model.js';
 import { SessionSummaryService, type KnowledgeBlock } from '../session-summary.service.js';
-import { segmentMessages, type SegmentationResult } from './chat.segmentation.service.js';
+import { segmentMessages, VERIFICABLE_MARKERS, type SegmentationResult } from './chat.segmentation.service.js';
 import { extractBlocks } from './chat.block-extraction.service.js';
 import { pickVerifierModel, verifyCompaction, type MissingContentItem } from './chat.compaction-verifier.service.js';
 import { SYSTEM_PROMPT_COMPACTOR } from '../../prompts/system.js';
@@ -90,6 +90,27 @@ async function runNarrativeCompaction(sessionId: string, userPrompt: string, mod
   }
 }
 
+// Frases que la IA de compactación narrativa a veces usa para descartar todo
+// el contenido de la pasada como "no hay nada verificable/académico".
+const ABSENCE_MARKERS = [
+  /no hay contenido (acad[eé]mico|relevante|verificable)/i,
+  /nada (que destacar|relevante)/i,
+  /sin contenido (acad[eé]mico|relevante|verificable)/i,
+  /no se (encontr[oó]|identific[oó]) contenido/i,
+];
+
+// Contradicción mecánica (spec 5.2): la narrativa dice "no hay nada" pero
+// newMessages sí trae marcadores verificables (código, LaTeX, explicación
+// larga de asistente) — mismo umbral y regex que el heurístico de Task 2,
+// reusados vía VERIFICABLE_MARKERS en vez de duplicarlos.
+function hasAbsenceHallucination(summary: string, messages: NarrativeMessage[]): boolean {
+  if (!ABSENCE_MARKERS.some(re => re.test(summary))) return false;
+  return messages.some(m =>
+    VERIFICABLE_MARKERS.some(re => re.test(m.content)) ||
+    (m.role === 'assistant' && m.content.length > 400),
+  );
+}
+
 // Agrega directo al texto de la narrativa el contenido que la verificación
 // cruzada marcó como faltante — no hay cola de revisión separada (spec 4.4):
 // lo que no está reflejado en narrativa ni bloques, se anexa así, nunca se
@@ -144,7 +165,19 @@ export async function compactSession(sessionId: string, userId: string, force = 
     const blockRefs = blocks.map(b => `- ${b.id}: "${b.title}"`).join('\n');
     const userPrompt = buildNarrativePrompt(priorNarrative, narrativeMessages, blockRefs);
 
-    const narrativeResult = await runNarrativeCompaction(sessionId, userPrompt, model);
+    let narrativeResult = await runNarrativeCompaction(sessionId, userPrompt, model);
+
+    // Chequeo mecánico de "alucinación de ausencia" (spec 5.2) — un solo
+    // reintento, sin gastar otra llamada de verificación separada; el
+    // reintento mismo es la corrección.
+    if (narrativeResult && hasAbsenceHallucination(narrativeResult.summary, newMessages)) {
+      logger.warn('Narrativa reporta ausencia de contenido pero newMessages trae marcadores verificables, reintentando', { sessionId, model });
+      narrativeResult = await runNarrativeCompaction(sessionId, userPrompt, model);
+      if (narrativeResult && hasAbsenceHallucination(narrativeResult.summary, newMessages)) {
+        logger.warn('Alucinación de ausencia persiste tras reintento, se descarta este intento', { sessionId, model });
+        narrativeResult = null;
+      }
+    }
 
     if (!narrativeResult) {
       // Los bloques del Paso 2 ya quedaron guardados; el cursor NO avanza

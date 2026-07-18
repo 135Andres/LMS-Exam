@@ -18,7 +18,10 @@ export interface SegmentableMessage {
   role: string;
 }
 
-const VERIFICABLE_MARKERS = [
+// Exportado para que chat.compaction.service.ts pueda reusar los mismos
+// marcadores en su chequeo de "alucinación de ausencia" del Paso 3 (spec 5.2)
+// sin duplicar la lista ni tocar la clasificación de este archivo.
+export const VERIFICABLE_MARKERS = [
   /\$\$?[^$]+\$\$?/,                          // LaTeX inline o bloque
   /```/,                                       // código (reusa hasCode de chat.classifier.service.ts)
   /\b(por lo tanto|entonces|demostraci[oó]n|derivaci[oó]n|paso a paso|definici[oó]n de)\b/i,
