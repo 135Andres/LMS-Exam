@@ -65,7 +65,7 @@ function stripAccents(text: string): string {
   return text.normalize('NFD').replace(/[̀-ͯ]/g, '');
 }
 
-function hasCode(message: string): boolean {
+export function hasCode(message: string): boolean {
   return CODE_PATTERNS.some(re => re.test(message));
 }
 
