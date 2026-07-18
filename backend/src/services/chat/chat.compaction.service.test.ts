@@ -1,7 +1,10 @@
 // backend/src/services/chat/chat.compaction.service.test.ts
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { generateFromAIMock, chatModelMock, sessionSummaryMock, knowledgeModelMock } = vi.hoisted(() => ({
+const {
+  generateFromAIMock, chatModelMock, sessionSummaryMock,
+  segmentMessagesMock, extractBlocksMock, verifyCompactionMock, pickVerifierModelMock,
+} = vi.hoisted(() => ({
   generateFromAIMock: vi.fn(),
   chatModelMock: {
     getSummaryCursor: vi.fn(),
@@ -13,10 +16,10 @@ const { generateFromAIMock, chatModelMock, sessionSummaryMock, knowledgeModelMoc
     getNarrative: vi.fn(),
     saveNarrative: vi.fn(),
   },
-  knowledgeModelMock: {
-    existsByHash: vi.fn(),
-    create: vi.fn(),
-  },
+  segmentMessagesMock: vi.fn(),
+  extractBlocksMock: vi.fn(),
+  verifyCompactionMock: vi.fn(),
+  pickVerifierModelMock: vi.fn(),
 }));
 
 vi.mock('../ai/index.js', () => ({
@@ -31,9 +34,17 @@ vi.mock('../session-summary.service.js', () => ({
   SessionSummaryService: sessionSummaryMock,
 }));
 
-vi.mock('../../models/knowledge.model.js', () => ({
-  KnowledgeModel: knowledgeModelMock,
-  hashKnowledgeContent: (content: string) => `hash:${content}`,
+vi.mock('./chat.segmentation.service.js', () => ({
+  segmentMessages: (...args: unknown[]) => segmentMessagesMock(...args),
+}));
+
+vi.mock('./chat.block-extraction.service.js', () => ({
+  extractBlocks: (...args: unknown[]) => extractBlocksMock(...args),
+}));
+
+vi.mock('./chat.compaction-verifier.service.js', () => ({
+  verifyCompaction: (...args: unknown[]) => verifyCompactionMock(...args),
+  pickVerifierModel: (...args: unknown[]) => pickVerifierModelMock(...args),
 }));
 
 import { compactSession } from './chat.compaction.service.js';
@@ -51,12 +62,14 @@ const NEW_MESSAGES = [
   { id: 'm6', role: 'assistant', content: 'de nada', created_at: '2026-07-17T10:02:05Z' },
 ];
 
-const VALID_RESULT = JSON.stringify({
-  summary: 'El estudiante preguntó sobre integrales.',
-  confidence: 'high',
-  reviewedMessageCount: 6,
-  kbCandidates: [],
-});
+// Todos narrativo por default — segmentación sin ningún candidato a bloque,
+// así los tests de modelo dinámico / retry se enfocan solo en lo que
+// prueban, sin que Paso 2/4 les agreguen ruido.
+function allNarrativo() {
+  return NEW_MESSAGES.map(m => ({ messageId: m.id, class: 'narrativo' as const, confidence: 'high' as const, method: 'heuristic' as const }));
+}
+
+const VALID_RESULT = JSON.stringify({ summary: 'El estudiante preguntó sobre integrales.', confidence: 'high' });
 
 describe('compactSession — modelo dinámico', () => {
   beforeEach(() => {
@@ -67,8 +80,10 @@ describe('compactSession — modelo dinámico', () => {
     chatModelMock.getLastAssistantModel.mockReset();
     sessionSummaryMock.getNarrative.mockReset().mockReturnValue(null);
     sessionSummaryMock.saveNarrative.mockReset();
-    knowledgeModelMock.existsByHash.mockReset().mockReturnValue(false);
-    knowledgeModelMock.create.mockReset();
+    segmentMessagesMock.mockReset().mockResolvedValue(allNarrativo());
+    extractBlocksMock.mockReset().mockResolvedValue([]);
+    verifyCompactionMock.mockReset().mockResolvedValue({ missing: [] });
+    pickVerifierModelMock.mockReset().mockReturnValue('ag/gemini-3-flash');
   });
 
   it('usa Inkling para compactar una sesión cuyo último modelo fue Inkling', async () => {
@@ -129,8 +144,10 @@ describe('compactSession — retry en truncamiento', () => {
     chatModelMock.getLastAssistantModel.mockReset().mockReturnValue('nvidia/thinkingmachines/inkling');
     sessionSummaryMock.getNarrative.mockReset().mockReturnValue(null);
     sessionSummaryMock.saveNarrative.mockReset();
-    knowledgeModelMock.existsByHash.mockReset().mockReturnValue(false);
-    knowledgeModelMock.create.mockReset();
+    segmentMessagesMock.mockReset().mockResolvedValue(allNarrativo());
+    extractBlocksMock.mockReset().mockResolvedValue([]);
+    verifyCompactionMock.mockReset().mockResolvedValue({ missing: [] });
+    pickVerifierModelMock.mockReset().mockReturnValue('ag/gemini-3-flash');
   });
 
   it('reintenta con más presupuesto si la primera respuesta viene truncada, y guarda el resultado del reintento', async () => {
@@ -146,9 +163,13 @@ describe('compactSession — retry en truncamiento', () => {
       expect.objectContaining({ max_tokens: 6000 }),
     );
     expect(sessionSummaryMock.saveNarrative).toHaveBeenCalledWith('s1', 'El estudiante preguntó sobre integrales.', expect.any(Object));
+    expect(chatModelMock.setSummaryCursor).toHaveBeenCalledWith('s1', NEW_MESSAGES[5].created_at);
   });
 
-  it('descarta el intento (no guarda nada) si sigue truncado tras el reintento', async () => {
+  it('descarta el intento (no guarda nada) si sigue truncado tras el reintento, pero los bloques ya extraídos no se pierden', async () => {
+    extractBlocksMock.mockResolvedValue([
+      { id: 'block_1', subject: 'matematicas', extractedFromMessages: ['m3'], extractedAt: 'x', extractionModel: 'm', confidence: 'high', title: 't', content: 'c' },
+    ]);
     generateFromAIMock
       .mockResolvedValueOnce(aiResponse('{"summary": "cortado', 'length'))
       .mockResolvedValueOnce(aiResponse('{"summary": "sigue cortado', 'length'));
@@ -156,16 +177,14 @@ describe('compactSession — retry en truncamiento', () => {
     await compactSession('s1', 'u1', true);
 
     expect(generateFromAIMock).toHaveBeenCalledTimes(2);
+    expect(extractBlocksMock).toHaveBeenCalled();
     expect(sessionSummaryMock.saveNarrative).not.toHaveBeenCalled();
     expect(chatModelMock.setSummaryCursor).not.toHaveBeenCalled();
   });
 });
 
-describe('compactSession — auditoría de confianza y cobertura', () => {
-  let warnSpy: ReturnType<typeof vi.spyOn>;
-  let infoSpy: ReturnType<typeof vi.spyOn>;
-
-  beforeEach(async () => {
+describe('compactSession — orquestación de 4 pasos (Fase 2)', () => {
+  beforeEach(() => {
     generateFromAIMock.mockReset();
     chatModelMock.getSummaryCursor.mockReset().mockReturnValue(null);
     chatModelMock.getMessagesSince.mockReset().mockReturnValue(NEW_MESSAGES);
@@ -173,88 +192,70 @@ describe('compactSession — auditoría de confianza y cobertura', () => {
     chatModelMock.getLastAssistantModel.mockReset().mockReturnValue('nvidia/thinkingmachines/inkling');
     sessionSummaryMock.getNarrative.mockReset().mockReturnValue(null);
     sessionSummaryMock.saveNarrative.mockReset();
-    knowledgeModelMock.existsByHash.mockReset().mockReturnValue(false);
-    knowledgeModelMock.create.mockReset();
-    const { logger } = await import('../../utils/logger.js');
-    // vi.spyOn reutiliza la misma instancia de mock si el módulo ya estaba
-    // espiado (import cacheado entre tests) — mockClear evita que las
-    // llamadas de un test anterior contaminen el conteo del siguiente.
-    warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined as any);
-    infoSpy = vi.spyOn(logger, 'info').mockImplementation(() => undefined as any);
-    warnSpy.mockClear();
-    infoSpy.mockClear();
+    segmentMessagesMock.mockReset().mockResolvedValue(allNarrativo());
+    extractBlocksMock.mockReset().mockResolvedValue([]);
+    verifyCompactionMock.mockReset().mockResolvedValue({ missing: [] });
+    pickVerifierModelMock.mockReset().mockReturnValue('ag/gemini-3-flash');
+    generateFromAIMock.mockResolvedValue(aiResponse(VALID_RESULT));
   });
 
-  it('loguea un warning si reviewedMessageCount es menor a los mensajes reales (posible contenido saltado)', async () => {
-    generateFromAIMock.mockResolvedValueOnce(aiResponse(JSON.stringify({
-      summary: 'resumen parcial', confidence: 'high', reviewedMessageCount: 3, kbCandidates: [],
-    })));
+  it('cobertura incompleta de segmentación aborta la pasada sin avanzar el cursor ni llamar extractBlocks', async () => {
+    segmentMessagesMock.mockResolvedValue(allNarrativo().slice(0, 3)); // menos resultados que mensajes
 
     await compactSession('s1', 'u1', true);
 
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringMatching(/cobertura|reviewedMessageCount|menos mensajes/i),
-      expect.objectContaining({ sessionId: 's1', expected: 6, reviewedMessageCount: 3 }),
-    );
-    // Un mismatch de cobertura NO bloquea el guardado — solo se audita (Fase 3 corrige).
-    expect(sessionSummaryMock.saveNarrative).toHaveBeenCalledWith('s1', 'resumen parcial', expect.any(Object));
-  });
-
-  it('loguea un warning si confidence no es "high"', async () => {
-    generateFromAIMock.mockResolvedValueOnce(aiResponse(JSON.stringify({
-      summary: 'resumen dudoso', confidence: 'low', reviewedMessageCount: 6, kbCandidates: [],
-    })));
-
-    await compactSession('s1', 'u1', true);
-
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringMatching(/confianza baja|confidence/i),
-      expect.objectContaining({ sessionId: 's1', confidence: 'low' }),
-    );
-  });
-
-  it('loguea un warning si reviewedMessageCount no vino en la respuesta', async () => {
-    generateFromAIMock.mockResolvedValueOnce(aiResponse(JSON.stringify({
-      summary: 'resumen sin conteo', confidence: 'high', kbCandidates: [],
-    })));
-
-    await compactSession('s1', 'u1', true);
-
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringMatching(/reviewedMessageCount ausente/i),
-      expect.objectContaining({ sessionId: 's1' }),
-    );
-  });
-
-  it('no loguea ningún warning de auditoría cuando confidence es high y el conteo coincide', async () => {
-    generateFromAIMock.mockResolvedValueOnce(aiResponse(JSON.stringify({
-      summary: 'resumen completo', confidence: 'high', reviewedMessageCount: 6, kbCandidates: [],
-    })));
-
-    await compactSession('s1', 'u1', true);
-
-    expect(warnSpy).not.toHaveBeenCalled();
-    expect(infoSpy).toHaveBeenCalledWith('Sesión compactada', expect.objectContaining({
-      confidence: 'high', reviewedMessageCount: 6,
-    }));
-  });
-
-  it('audita cobertura/confianza incluso cuando el resumen viene vacío y no se guarda nada', async () => {
-    generateFromAIMock.mockResolvedValueOnce(aiResponse(JSON.stringify({
-      summary: '', confidence: 'low', reviewedMessageCount: 2, kbCandidates: [],
-    })));
-
-    await compactSession('s1', 'u1', true);
-
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringMatching(/cobertura|reviewedMessageCount|menos mensajes/i),
-      expect.objectContaining({ sessionId: 's1', expected: 6, reviewedMessageCount: 2 }),
-    );
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringMatching(/confianza baja|confidence/i),
-      expect.objectContaining({ sessionId: 's1', confidence: 'low' }),
-    );
+    expect(extractBlocksMock).not.toHaveBeenCalled();
+    expect(generateFromAIMock).not.toHaveBeenCalled();
     expect(sessionSummaryMock.saveNarrative).not.toHaveBeenCalled();
     expect(chatModelMock.setSummaryCursor).not.toHaveBeenCalled();
+  });
+
+  it('extractBlocks se ejecuta y persiste (Paso 2) incluso cuando la narrativa (Paso 3) falla', async () => {
+    extractBlocksMock.mockResolvedValue([
+      { id: 'block_1', subject: 'matematicas', extractedFromMessages: ['m3'], extractedAt: 'x', extractionModel: 'm', confidence: 'high', title: 't', content: 'c' },
+    ]);
+    generateFromAIMock.mockResolvedValue(aiResponse('no es json', 'stop'));
+
+    await compactSession('s1', 'u1', true);
+
+    expect(extractBlocksMock).toHaveBeenCalledWith('s1', NEW_MESSAGES, allNarrativo(), 'nvidia/thinkingmachines/inkling', 'u1');
+    expect(sessionSummaryMock.saveNarrative).not.toHaveBeenCalled();
+    expect(chatModelMock.setSummaryCursor).not.toHaveBeenCalled();
+  });
+
+  it('la verificación cruzada agrega el contenido faltante directo a la narrativa guardada, sin cola de revisión', async () => {
+    verifyCompactionMock.mockResolvedValue({ missing: [{ description: 'falta la derivación de la integral por partes' }] });
+
+    await compactSession('s1', 'u1', true);
+
+    expect(sessionSummaryMock.saveNarrative).toHaveBeenCalledWith(
+      's1',
+      expect.stringContaining('falta la derivación de la integral por partes'),
+      expect.any(Object),
+    );
+    expect(chatModelMock.setSummaryCursor).toHaveBeenCalled();
+  });
+
+  it('el prompt de narrativa excluye el contenido de mensajes verificables, solo los referencia por bloque', async () => {
+    segmentMessagesMock.mockResolvedValue([
+      { messageId: 'm1', class: 'narrativo', confidence: 'high', method: 'heuristic' },
+      { messageId: 'm2', class: 'narrativo', confidence: 'high', method: 'heuristic' },
+      { messageId: 'm3', class: 'verificable', confidence: 'high', method: 'heuristic' },
+      { messageId: 'm4', class: 'verificable', confidence: 'high', method: 'heuristic' },
+      { messageId: 'm5', class: 'narrativo', confidence: 'high', method: 'heuristic' },
+      { messageId: 'm6', class: 'narrativo', confidence: 'high', method: 'heuristic' },
+    ]);
+    extractBlocksMock.mockResolvedValue([
+      { id: 'block_abc', subject: 'matematicas', extractedFromMessages: ['m3', 'm4'], extractedAt: 'x', extractionModel: 'm', confidence: 'high', title: 'Integrales', content: 'una integral es...' },
+    ]);
+
+    await compactSession('s1', 'u1', true);
+
+    const userPromptSent = generateFromAIMock.mock.calls[0][2] as string;
+    expect(userPromptSent).not.toContain('explícame integrales');
+    expect(userPromptSent).not.toContain('una integral es...');
+    expect(userPromptSent).toContain('block_abc');
+    expect(userPromptSent).toContain('Integrales');
+    expect(userPromptSent).toContain('hola'); // mensaje narrativo sí va en el prompt
   });
 });
