@@ -332,6 +332,50 @@ Antes de aceptar el resultado del Paso 1 (segmentación) o Paso 3 (narrativa) co
 
 ---
 
+---
+
+### Task 8: Inyectar bloques relevantes en el prompt vivo (hallazgo del review final)
+
+**Motivo:** el review final del branch encontró que `getBlocks()` no tiene ningún consumidor fuera del propio pipeline de compactación — `chat.prompt.service.ts` y `chat.cross-reference.service.ts` solo leen `getNarrative()`, que deliberadamente excluye el contenido de los bloques (solo los referencia por id/título). Resultado: un estudiante que retoma la sesión pierde acceso a sus propias derivaciones/código ya extraídos, hasta que Fase 3 construya la UI/endpoint. Esto es una regresión de continuidad real, no solo de UI — se corrige acá, antes del merge, en vez de esperar a Fase 3.
+
+**Files:**
+- Modify: `backend/src/services/chat/chat.prompt.service.ts` (línea ~22, donde se lee `getNarrative`)
+- Test: `backend/src/services/chat/chat.prompt.service.test.ts` (actualizar/extender)
+
+**Diseño:** después de leer la narrativa, leer también `SessionSummaryService.getBlocks(sessionId)` e inyectar en el system prompt un resumen de los bloques disponibles — no todo el contenido crudo de cada bloque (podría ser mucho texto), sino algo razonable: para sesiones con pocos bloques, el contenido completo de cada uno; si crece mucho, priorizar los más recientes o truncar con un límite de caracteres razonable (definir un `MAX_BLOCKS_CONTEXT_CHARS` o similar, ponytail-style: límite simple documentado, no un sistema de ranking sofisticado). El objetivo mínimo viable es que el modelo tutor tenga acceso al contenido técnico ya extraído, no una solución perfecta de priorización — eso puede refinarse en Fase 3 con la UI real.
+
+No tocar `chat.cross-reference.service.ts` en este task salvo que sea trivial (evaluar si aplica el mismo problema ahí; si el fix es igual de simple, incluirlo, si no, dejarlo anotado para seguimiento).
+
+- [ ] **Step 1: Test que falla** — el system prompt construido incluye contenido de bloques existentes de la sesión, no solo la narrativa.
+- [ ] **Step 2: Confirmar que falla**
+- [ ] **Step 3: Implementar**
+- [ ] **Step 4: Confirmar que pasa, correr suite completa**
+- [ ] **Step 5: Commit**
+
+---
+
+### Task 9: Prompt de compactación narrativa dedicado + límite a reintentos indefinidos (hallazgo del review final)
+
+**Motivo:** dos hallazgos relacionados del review final:
+1. `chat.compaction.service.ts` sigue reusando `SYSTEM_PROMPT_COMPACTOR` de Fase 1 sin cambios — ese prompt le pide al modelo `reviewedMessageCount` y `kbCandidates[]`, campos que `runNarrativeCompaction` ahora ignora silenciosamente (parsea solo `summary`+`confidence`). Desperdicia tokens y no le pide al modelo la estructura de dos pistas que la spec sección 2.1 espera (`## Estado de la sesión`, `## Temas cubiertos`, lista de referencias a bloques).
+2. El global constraint "el cursor avanza por mensaje procesado, no solo si la narrativa compactó con éxito" solo se cumple a medias: los bloques sí avanzan siempre, pero si la narrativa falla persistentemente (truncamiento repetido, JSON inválido, o el guard de alucinación de ausencia del Task 6 rebotando en un pase sin mensajes narrativos), el cursor de narrativa nunca avanza y cada pasada futura vuelve a gastar IA (segmentación + narrativa + verificación) sobre el mismo rango, sin límite.
+
+**Files:**
+- Modify: `backend/src/prompts/system.ts` (o donde viva `SYSTEM_PROMPT_COMPACTOR` — crear un prompt nuevo específico para la narrativa de dos pistas, sin pedir `reviewedMessageCount`/`kbCandidates`)
+- Modify: `backend/src/services/chat/chat.compaction.service.ts`
+
+**Diseño parte 1 (prompt):** nuevo prompt (ej. `SYSTEM_PROMPT_NARRATIVE_COMPACTOR`) que le pide al modelo actualizar la narrativa incremental en base a: la narrativa previa, los mensajes narrativos nuevos, y la lista de referencias a bloques (id+título) — sin pedir campos que ya no se usan. Pedir el formato de spec 2.1 (encabezados sugeridos), aunque no hace falta parsear esa estructura rígidamente, es guía para el modelo. Responde solo `{ "summary": "...", "confidence": "high"|"medium"|"low" }`.
+
+**Diseño parte 2 (límite a reintentos indefinidos):** agregar un contador de intentos fallidos de narrativa persistido en el índice de la sesión (ej. nuevo campo en `index.json` vía `SessionSummaryService`, o un campo simple como `narrativeFailureCount` en el propio índice) — ponytail: contador simple en disco, no una cola de reintentos con backoff exponencial. Si una pasada de narrativa falla (truncamiento tras retry, alucinación de ausencia tras retry, o JSON inválido), incrementar el contador. Si supera un umbral bajo (ej. 3 pasadas fallidas consecutivas sobre el mismo rango), en vez de reintentar indefinidamente: avanzar igual el cursor (aceptando que esa narrativa quedó sin actualizar esta vez, los bloques ya están a salvo) y loguear un warning claro para que un humano pueda revisar la sesión — nunca se pierde contenido (los bloques ya persistieron), solo se acepta que la narrativa de esa sesión quedó momentáneamente desactualizada en vez de bloquear el pipeline para siempre. Resetear el contador a 0 en cualquier compactación exitosa.
+
+- [ ] **Step 1: Tests que fallan** — nuevo prompt no pide reviewedMessageCount/kbCandidates; contador de fallos persiste y se resetea en éxito; tras superar el umbral, el cursor avanza igual con un warning, sin reintentar más esa pasada.
+- [ ] **Step 2: Confirmar que fallan**
+- [ ] **Step 3: Implementar**
+- [ ] **Step 4: Confirmar que pasan, correr suite completa**
+- [ ] **Step 5: Commit**
+
+---
+
 ## Fuera de alcance de este plan (recordatorio)
 
 - UI del sidebar (`contextPanel`, "Resumen de la sesión" desplegable, edición manual) — Fase 3, spec sección 7.
