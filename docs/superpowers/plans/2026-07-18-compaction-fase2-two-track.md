@@ -30,6 +30,9 @@
 
 **Files:**
 - Modify: `backend/src/services/session-summary.service.ts` (reescritura completa)
+- Modify: `backend/src/services/chat/chat.prompt.service.ts` (línea 22: `getSummary`→`getNarrative`)
+- Modify: `backend/src/controllers/chat.controller.ts` (línea 207: `getSummary`→`getNarrative`)
+- Modify: `backend/src/services/chat/chat.cross-reference.service.ts` (líneas 57, 60: `getSummary`→`getNarrative`)
 - Test: `backend/src/services/session-summary.service.test.ts` (nuevo)
 
 **Interfaces:**
@@ -58,6 +61,8 @@
   };
   ```
 
+**Resolución de preflight (confirmada con el usuario):** el rename `getSummary`→`getNarrative` / `saveSummary`→`saveNarrative` rompe 3 llamadores fuera del scope original del plan: `chat.prompt.service.ts:22`, `chat.controller.ts:207`, `chat.cross-reference.service.ts:57,60`. Task 1 debe actualizar esos 3 call sites a los nuevos nombres (comportamiento idéntico, `narrative.md` reemplaza `summary.md` 1:1 para lectura). `deleteSummary` no cambia de nombre.
+
 **Migración de datos existentes (lazy, no un job aparte):**
 - Al llamar `getNarrative(sessionId)`, si no existe `data/session-summaries/{sessionId}/narrative.md` PERO existe el archivo viejo `data/session-summaries/{sessionId}.md`, migrar automáticamente: crear la carpeta, mover el contenido a `narrative.md`, crear `index.json` vacío (`blocks: []`), y borrar el archivo viejo. Sin `blocks/` retroactivos — el resumen viejo queda como narrativa inicial, tal como dice la spec sección 8, Fase 2, punto 5.
 - Esto evita un script de migración separado y un estado transitorio de "sesiones migradas vs no migradas" que haya que trackear.
@@ -77,7 +82,7 @@
 - Test: `backend/src/services/chat/chat.segmentation.service.test.ts` (nuevo)
 
 **Interfaces:**
-- Consumes: **reutiliza** `hasCode()` y las señales de complejidad ya escritas en `chat.classifier.service.ts` (Fase de orquestación) — no reimplementar detección de código desde cero, importar y usar.
+- Consumes: **reutiliza** `hasCode()` de `chat.classifier.service.ts` — no reimplementar detección de código desde cero, importar y usar. `hasCode` es actualmente privada (no exportada); **resolución de preflight confirmada:** agregar `export` a su declaración en `chat.classifier.service.ts` (una palabra, sin tocar lógica) — esto satisface el global constraint "no tocar" en espíritu (cero cambio de comportamiento).
 - Produces: `SegmentationResult[]` que consume Task 3 (extracción) y Task 4 (compactación narrativa).
 
 ```ts
