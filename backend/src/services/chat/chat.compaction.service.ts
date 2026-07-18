@@ -5,8 +5,14 @@ import { SessionSummaryService, type KnowledgeBlock } from '../session-summary.s
 import { segmentMessages, VERIFICABLE_MARKERS, type SegmentationResult } from './chat.segmentation.service.js';
 import { extractBlocks } from './chat.block-extraction.service.js';
 import { pickVerifierModel, verifyCompaction, type MissingContentItem } from './chat.compaction-verifier.service.js';
-import { SYSTEM_PROMPT_COMPACTOR } from '../../prompts/system.js';
+import { SYSTEM_PROMPT_NARRATIVE_COMPACTOR } from '../../prompts/system.js';
 import { INKLING_MODEL_ID } from '../../config/models.js';
+
+// Tope de pasadas de narrativa fallidas consecutivas (mismo rango) antes de
+// forzar el avance del cursor sin narrativa actualizada — evita gastar IA
+// (segmentación + narrativa + verificación) sin límite en un rango que nunca
+// compacta con éxito. Los bloques del Paso 2 nunca se pierden de todos modos.
+const MAX_NARRATIVE_FAILURES = 3;
 
 // Umbral para compactación automática en segundo plano (además del disparador
 // explícito por cambio de modelo, que siempre compacta sin importar cuántos
@@ -60,7 +66,7 @@ function buildNarrativePrompt(priorNarrative: string, narrativeMessages: Narrati
 // ni sin "summary" como resultado final; se descarta el intento en vez de
 // guardar una narrativa a medias.
 async function runNarrativeCompaction(sessionId: string, userPrompt: string, model: string): Promise<NarrativeResult | null> {
-  let result = await generateFromAI('nineRouter', SYSTEM_PROMPT_COMPACTOR, userPrompt, null, {
+  let result = await generateFromAI('nineRouter', SYSTEM_PROMPT_NARRATIVE_COMPACTOR, userPrompt, null, {
     model,
     temperature: 0.3,
     max_tokens: INITIAL_MAX_TOKENS,
@@ -68,7 +74,7 @@ async function runNarrativeCompaction(sessionId: string, userPrompt: string, mod
 
   if (result.finishReason === 'length') {
     logger.warn('Compactación truncada por max_tokens, reintentando con presupuesto mayor', { sessionId, model });
-    result = await generateFromAI('nineRouter', SYSTEM_PROMPT_COMPACTOR, userPrompt, null, {
+    result = await generateFromAI('nineRouter', SYSTEM_PROMPT_NARRATIVE_COMPACTOR, userPrompt, null, {
       model,
       temperature: 0.3,
       max_tokens: RETRY_MAX_TOKENS,
@@ -180,10 +186,22 @@ export async function compactSession(sessionId: string, userId: string, force = 
     }
 
     if (!narrativeResult) {
-      // Los bloques del Paso 2 ya quedaron guardados; el cursor NO avanza
-      // para que estos mismos mensajes se reintenten en la narrativa la
-      // próxima pasada.
-      logger.warn('Narrativa truncada o inválida tras reintento, bloques ya persistidos, narrativa pendiente', { sessionId, model });
+      // Los bloques del Paso 2 ya quedaron guardados. Por defecto el cursor NO
+      // avanza para que estos mismos mensajes se reintenten en la narrativa la
+      // próxima pasada — pero si esto ya falló MAX_NARRATIVE_FAILURES veces
+      // seguidas sobre el mismo rango, dejar de reintentar para siempre y
+      // forzar el avance: la narrativa queda desactualizada esta pasada, pero
+      // nunca se pierde contenido (los bloques ya están a salvo) y el
+      // pipeline no se queda gastando IA sin límite.
+      const failureCount = SessionSummaryService.recordNarrativeFailure(sessionId);
+      if (failureCount >= MAX_NARRATIVE_FAILURES) {
+        logger.warn('Narrativa falló repetidamente, se fuerza el avance del cursor sin actualizarla — revisar sesión manualmente', {
+          sessionId, model, failureCount,
+        });
+        ChatModel.setSummaryCursor(sessionId, newMessages[newMessages.length - 1].created_at);
+        return;
+      }
+      logger.warn('Narrativa truncada o inválida tras reintento, bloques ya persistidos, narrativa pendiente', { sessionId, model, failureCount });
       return;
     }
 
@@ -193,6 +211,7 @@ export async function compactSession(sessionId: string, userId: string, force = 
     const finalNarrative = appendMissingContent(narrativeResult.summary, verification.missing);
 
     SessionSummaryService.saveNarrative(sessionId, finalNarrative, { model, confidence: narrativeResult.confidence });
+    SessionSummaryService.resetNarrativeFailureCount(sessionId);
     ChatModel.setSummaryCursor(sessionId, newMessages[newMessages.length - 1].created_at);
 
     logger.info('Sesión compactada (dos pistas)', {

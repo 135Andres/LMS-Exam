@@ -20,6 +20,7 @@ export interface KnowledgeBlock {
 interface SessionIndex {
   narrativeCompactions: Array<{ savedAt: string; model: string; confidence: string }>;
   blocks: Array<{ id: string; title: string; subject: string; extractedAt: string }>;
+  narrativeFailureCount?: number;
 }
 
 function sessionDir(sessionId: string): string {
@@ -142,6 +143,29 @@ export const SessionSummaryService = {
 
   getIndex(sessionId: string): SessionIndex {
     return readIndex(sessionId);
+  },
+
+  // Contador simple de pasadas de narrativa fallidas consecutivas (truncamiento
+  // tras retry, JSON inválido, alucinación de ausencia persistente) — evita
+  // reintentar por siempre el mismo rango si la narrativa nunca compacta con
+  // éxito; ver compactSession. Sin cola de reintentos con backoff, un contador.
+  getNarrativeFailureCount(sessionId: string): number {
+    return readIndex(sessionId).narrativeFailureCount ?? 0;
+  },
+
+  recordNarrativeFailure(sessionId: string): number {
+    const index = readIndex(sessionId);
+    index.narrativeFailureCount = (index.narrativeFailureCount ?? 0) + 1;
+    if (!fs.existsSync(sessionDir(sessionId))) fs.mkdirSync(sessionDir(sessionId), { recursive: true });
+    writeIndex(sessionId, index);
+    return index.narrativeFailureCount;
+  },
+
+  resetNarrativeFailureCount(sessionId: string): void {
+    const index = readIndex(sessionId);
+    if (!index.narrativeFailureCount) return;
+    index.narrativeFailureCount = 0;
+    writeIndex(sessionId, index);
   },
 
   deleteSummary(sessionId: string): void {

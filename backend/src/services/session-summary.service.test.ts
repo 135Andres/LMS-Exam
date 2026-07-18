@@ -108,6 +108,28 @@ describe('SessionSummaryService', () => {
     expect(fs.existsSync(blockFile)).toBe(true);
   });
 
+  it('getNarrativeFailureCount devuelve 0 si no hay index aún', () => {
+    expect(SessionSummaryService.getNarrativeFailureCount(SESSION_ID)).toBe(0);
+  });
+
+  it('recordNarrativeFailure incrementa el contador y lo persiste en index.json', () => {
+    expect(SessionSummaryService.recordNarrativeFailure(SESSION_ID)).toBe(1);
+    expect(SessionSummaryService.recordNarrativeFailure(SESSION_ID)).toBe(2);
+    expect(SessionSummaryService.getNarrativeFailureCount(SESSION_ID)).toBe(2);
+
+    const index = SessionSummaryService.getIndex(SESSION_ID);
+    expect(index.narrativeFailureCount).toBe(2);
+  });
+
+  it('resetNarrativeFailureCount vuelve el contador a 0', () => {
+    SessionSummaryService.recordNarrativeFailure(SESSION_ID);
+    SessionSummaryService.recordNarrativeFailure(SESSION_ID);
+
+    SessionSummaryService.resetNarrativeFailureCount(SESSION_ID);
+
+    expect(SessionSummaryService.getNarrativeFailureCount(SESSION_ID)).toBe(0);
+  });
+
   it('deleteSummary borra la carpeta completa incluyendo blocks/', () => {
     SessionSummaryService.saveNarrative(SESSION_ID, 'contenido', { model: 'test-model', confidence: 'high' });
     SessionSummaryService.addBlock(SESSION_ID, {

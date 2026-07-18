@@ -15,6 +15,9 @@ const {
   sessionSummaryMock: {
     getNarrative: vi.fn(),
     saveNarrative: vi.fn(),
+    getNarrativeFailureCount: vi.fn(),
+    recordNarrativeFailure: vi.fn(),
+    resetNarrativeFailureCount: vi.fn(),
   },
   segmentMessagesMock: vi.fn(),
   extractBlocksMock: vi.fn(),
@@ -85,6 +88,9 @@ describe('compactSession — modelo dinámico', () => {
     chatModelMock.getLastAssistantModel.mockReset();
     sessionSummaryMock.getNarrative.mockReset().mockReturnValue(null);
     sessionSummaryMock.saveNarrative.mockReset();
+    sessionSummaryMock.getNarrativeFailureCount.mockReset().mockReturnValue(0);
+    sessionSummaryMock.recordNarrativeFailure.mockReset().mockReturnValue(1);
+    sessionSummaryMock.resetNarrativeFailureCount.mockReset();
     segmentMessagesMock.mockReset().mockResolvedValue(allNarrativo());
     extractBlocksMock.mockReset().mockResolvedValue([]);
     verifyCompactionMock.mockReset().mockResolvedValue({ missing: [] });
@@ -149,6 +155,9 @@ describe('compactSession — retry en truncamiento', () => {
     chatModelMock.getLastAssistantModel.mockReset().mockReturnValue('nvidia/thinkingmachines/inkling');
     sessionSummaryMock.getNarrative.mockReset().mockReturnValue(null);
     sessionSummaryMock.saveNarrative.mockReset();
+    sessionSummaryMock.getNarrativeFailureCount.mockReset().mockReturnValue(0);
+    sessionSummaryMock.recordNarrativeFailure.mockReset().mockReturnValue(1);
+    sessionSummaryMock.resetNarrativeFailureCount.mockReset();
     segmentMessagesMock.mockReset().mockResolvedValue(allNarrativo());
     extractBlocksMock.mockReset().mockResolvedValue([]);
     verifyCompactionMock.mockReset().mockResolvedValue({ missing: [] });
@@ -197,6 +206,9 @@ describe('compactSession — orquestación de 4 pasos (Fase 2)', () => {
     chatModelMock.getLastAssistantModel.mockReset().mockReturnValue('nvidia/thinkingmachines/inkling');
     sessionSummaryMock.getNarrative.mockReset().mockReturnValue(null);
     sessionSummaryMock.saveNarrative.mockReset();
+    sessionSummaryMock.getNarrativeFailureCount.mockReset().mockReturnValue(0);
+    sessionSummaryMock.recordNarrativeFailure.mockReset().mockReturnValue(1);
+    sessionSummaryMock.resetNarrativeFailureCount.mockReset();
     segmentMessagesMock.mockReset().mockResolvedValue(allNarrativo());
     extractBlocksMock.mockReset().mockResolvedValue([]);
     verifyCompactionMock.mockReset().mockResolvedValue({ missing: [] });
@@ -285,6 +297,9 @@ describe('compactSession — alucinación de ausencia (Fase 2 paso 6)', () => {
     chatModelMock.getLastAssistantModel.mockReset().mockReturnValue('nvidia/thinkingmachines/inkling');
     sessionSummaryMock.getNarrative.mockReset().mockReturnValue(null);
     sessionSummaryMock.saveNarrative.mockReset();
+    sessionSummaryMock.getNarrativeFailureCount.mockReset().mockReturnValue(0);
+    sessionSummaryMock.recordNarrativeFailure.mockReset().mockReturnValue(1);
+    sessionSummaryMock.resetNarrativeFailureCount.mockReset();
     segmentMessagesMock.mockReset().mockResolvedValue(allNarrativoFor(CODE_MESSAGES));
     extractBlocksMock.mockReset().mockResolvedValue([]);
     verifyCompactionMock.mockReset().mockResolvedValue({ missing: [] });
@@ -317,5 +332,60 @@ describe('compactSession — alucinación de ausencia (Fase 2 paso 6)', () => {
     expect(extractBlocksMock).toHaveBeenCalled();
     expect(sessionSummaryMock.saveNarrative).not.toHaveBeenCalled();
     expect(chatModelMock.setSummaryCursor).not.toHaveBeenCalled();
+  });
+});
+
+describe('compactSession — límite a reintentos indefinidos de narrativa (Fase 2 paso 9)', () => {
+  beforeEach(() => {
+    generateFromAIMock.mockReset();
+    chatModelMock.getSummaryCursor.mockReset().mockReturnValue(null);
+    chatModelMock.getMessagesSince.mockReset().mockReturnValue(NEW_MESSAGES);
+    chatModelMock.setSummaryCursor.mockReset();
+    chatModelMock.getLastAssistantModel.mockReset().mockReturnValue('nvidia/thinkingmachines/inkling');
+    sessionSummaryMock.getNarrative.mockReset().mockReturnValue(null);
+    sessionSummaryMock.saveNarrative.mockReset();
+    sessionSummaryMock.getNarrativeFailureCount.mockReset().mockReturnValue(0);
+    sessionSummaryMock.recordNarrativeFailure.mockReset().mockReturnValue(1);
+    sessionSummaryMock.resetNarrativeFailureCount.mockReset();
+    segmentMessagesMock.mockReset().mockResolvedValue(allNarrativo());
+    extractBlocksMock.mockReset().mockResolvedValue([]);
+    verifyCompactionMock.mockReset().mockResolvedValue({ missing: [] });
+    pickVerifierModelMock.mockReset().mockReturnValue('ag/gemini-3-flash');
+  });
+
+  it('narrativa fallida por debajo del umbral: registra el fallo pero no avanza el cursor (comportamiento previo, Task 4)', async () => {
+    sessionSummaryMock.recordNarrativeFailure.mockReturnValue(2); // 2/3, aún bajo el umbral
+    generateFromAIMock
+      .mockResolvedValueOnce(aiResponse('{"summary": "cortado', 'length'))
+      .mockResolvedValueOnce(aiResponse('{"summary": "sigue cortado', 'length'));
+
+    await compactSession('s1', 'u1', true);
+
+    expect(sessionSummaryMock.recordNarrativeFailure).toHaveBeenCalledWith('s1');
+    expect(sessionSummaryMock.saveNarrative).not.toHaveBeenCalled();
+    expect(chatModelMock.setSummaryCursor).not.toHaveBeenCalled();
+  });
+
+  it('narrativa exitosa resetea el contador de fallos', async () => {
+    generateFromAIMock.mockResolvedValueOnce(aiResponse(VALID_RESULT, 'stop'));
+
+    await compactSession('s1', 'u1', true);
+
+    expect(sessionSummaryMock.resetNarrativeFailureCount).toHaveBeenCalledWith('s1');
+    expect(sessionSummaryMock.recordNarrativeFailure).not.toHaveBeenCalled();
+  });
+
+  it('al llegar al umbral (3 fallos), fuerza el avance del cursor sin guardar narrativa y sin más intentos de IA de los que ya usa un solo pase', async () => {
+    sessionSummaryMock.recordNarrativeFailure.mockReturnValue(3); // ya llegó al umbral
+    generateFromAIMock
+      .mockResolvedValueOnce(aiResponse('{"summary": "cortado', 'length'))
+      .mockResolvedValueOnce(aiResponse('{"summary": "sigue cortado', 'length'));
+
+    await compactSession('s1', 'u1', true);
+
+    expect(generateFromAIMock).toHaveBeenCalledTimes(2); // solo el intento normal + 1 retry, nada extra
+    expect(sessionSummaryMock.recordNarrativeFailure).toHaveBeenCalledWith('s1');
+    expect(sessionSummaryMock.saveNarrative).not.toHaveBeenCalled();
+    expect(chatModelMock.setSummaryCursor).toHaveBeenCalledWith('s1', NEW_MESSAGES[5].created_at);
   });
 });
