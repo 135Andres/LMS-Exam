@@ -19,7 +19,7 @@ export class ChatPromptService {
     let prompt = basePrompt.replace(/\{MODEL_NAME\}/g, modelLabel);
 
     if (sessionId) {
-      const summary = SessionSummaryService.getSummary(sessionId);
+      const summary = SessionSummaryService.getNarrative(sessionId);
       if (summary) {
         prompt += `\n\n--- Resumen de la conversación previa ---\n${summary}\n---`;
       }

@@ -54,7 +54,7 @@ export async function compactSession(sessionId: string, userId: string, force = 
   if (newMessages.length === 0) return;
   if (!force && newMessages.length < MIN_MESSAGES_TO_COMPACT) return;
 
-  const priorSummary = SessionSummaryService.getSummary(sessionId) || '(sin resumen previo, es el inicio de la conversación)';
+  const priorSummary = SessionSummaryService.getNarrative(sessionId) || '(sin resumen previo, es el inicio de la conversación)';
   const transcript = newMessages.map(m => `[${m.role}] ${m.content}`).join('\n\n');
   const userPrompt = `--- Resumen previo ---\n${priorSummary}\n\n--- Mensajes nuevos ---\n${transcript}`;
   const model = resolveCompactionModel(sessionId);
@@ -104,7 +104,7 @@ export async function compactSession(sessionId: string, userId: string, force = 
 
     if (!parsed.summary) return;
 
-    SessionSummaryService.saveSummary(sessionId, parsed.summary);
+    SessionSummaryService.saveNarrative(sessionId, parsed.summary, { model, confidence: parsed.confidence || 'high' });
     ChatModel.setSummaryCursor(sessionId, newMessages[newMessages.length - 1].created_at);
 
     for (const candidate of parsed.kbCandidates || []) {

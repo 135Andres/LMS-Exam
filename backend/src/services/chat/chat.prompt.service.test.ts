@@ -7,7 +7,7 @@ vi.mock('../profile.service.js', () => ({
   ProfileService: { getProfile: () => null },
 }));
 vi.mock('../session-summary.service.js', () => ({
-  SessionSummaryService: { getSummary: () => null },
+  SessionSummaryService: { getNarrative: () => null },
 }));
 
 import { ChatPromptService } from './chat.prompt.service.js';

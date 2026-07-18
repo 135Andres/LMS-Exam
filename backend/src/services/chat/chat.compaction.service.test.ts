@@ -10,8 +10,8 @@ const { generateFromAIMock, chatModelMock, sessionSummaryMock, knowledgeModelMoc
     getLastAssistantModel: vi.fn(),
   },
   sessionSummaryMock: {
-    getSummary: vi.fn(),
-    saveSummary: vi.fn(),
+    getNarrative: vi.fn(),
+    saveNarrative: vi.fn(),
   },
   knowledgeModelMock: {
     existsByHash: vi.fn(),
@@ -65,8 +65,8 @@ describe('compactSession — modelo dinámico', () => {
     chatModelMock.getMessagesSince.mockReset().mockReturnValue(NEW_MESSAGES);
     chatModelMock.setSummaryCursor.mockReset();
     chatModelMock.getLastAssistantModel.mockReset();
-    sessionSummaryMock.getSummary.mockReset().mockReturnValue(null);
-    sessionSummaryMock.saveSummary.mockReset();
+    sessionSummaryMock.getNarrative.mockReset().mockReturnValue(null);
+    sessionSummaryMock.saveNarrative.mockReset();
     knowledgeModelMock.existsByHash.mockReset().mockReturnValue(false);
     knowledgeModelMock.create.mockReset();
   });
@@ -127,8 +127,8 @@ describe('compactSession — retry en truncamiento', () => {
     chatModelMock.getMessagesSince.mockReset().mockReturnValue(NEW_MESSAGES);
     chatModelMock.setSummaryCursor.mockReset();
     chatModelMock.getLastAssistantModel.mockReset().mockReturnValue('nvidia/thinkingmachines/inkling');
-    sessionSummaryMock.getSummary.mockReset().mockReturnValue(null);
-    sessionSummaryMock.saveSummary.mockReset();
+    sessionSummaryMock.getNarrative.mockReset().mockReturnValue(null);
+    sessionSummaryMock.saveNarrative.mockReset();
     knowledgeModelMock.existsByHash.mockReset().mockReturnValue(false);
     knowledgeModelMock.create.mockReset();
   });
@@ -145,7 +145,7 @@ describe('compactSession — retry en truncamiento', () => {
       'nineRouter', expect.any(String), expect.any(String), null,
       expect.objectContaining({ max_tokens: 6000 }),
     );
-    expect(sessionSummaryMock.saveSummary).toHaveBeenCalledWith('s1', 'El estudiante preguntó sobre integrales.');
+    expect(sessionSummaryMock.saveNarrative).toHaveBeenCalledWith('s1', 'El estudiante preguntó sobre integrales.', expect.any(Object));
   });
 
   it('descarta el intento (no guarda nada) si sigue truncado tras el reintento', async () => {
@@ -156,7 +156,7 @@ describe('compactSession — retry en truncamiento', () => {
     await compactSession('s1', 'u1', true);
 
     expect(generateFromAIMock).toHaveBeenCalledTimes(2);
-    expect(sessionSummaryMock.saveSummary).not.toHaveBeenCalled();
+    expect(sessionSummaryMock.saveNarrative).not.toHaveBeenCalled();
     expect(chatModelMock.setSummaryCursor).not.toHaveBeenCalled();
   });
 });
@@ -171,8 +171,8 @@ describe('compactSession — auditoría de confianza y cobertura', () => {
     chatModelMock.getMessagesSince.mockReset().mockReturnValue(NEW_MESSAGES);
     chatModelMock.setSummaryCursor.mockReset();
     chatModelMock.getLastAssistantModel.mockReset().mockReturnValue('nvidia/thinkingmachines/inkling');
-    sessionSummaryMock.getSummary.mockReset().mockReturnValue(null);
-    sessionSummaryMock.saveSummary.mockReset();
+    sessionSummaryMock.getNarrative.mockReset().mockReturnValue(null);
+    sessionSummaryMock.saveNarrative.mockReset();
     knowledgeModelMock.existsByHash.mockReset().mockReturnValue(false);
     knowledgeModelMock.create.mockReset();
     const { logger } = await import('../../utils/logger.js');
@@ -197,7 +197,7 @@ describe('compactSession — auditoría de confianza y cobertura', () => {
       expect.objectContaining({ sessionId: 's1', expected: 6, reviewedMessageCount: 3 }),
     );
     // Un mismatch de cobertura NO bloquea el guardado — solo se audita (Fase 3 corrige).
-    expect(sessionSummaryMock.saveSummary).toHaveBeenCalledWith('s1', 'resumen parcial');
+    expect(sessionSummaryMock.saveNarrative).toHaveBeenCalledWith('s1', 'resumen parcial', expect.any(Object));
   });
 
   it('loguea un warning si confidence no es "high"', async () => {
@@ -254,7 +254,7 @@ describe('compactSession — auditoría de confianza y cobertura', () => {
       expect.stringMatching(/confianza baja|confidence/i),
       expect.objectContaining({ sessionId: 's1', confidence: 'low' }),
     );
-    expect(sessionSummaryMock.saveSummary).not.toHaveBeenCalled();
+    expect(sessionSummaryMock.saveNarrative).not.toHaveBeenCalled();
     expect(chatModelMock.setSummaryCursor).not.toHaveBeenCalled();
   });
 });
