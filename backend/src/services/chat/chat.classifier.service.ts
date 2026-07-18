@@ -51,6 +51,14 @@ const LOW_COMPLEXITY_MARKERS = [
   'que es', 'define', 'definicion de', 'cuando fue', 'cual es', 'traduce',
 ];
 
+// Pedido explícito del estudiante de razonamiento extenso — fuerza 'high'
+// sin importar longitud del mensaje (ver estimateComplexity).
+const EXPLICIT_MAX_EFFORT_MARKERS = [
+  'razona', 'razonamiento extenso', 'razonamiento profundo', 'razonamiento maximo',
+  'responde detalladamente', 'explica detalladamente', 'explicacion detallada',
+  'piensa detenidamente', 'piensalo bien', 'analiza a fondo',
+];
+
 const RAG_CONTEXT_LENGTH_FOR_GEMINI = 4000;
 
 function stripAccents(text: string): string {
@@ -70,9 +78,10 @@ export function detectSubjectExtended(query: string): string | undefined {
 }
 
 function estimateComplexity(message: string): Complexity {
-  const lower = message.toLowerCase();
+  const lower = stripAccents(message.toLowerCase());
   const len = message.length;
 
+  if (EXPLICIT_MAX_EFFORT_MARKERS.some(m => lower.includes(m))) return 'high';
   if (HIGH_COMPLEXITY_MARKERS.some(m => lower.includes(m)) || len > 600) return 'high';
   if (LOW_COMPLEXITY_MARKERS.some(m => lower.includes(m)) || len < 80) return 'low';
   return 'medium';
