@@ -5,6 +5,10 @@ import { SessionSummaryService } from '../session-summary.service.js';
 import { ImportedMemoryService } from '../imported-memory.service.js';
 import { ChatQuizModeService } from './chat.quiz-mode.service.js';
 
+// ponytail: presupuesto simple por caracteres, prioriza recencia — no hay
+// ranking por relevancia; si hace falta afinar, Fase 3 con la UI real.
+const MAX_BLOCKS_CONTEXT_CHARS = 6000;
+
 export interface Attachment {
   type: 'image' | 'audio' | 'file';
   mime: string;
@@ -22,6 +26,22 @@ export class ChatPromptService {
       const summary = SessionSummaryService.getNarrative(sessionId);
       if (summary) {
         prompt += `\n\n--- Resumen de la conversación previa ---\n${summary}\n---`;
+      }
+
+      const blocks = SessionSummaryService.getBlocks(sessionId);
+      if (blocks.length > 0) {
+        const sorted = [...blocks].sort((a, b) => b.extractedAt.localeCompare(a.extractedAt));
+        const included: string[] = [];
+        let usedChars = 0;
+        for (const block of sorted) {
+          const text = `### ${block.title}\n${block.content}`;
+          if (usedChars + text.length > MAX_BLOCKS_CONTEXT_CHARS) break;
+          included.push(text);
+          usedChars += text.length;
+        }
+        if (included.length > 0) {
+          prompt += `\n\n--- Contenido técnico ya extraído de esta sesión ---\n${included.join('\n\n')}\n---`;
+        }
       }
     }
 
