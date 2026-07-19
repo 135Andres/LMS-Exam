@@ -601,7 +601,7 @@ body {
   z-index: 100;
   opacity: 0;
   pointer-events: none;
-  transition: right 0.4s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.4s ease;
+  transition: opacity 0.4s ease;
 }
 
 .top-bar.visible {
@@ -611,6 +611,13 @@ body {
 
 .page-content.panel-open .top-bar {
   right: 420px;
+}
+
+/* En "new" (hero-active) todavía no hay sesión con contenido — el botón de
+   info de sesión y el título del chat no tienen nada que mostrar aún. */
+.page-content.hero-active .context-btn,
+.page-content.hero-active .top-bar-chat-title {
+  display: none;
 }
 
 .top-bar-left {
@@ -635,18 +642,6 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
-}
-
-.top-bar-chat-title:has(.top-bar-chat-title-text:not(:empty))::before {
-  content: '/';
-  margin-right: 0.6rem;
-  color: rgba(var(--ink-rgb), 0.2);
-}
-
-/* Sidebar abierta: el logo decorativo ya se desvanece (ver .top-bar-title
-   arriba) — el "/" quedaría apuntando a texto invisible, así que se quita. */
-.sidebar.open ~ .page-content .top-bar-chat-title::before {
-  content: none;
 }
 
 /* En mobile la sidebar cubre toda la pantalla (100vw) al abrirse — el
@@ -1682,12 +1677,15 @@ body.exam-mode #showArchivedBtn {
   outline: none;
   cursor: pointer;
   opacity: 0;
-  transition: opacity 200ms ease, background 150ms ease, border-color 150ms ease;
+  transition: background 150ms ease, border-color 150ms ease;
   max-width: 180px;
   min-width: 120px;
   -webkit-appearance: none;
   appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='rgba(var(--ink-rgb), 0.5)'/%3E%3C/svg%3E");
+  /* El fill no puede usar var(--ink-rgb): un SVG embebido como data-URI no
+     tiene acceso a las custom properties del documento, así que caía siempre
+     a negro sólido. Se fija un gris legible en ambos temas. */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23888'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 0.4rem center;
   background-size: 8px;
@@ -2032,7 +2030,7 @@ body.exam-mode #showArchivedBtn {
   align-items: center;
   justify-content: space-between;
   padding: 1.25rem 1.5rem;
-  border-bottom: 1px solid rgba(var(--paper-rgb), 0.08);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   flex-shrink: 0;
 }
 
@@ -2045,7 +2043,7 @@ body.exam-mode #showArchivedBtn {
 .context-panel-close {
   background: none;
   border: none;
-  color: rgba(var(--paper-rgb), 0.5);
+  color: rgba(255, 255, 255, 0.5);
   font-size: 1.1rem;
   cursor: pointer;
   width: 32px;
@@ -2058,7 +2056,7 @@ body.exam-mode #showArchivedBtn {
 }
 
 .context-panel-close:hover {
-  background: rgba(var(--paper-rgb), 0.1);
+  background: rgba(255, 255, 255, 0.1);
   color: #fff;
 }
 
@@ -2067,7 +2065,7 @@ body.exam-mode #showArchivedBtn {
   overflow-y: auto;
   padding: 1.25rem 1.5rem;
   scrollbar-width: thin;
-  scrollbar-color: rgba(var(--paper-rgb), 0.15) transparent;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
 }
 
 .context-panel-body::-webkit-scrollbar {
@@ -2077,12 +2075,12 @@ body.exam-mode #showArchivedBtn {
   background: transparent;
 }
 .context-panel-body::-webkit-scrollbar-thumb {
-  background: rgba(var(--paper-rgb), 0.15);
+  background: rgba(255, 255, 255, 0.15);
   border-radius: 999px;
   transition: background 0.2s ease;
 }
 .context-panel-body::-webkit-scrollbar-thumb:hover {
-  background: rgba(var(--paper-rgb), 0.25);
+  background: rgba(255, 255, 255, 0.25);
 }
 
 /* ── Session info grid ── */
@@ -2105,7 +2103,7 @@ body.exam-mode #showArchivedBtn {
 
 .session-info-label {
   font-size: 0.6rem;
-  color: rgba(var(--paper-rgb), 0.4);
+  color: rgba(255, 255, 255, 0.4);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -2122,7 +2120,7 @@ body.exam-mode #showArchivedBtn {
 
 .breakdown-section h4 {
   font-size: 0.7rem;
-  color: rgba(var(--paper-rgb), 0.5);
+  color: rgba(255, 255, 255, 0.5);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-bottom: 0.5rem;
@@ -2133,7 +2131,7 @@ body.exam-mode #showArchivedBtn {
   height: 8px;
   border-radius: 999px;
   overflow: hidden;
-  background: rgba(var(--paper-rgb), 0.08);
+  background: rgba(255, 255, 255, 0.08);
   margin-bottom: 0.5rem;
 }
 
@@ -2153,7 +2151,7 @@ body.exam-mode #showArchivedBtn {
   align-items: center;
   gap: 0.35rem;
   font-size: 0.6rem;
-  color: rgba(var(--paper-rgb), 0.6);
+  color: rgba(255, 255, 255, 0.6);
 }
 
 .breakdown-dot {
@@ -2166,7 +2164,7 @@ body.exam-mode #showArchivedBtn {
 /* ── Raw messages list ── */
 .raw-messages-section h4 {
   font-size: 0.7rem;
-  color: rgba(var(--paper-rgb), 0.5);
+  color: rgba(255, 255, 255, 0.5);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-bottom: 0.5rem;
@@ -2179,7 +2177,7 @@ body.exam-mode #showArchivedBtn {
   flex-direction: column;
   gap: 0.25rem;
   scrollbar-width: thin;
-  scrollbar-color: rgba(var(--paper-rgb), 0.15) transparent;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
 }
 
 .raw-messages-list::-webkit-scrollbar {
@@ -2189,19 +2187,19 @@ body.exam-mode #showArchivedBtn {
   background: transparent;
 }
 .raw-messages-list::-webkit-scrollbar-thumb {
-  background: rgba(var(--paper-rgb), 0.15);
+  background: rgba(255, 255, 255, 0.15);
   border-radius: 999px;
   transition: background 0.2s ease;
 }
 .raw-messages-list::-webkit-scrollbar-thumb:hover {
-  background: rgba(var(--paper-rgb), 0.25);
+  background: rgba(255, 255, 255, 0.25);
 }
 
 .raw-message-item {
   font-size: 0.6rem;
-  color: rgba(var(--paper-rgb), 0.7);
+  color: rgba(255, 255, 255, 0.7);
   padding: 0.25rem 0;
-  border-bottom: 1px solid rgba(var(--paper-rgb), 0.04);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
   line-height: 1.4;
   word-break: break-all;
 }
@@ -2224,7 +2222,7 @@ body.exam-mode #showArchivedBtn {
 
 /* ── Notas rápidas (mensajes fijados) — panel de sesión ── */
 .pinned-messages-section {
-  border-top: 1px solid rgba(var(--paper-rgb), 0.08);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
   padding: 1rem 1.25rem;
   flex-shrink: 0;
 }
@@ -2233,7 +2231,7 @@ body.exam-mode #showArchivedBtn {
   cursor: pointer;
   font-size: 0.7rem;
   font-weight: 700;
-  color: rgba(var(--paper-rgb), 0.7);
+  color: rgba(255, 255, 255, 0.7);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   list-style: none;
@@ -2255,7 +2253,7 @@ body.exam-mode #showArchivedBtn {
 }
 
 .pinned-messages-section #pinnedMessagesCount {
-  color: rgba(var(--paper-rgb), 0.4);
+  color: rgba(255, 255, 255, 0.4);
   font-weight: 400;
 }
 
@@ -2274,11 +2272,11 @@ body.exam-mode #showArchivedBtn {
 }
 
 .pinned-message-item:hover {
-  background: rgba(var(--paper-rgb), 0.06);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .pinned-message-preview {
-  color: rgba(var(--paper-rgb), 0.7);
+  color: rgba(255, 255, 255, 0.7);
   font-size: 0.65rem;
 }
 
@@ -2998,12 +2996,29 @@ body.exam-mode #showArchivedBtn {
     flex-direction: column;
   }
 
+  /* La barra de categorías pasa a ser una fila horizontal arriba del todo —
+     sin este padding, la "X" (absoluta respecto al card) queda flotando
+     encima de los botones de categoría y se pierde visualmente. */
+  .settings-close-btn {
+    top: 0.6rem;
+    right: 0.6rem;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(var(--ink-rgb), 0.08);
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 3;
+  }
+
   .settings-sidebar {
     width: 100%;
     flex-direction: row;
     border-right: none;
     border-bottom: 1px solid rgba(var(--ink-rgb), 0.06);
-    padding: 0.75rem;
+    padding: 0.75rem 3rem 0.75rem 0.75rem;
     overflow-x: auto;
   }
 
