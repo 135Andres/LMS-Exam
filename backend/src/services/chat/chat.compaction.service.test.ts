@@ -219,12 +219,13 @@ describe('compactSession — orquestación de 4 pasos (Fase 2)', () => {
   it('cobertura incompleta de segmentación aborta la pasada sin avanzar el cursor ni llamar extractBlocks', async () => {
     segmentMessagesMock.mockResolvedValue(allNarrativo().slice(0, 3)); // menos resultados que mensajes
 
-    await compactSession('s1', 'u1', true);
+    const outcome = await compactSession('s1', 'u1', true);
 
     expect(extractBlocksMock).not.toHaveBeenCalled();
     expect(generateFromAIMock).not.toHaveBeenCalled();
     expect(sessionSummaryMock.saveNarrative).not.toHaveBeenCalled();
     expect(chatModelMock.setSummaryCursor).not.toHaveBeenCalled();
+    expect(outcome).toEqual({ status: 'failed_segmentation' });
   });
 
   it('extractBlocks se ejecuta y persiste (Paso 2) incluso cuando la narrativa (Paso 3) falla', async () => {
@@ -251,6 +252,11 @@ describe('compactSession — orquestación de 4 pasos (Fase 2)', () => {
       expect.any(Object),
     );
     expect(chatModelMock.setSummaryCursor).toHaveBeenCalled();
+  });
+
+  it('devuelve status "compacted" en el camino feliz', async () => {
+    const outcome = await compactSession('s1', 'u1', true);
+    expect(outcome).toEqual({ status: 'compacted' });
   });
 
   it('el prompt de narrativa excluye el contenido de mensajes verificables, solo los referencia por bloque', async () => {
@@ -359,11 +365,12 @@ describe('compactSession — límite a reintentos indefinidos de narrativa (Fase
       .mockResolvedValueOnce(aiResponse('{"summary": "cortado', 'length'))
       .mockResolvedValueOnce(aiResponse('{"summary": "sigue cortado', 'length'));
 
-    await compactSession('s1', 'u1', true);
+    const outcome = await compactSession('s1', 'u1', true);
 
     expect(sessionSummaryMock.recordNarrativeFailure).toHaveBeenCalledWith('s1');
     expect(sessionSummaryMock.saveNarrative).not.toHaveBeenCalled();
     expect(chatModelMock.setSummaryCursor).not.toHaveBeenCalled();
+    expect(outcome).toEqual({ status: 'failed_narrative', failureCount: 2 });
   });
 
   it('narrativa exitosa resetea el contador de fallos', async () => {
@@ -398,6 +405,28 @@ describe('compactSession — límite a reintentos indefinidos de narrativa (Fase
     await compactSession('s1', 'u1', true);
 
     expect(sessionSummaryMock.resetNarrativeFailureCount).toHaveBeenCalledWith('s1');
+  });
+});
+
+describe('compactSession — outcomes tempranos', () => {
+  it('devuelve status "skipped_no_new_messages" si no hay mensajes nuevos', async () => {
+    chatModelMock.getSummaryCursor.mockReset().mockReturnValue(null);
+    chatModelMock.getMessagesSince.mockReset().mockReturnValue([]);
+
+    const outcome = await compactSession('s1', 'u1', true);
+
+    expect(outcome).toEqual({ status: 'skipped_no_new_messages' });
+  });
+
+  it('devuelve status "error" con el mensaje si compactSession lanza una excepción', async () => {
+    chatModelMock.getSummaryCursor.mockReset().mockReturnValue(null);
+    chatModelMock.getMessagesSince.mockReset().mockReturnValue(NEW_MESSAGES);
+    chatModelMock.getLastAssistantModel.mockReset().mockReturnValue('nvidia/thinkingmachines/inkling');
+    segmentMessagesMock.mockReset().mockRejectedValue(new Error('boom'));
+
+    const outcome = await compactSession('s1', 'u1', true);
+
+    expect(outcome).toEqual({ status: 'error', message: 'boom' });
   });
 });
 
