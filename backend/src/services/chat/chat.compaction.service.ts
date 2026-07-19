@@ -127,19 +127,27 @@ function appendMissingContent(narrative: string, missing: MissingContentItem[]):
   return `${narrative}\n\n--- Contenido detectado como faltante en verificación cruzada ---\n${section}`;
 }
 
+export type CompactionOutcome =
+  | { status: 'compacted' }
+  | { status: 'skipped_no_new_messages' }
+  | { status: 'skipped_below_threshold' }
+  | { status: 'failed_segmentation' }
+  | { status: 'failed_narrative'; failureCount: number }
+  | { status: 'error'; message: string };
+
 // Compacta lo nuevo desde el último corte (cursor) de una sesión en 4 pasos:
 // 1) segmenta verificable/narrativo, 2) extrae bloques verbatim (persiste
 // independiente de lo que pase después), 3) compacta la narrativa (excluye
 // contenido verificable, solo lo referencia), 4) verifica cruzado con un
 // modelo de otra familia y agrega directo lo que falte. El cursor de
 // narrativa solo avanza si el paso 3 guardó con éxito.
-export async function compactSession(sessionId: string, userId: string, force = false): Promise<void> {
+export async function compactSession(sessionId: string, userId: string, force = false): Promise<CompactionOutcome> {
   const cursor = ChatModel.getSummaryCursor(sessionId);
   const newMessages = ChatModel.getMessagesSince(sessionId, cursor)
     .filter(m => m.role === 'user' || m.role === 'assistant');
 
-  if (newMessages.length === 0) return;
-  if (!force && newMessages.length < MIN_MESSAGES_TO_COMPACT) return;
+  if (newMessages.length === 0) return { status: 'skipped_no_new_messages' };
+  if (!force && newMessages.length < MIN_MESSAGES_TO_COMPACT) return { status: 'skipped_below_threshold' };
 
   const model = resolveCompactionModel(sessionId);
 
@@ -152,7 +160,7 @@ export async function compactSession(sessionId: string, userId: string, force = 
       logger.warn('Segmentación incompleta, se aborta esta pasada', {
         sessionId, expected: newMessages.length, got: segments.length,
       });
-      return; // no avanza cursor, se reintentará en la próxima pasada
+      return { status: 'failed_segmentation' }; // no avanza cursor, se reintentará en la próxima pasada
     }
 
     // Paso 2 — Extracción de bloques verbatim. Siempre se ejecuta y persiste,
@@ -200,10 +208,10 @@ export async function compactSession(sessionId: string, userId: string, force = 
         });
         SessionSummaryService.resetNarrativeFailureCount(sessionId);
         ChatModel.setSummaryCursor(sessionId, newMessages[newMessages.length - 1].created_at);
-        return;
+        return { status: 'failed_narrative', failureCount };
       }
       logger.warn('Narrativa truncada o inválida tras reintento, bloques ya persistidos, narrativa pendiente', { sessionId, model, failureCount });
-      return;
+      return { status: 'failed_narrative', failureCount };
     }
 
     // Paso 4 — Verificación cruzada OBLIGATORIA, sin excepción por presupuesto.
@@ -232,7 +240,9 @@ export async function compactSession(sessionId: string, userId: string, force = 
       sessionId, model, messagesCompacted: newMessages.length,
       blocksExtracted: blocks.length, verificationGaps: verification.missing.length,
     });
+    return { status: 'compacted' };
   } catch (err) {
     logger.warn('Error compactando sesión', { sessionId, model, error: (err as Error).message });
+    return { status: 'error', message: (err as Error).message };
   }
 }

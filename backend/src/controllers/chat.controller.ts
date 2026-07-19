@@ -203,7 +203,10 @@ export async function summarizeSessionHandler(req: Request, res: Response): Prom
     return;
   }
 
-  await compactSession(sessionId, userId, true);
+  const outcome = await compactSession(sessionId, userId, true);
+  if (outcome.status !== 'compacted' && outcome.status !== 'skipped_no_new_messages') {
+    logger.warn('Comando /resumen no pudo compactar', { sessionId, userId, outcome });
+  }
   const summary = SessionSummaryService.getNarrative(sessionId);
   const blocks = SessionSummaryService.getBlocks(sessionId).map(b => ({
     id: b.id,

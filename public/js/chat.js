@@ -1797,7 +1797,9 @@ async function runSummaryCommand() {
     }
     const data = await res.json();
     addSessionDivider(t('sessionCompacted'));
-    addMessage(data.summary || t('notEnoughToSummarize'), 'ai');
+    if (data.summary) {
+      addMessage(data.summary, 'ai');
+    }
 
     if (Array.isArray(data.blocks) && data.blocks.length > 0) {
       const list = data.blocks.map(b => `- **${b.title}** (${b.subject})`).join('\n');
