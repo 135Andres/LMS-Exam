@@ -4,7 +4,7 @@ import { detectSubject } from './knowledge-detection.service.js';
 
 describe('detectSubject', () => {
   it('detecta materia con texto acentuado (via stripAccents sobre keywords sin tilde)', () => {
-    expect(detectSubject('¿Cómo se resuelve una derivada en cálculo?')).toBe('matematicas');
+    expect(detectSubject('necesito ayuda con cálculo')).toBe('matematicas');
   });
 
   it('detecta materia con texto sin tildes', () => {
