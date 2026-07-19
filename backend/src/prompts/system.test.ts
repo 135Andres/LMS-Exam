@@ -7,6 +7,8 @@ import {
   SYSTEM_PROMPT_COMPACTOR,
   SYSTEM_PROMPT_NARRATIVE_COMPACTOR,
   SYSTEM_PROMPT_EXAM,
+  FORMAT_MATH_RULES_SIMPLE,
+  FORMAT_MATH_RULES_ESCAPED,
 } from './system.js';
 
 describe('prompts de cuestionario', () => {
@@ -79,8 +81,7 @@ describe('SYSTEM_PROMPT_NARRATIVE_COMPACTOR', () => {
 
 describe('LaTeX escape directives (Task 1 fix)', () => {
   it('SYSTEM_PROMPT_TUTOR debe instruir backslash simple, NO doble escape', () => {
-    // Directriz 2 debe pedir backslash simple para streaming de texto plano, no doble escape
-    expect(SYSTEM_PROMPT_TUTOR).toContain('Usa backslash simple');
+    expect(SYSTEM_PROMPT_TUTOR).toContain('Backslash simple en comandos LaTeX');
     expect(SYSTEM_PROMPT_TUTOR).not.toContain('Escapa dobles barras invertidas');
     // Verificar que no hay instrucción de doblar (el patrón \\\\ en la fuente se evalúa a \\)
     expect(SYSTEM_PROMPT_TUTOR).not.toMatch(/escapa.*dobles/i);
@@ -92,12 +93,12 @@ describe('LaTeX escape directives (Task 1 fix)', () => {
 
   it('SYSTEM_PROMPT_QUIZ_SOLVE debe conservar instrucción de doble escape (output JSON)', () => {
     // Este prompt genera JSON que será parseado, necesita double escape
-    expect(SYSTEM_PROMPT_QUIZ_SOLVE).toContain('escapa backslashes dobles');
+    expect(SYSTEM_PROMPT_QUIZ_SOLVE).toContain('Escapa backslashes dobles en comandos LaTeX');
   });
 
   it('SYSTEM_PROMPT_EXAM debe conservar instrucción de doble escape (output JSON)', () => {
     // Este prompt genera JSON que será parseado, necesita double escape
-    expect(SYSTEM_PROMPT_EXAM).toContain('Escapa dobles barras invertidas');
+    expect(SYSTEM_PROMPT_EXAM).toContain('Escapa backslashes dobles en comandos LaTeX');
   });
 
   it('SYSTEM_PROMPT_QUIZ_EXPLAIN NO debe contener instrucción de doble escape (control test)', () => {
@@ -105,5 +106,25 @@ describe('LaTeX escape directives (Task 1 fix)', () => {
     // Este test documenta el estado actual para detectar si alguien lo rompe a futuro
     expect(SYSTEM_PROMPT_QUIZ_EXPLAIN).not.toContain('Escapa dobles barras');
     expect(SYSTEM_PROMPT_QUIZ_EXPLAIN).not.toContain('escapa backslashes dobles');
+  });
+});
+
+describe('FORMAT_MATH_RULES_SIMPLE / FORMAT_MATH_RULES_ESCAPED (Task 3 consolidation)', () => {
+  it('FORMAT_MATH_RULES_SIMPLE tiene backslash simple en runtime (no doble)', () => {
+    expect(FORMAT_MATH_RULES_SIMPLE).toContain('\\frac{a}{b}');
+    expect(FORMAT_MATH_RULES_SIMPLE).not.toContain('\\\\frac');
+  });
+
+  it('FORMAT_MATH_RULES_ESCAPED tiene backslash doble en runtime', () => {
+    expect(FORMAT_MATH_RULES_ESCAPED).toContain('\\\\frac{a}{b}');
+  });
+
+  it('SYSTEM_PROMPT_TUTOR interpola FORMAT_MATH_RULES_SIMPLE', () => {
+    expect(SYSTEM_PROMPT_TUTOR).toContain(FORMAT_MATH_RULES_SIMPLE);
+  });
+
+  it('SYSTEM_PROMPT_EXAM y SYSTEM_PROMPT_QUIZ_SOLVE interpolan FORMAT_MATH_RULES_ESCAPED', () => {
+    expect(SYSTEM_PROMPT_EXAM).toContain(FORMAT_MATH_RULES_ESCAPED);
+    expect(SYSTEM_PROMPT_QUIZ_SOLVE).toContain(FORMAT_MATH_RULES_ESCAPED);
   });
 });
