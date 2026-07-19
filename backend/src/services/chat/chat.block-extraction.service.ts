@@ -1,11 +1,13 @@
 // backend/src/services/chat/chat.block-extraction.service.ts
 import { randomUUID } from 'node:crypto';
 import { generateFromAI } from '../ai/index.js';
-import { detectSubjectExtended } from './chat.classifier.service.js';
+import { SUBJECT_KEYWORDS, detectSubjectByKeywords } from '../../utils/subject-keywords.js';
 import { SessionSummaryService, type KnowledgeBlock } from '../session-summary.service.js';
 import { KnowledgeModel, hashKnowledgeContent } from '../../models/knowledge.model.js';
 import { logger } from '../../utils/logger.js';
 import type { SegmentationResult } from './chat.segmentation.service.js';
+
+const VALID_SUBJECTS = [...Object.keys(SUBJECT_KEYWORDS), 'general'];
 
 export interface ExtractableMessage {
   id: string;
@@ -30,24 +32,35 @@ function trimLeadingFillers(content: string): string {
   return result.trim();
 }
 
-const SYSTEM_PROMPT_TITLES_BATCH = 'Genera un título corto (máximo 8 palabras) para cada uno de los siguientes fragmentos de contenido académico. Responde con un título por fragmento, en el mismo orden, identificado por su id.';
+const SYSTEM_PROMPT_TITLES_BATCH = `Genera un título corto (máximo 8 palabras) para cada uno de los siguientes fragmentos de contenido académico. Responde con un título por fragmento, en el mismo orden, identificado por su id. Para los fragmentos marcados con "(requiere materia)", además clasifica la materia usando exactamente uno de estos valores: ${VALID_SUBJECTS.join(', ')}.`;
 
 interface TitleBatchItem {
   id: string;
   title: string;
+  subject?: string;
+}
+
+interface TitleBatchResult {
+  title: string;
+  subject?: string;
 }
 
 // Una sola llamada de IA para todos los títulos pendientes de la pasada,
 // nunca una por bloque (mismo patrón que classifyBatch en
-// chat.segmentation.service.ts). Ante fallo, cada ítem cae al fallback de
-// truncamiento, igual que la versión serial anterior.
-async function generateShortTitlesBatch(
-  items: Array<{ id: string; content: string }>,
+// chat.segmentation.service.ts). Se le pide materia solo para los ítems
+// donde la heurística (Tarea 1) no vino segura — no se le pide reclasificar
+// lo que ya se resolvió con confianza. Ante fallo total de la IA, cada ítem
+// cae al fallback (título truncado, sin materia — el caller usa la
+// heurística en ese caso).
+async function generateTitlesAndSubjectsBatch(
+  items: Array<{ id: string; content: string; needsSubject: boolean }>,
   model: string,
-): Promise<Record<string, string>> {
+): Promise<Record<string, TitleBatchResult>> {
   if (items.length === 0) return {};
 
-  const userPrompt = items.map(i => `(id: ${i.id})\n${i.content}`).join('\n\n---\n\n');
+  const userPrompt = items
+    .map(i => `(id: ${i.id}${i.needsSubject ? ', requiere materia' : ''})\n${i.content}`)
+    .join('\n\n---\n\n');
 
   try {
     const result = await generateFromAI('nineRouter', SYSTEM_PROMPT_TITLES_BATCH, userPrompt, {
@@ -55,31 +68,39 @@ async function generateShortTitlesBatch(
       json_schema: {
         type: 'object',
         properties: {
-          titles: {
+          items: {
             type: 'array',
             items: {
               type: 'object',
-              properties: { id: { type: 'string' }, title: { type: 'string' } },
+              properties: {
+                id: { type: 'string' },
+                title: { type: 'string' },
+                subject: { type: 'string' },
+              },
               required: ['id', 'title'],
             },
           },
         },
-        required: ['titles'],
+        required: ['items'],
       },
     }, { model, temperature: 0.3, max_tokens: 800 });
 
-    const parsed = JSON.parse(result.content) as { titles?: TitleBatchItem[] };
-    const byId = new Map((parsed.titles || []).map(t => [t.id, t.title]));
+    const parsed = JSON.parse(result.content) as { items?: TitleBatchItem[] };
+    const byId = new Map((parsed.items || []).map(t => [t.id, t]));
 
-    const out: Record<string, string> = {};
+    const out: Record<string, TitleBatchResult> = {};
     for (const item of items) {
-      out[item.id] = byId.get(item.id) || item.content.slice(0, 60).trim();
+      const found = byId.get(item.id);
+      const subject = item.needsSubject && found?.subject && VALID_SUBJECTS.includes(found.subject)
+        ? found.subject
+        : undefined;
+      out[item.id] = { title: found?.title || item.content.slice(0, 60).trim(), subject };
     }
     return out;
   } catch (err) {
-    logger.warn('Error en batch de títulos de bloques, se usa fallback por truncamiento', { error: (err as Error).message });
-    const out: Record<string, string> = {};
-    for (const item of items) out[item.id] = item.content.slice(0, 60).trim();
+    logger.warn('Error en batch de títulos/materia de bloques, se usa fallback', { error: (err as Error).message });
+    const out: Record<string, TitleBatchResult> = {};
+    for (const item of items) out[item.id] = { title: item.content.slice(0, 60).trim() };
     return out;
   }
 }
@@ -132,15 +153,24 @@ export async function extractBlocks(
 
   if (pending.length === 0) return [];
 
-  const titles = await generateShortTitlesBatch(
-    pending.map(({ msg }) => ({ id: msg.id, content: msg.content })),
+  const heuristics = new Map(pending.map(({ msg }) => [msg.id, detectSubjectByKeywords(msg.content)]));
+
+  const results = await generateTitlesAndSubjectsBatch(
+    pending.map(({ msg }) => ({
+      id: msg.id,
+      content: msg.content,
+      needsSubject: heuristics.get(msg.id)!.confidence !== 'high',
+    })),
     model,
   );
 
   const blocks: KnowledgeBlock[] = [];
   for (const { seg, msg } of pending) {
     const content = trimLeadingFillers(msg.content);
-    const subject = detectSubjectExtended(msg.content) || 'general';
+    const heuristic = heuristics.get(msg.id)!;
+    const subject = heuristic.confidence === 'high'
+      ? (heuristic.subject as string)
+      : (results[msg.id]?.subject || heuristic.subject || 'general');
 
     const block = SessionSummaryService.addBlock(sessionId, {
       subject,
@@ -148,7 +178,7 @@ export async function extractBlocks(
       extractedAt: new Date().toISOString(),
       extractionModel: model,
       confidence: seg.confidence,
-      title: titles[msg.id],
+      title: results[msg.id]?.title ?? msg.content.slice(0, 60).trim(),
       content,
     });
     blocks.push(block);

@@ -44,7 +44,7 @@ export function hasCode(message: string): boolean {
 }
 
 export function detectSubjectExtended(query: string): string | undefined {
-  return detectSubjectByKeywords(query);
+  return detectSubjectByKeywords(query).subject;
 }
 
 function estimateComplexity(message: string): Complexity {

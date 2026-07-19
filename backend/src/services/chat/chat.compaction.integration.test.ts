@@ -70,13 +70,13 @@ function setupAiMock() {
   generateFromAIMock.mockReset();
   generateFromAIMock.mockImplementation(async (_provider: string, systemPrompt: string, userPrompt: unknown) => {
     if (systemPrompt.includes('título corto')) {
-      // Batch de títulos: un item por id (id: ...) en el userPrompt, todos
-      // reciben el mismo título fijo en este escenario de integración.
+      // Batch de títulos: un item por id (id: ..., [requiere materia]) en el
+      // userPrompt, todos reciben el mismo título fijo en este escenario.
       const ids = typeof userPrompt === 'string'
-        ? [...userPrompt.matchAll(/\(id: ([^)]+)\)/g)].map(m => m[1])
+        ? [...userPrompt.matchAll(/\(id: ([^,)]+)/g)].map(m => m[1])
         : [];
       return aiResponse(JSON.stringify({
-        titles: ids.map(id => ({ id, title: 'Integración por partes' })),
+        items: ids.map(id => ({ id, title: 'Integración por partes' })),
       }));
     }
     if (systemPrompt.includes('auditor de compactación')) {

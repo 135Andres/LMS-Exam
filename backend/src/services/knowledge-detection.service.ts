@@ -46,7 +46,7 @@ const DETECTION_RULES = {
 };
 
 export function detectSubject(text: string): string {
-  return detectSubjectByKeywords(text) ?? 'general';
+  return detectSubjectByKeywords(text).subject ?? 'general';
 }
 
 export function detectKnowledgeOpportunity(messages: ChatLogRow[]): DetectionResult | null {

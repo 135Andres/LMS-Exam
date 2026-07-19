@@ -42,8 +42,8 @@ function aiResponse(content: string) {
   return { content, usage: { promptTokens: 1, completionTokens: 1 }, finishReason: 'stop' };
 }
 
-function titlesBatchResponse(titles: Array<{ id: string; title: string }>) {
-  return aiResponse(JSON.stringify({ titles }));
+function titlesBatchResponse(items: Array<{ id: string; title: string; subject?: string }>) {
+  return aiResponse(JSON.stringify({ items }));
 }
 
 const MODEL = 'nvidia/thinkingmachines/inkling';
@@ -175,6 +175,57 @@ describe('extractBlocks', () => {
     expect(call.extractionModel).toBe(MODEL);
     expect(call.confidence).toBe('medium');
     expect(typeof call.extractedAt).toBe('string');
+  });
+
+  it('heurística de alta confianza: no le pide materia a la IA y usa la materia heurística', async () => {
+    const messages = [
+      { id: 'm1', role: 'assistant', content: 'La derivada de x^2 es 2x, aplicando la regla de la potencia.' },
+    ];
+    const segments = [
+      { messageId: 'm1', class: 'verificable' as const, confidence: 'high' as const, method: 'heuristic' as const },
+    ];
+    // La IA devuelve una materia distinta (equivocada a propósito) para probar que se ignora.
+    generateFromAIMock.mockResolvedValueOnce(titlesBatchResponse([{ id: 'm1', title: 'Derivada', subject: 'artes' }]));
+
+    await extractBlocks('session1', messages, segments, MODEL);
+
+    const call = addBlockMock.mock.calls[0][1];
+    expect(call.subject).toBe('matematicas');
+    const userPromptSent = generateFromAIMock.mock.calls[0][2] as string;
+    expect(userPromptSent).not.toContain('requiere materia');
+  });
+
+  it('heurística de baja confianza/indefinida: usa la materia que devuelve la IA', async () => {
+    const messages = [
+      { id: 'm1', role: 'assistant', content: 'el clima cambió el movimiento de las corrientes marinas' },
+    ];
+    const segments = [
+      { messageId: 'm1', class: 'verificable' as const, confidence: 'high' as const, method: 'heuristic' as const },
+    ];
+    generateFromAIMock.mockResolvedValueOnce(titlesBatchResponse([{ id: 'm1', title: 'Corrientes marinas', subject: 'fisica' }]));
+
+    await extractBlocks('session1', messages, segments, MODEL);
+
+    const call = addBlockMock.mock.calls[0][1];
+    expect(call.subject).toBe('fisica');
+    const userPromptSent = generateFromAIMock.mock.calls[0][2] as string;
+    expect(userPromptSent).toContain('requiere materia');
+  });
+
+  it('si la llamada de IA falla, la materia cae al resultado heurístico aunque sea de baja confianza', async () => {
+    const messages = [
+      { id: 'm1', role: 'assistant', content: 'el clima cambió el movimiento de las corrientes marinas' },
+    ];
+    const segments = [
+      { messageId: 'm1', class: 'verificable' as const, confidence: 'high' as const, method: 'heuristic' as const },
+    ];
+    generateFromAIMock.mockRejectedValueOnce(new Error('AI down'));
+
+    const blocks = await extractBlocks('session1', messages, segments, MODEL);
+
+    expect(blocks).toHaveLength(1);
+    const call = addBlockMock.mock.calls[0][1];
+    expect(call.subject).toBe('fisica');
   });
 
   it('salta re-extracción si ya existe un bloque para ese messageId (idempotencia)', async () => {
