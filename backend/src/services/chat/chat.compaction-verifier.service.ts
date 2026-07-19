@@ -16,6 +16,10 @@ export interface MissingContentItem {
 
 export interface VerificationResult {
   missing: MissingContentItem[];
+  // false si la llamada falló (red, parseo, respuesta inválida) — no
+  // confundir con "verified: true, missing: []" (verificación exitosa que
+  // genuinamente no encontró nada faltante).
+  verified: boolean;
 }
 
 // Modelo de otra FAMILIA al que compactó — no el mismo proveedor con otro
@@ -68,12 +72,12 @@ export async function verifyCompaction(
     }, { model: verifierModel, temperature: 0.1, max_tokens: 1500 });
 
     const parsed = JSON.parse(result.content) as { missing?: MissingContentItem[] };
-    if (!parsed || !Array.isArray(parsed.missing)) return { missing: [] };
-    return { missing: parsed.missing };
+    if (!parsed || !Array.isArray(parsed.missing)) return { missing: [], verified: false };
+    return { missing: parsed.missing, verified: true };
   } catch (err) {
-    logger.warn('Error en verificación cruzada de compactación, se asume sin contenido faltante', {
+    logger.warn('Error en verificación cruzada de compactación, no se pudo confirmar completitud', {
       error: (err as Error).message,
     });
-    return { missing: [] };
+    return { missing: [], verified: false };
   }
 }

@@ -52,6 +52,7 @@ describe('verifyCompaction', () => {
     expect(result.missing).toEqual([
       { description: 'Falta la fórmula de la derivada por definición (límite)', suggestedBlock: true },
     ]);
+    expect(result.verified).toBe(true);
   });
 
   it('usa el modelo de otra familia indicado por pickVerifierModel para la llamada a IA', async () => {
@@ -68,27 +69,30 @@ describe('verifyCompaction', () => {
     expect(options.model).not.toBe(compactionModel);
   });
 
-  it('si no falta nada, devuelve missing: []', async () => {
+  it('si no falta nada, devuelve missing: [] con verified: true (distinguible de un fallo de verificación)', async () => {
     generateFromAIMock.mockResolvedValueOnce(aiResponse(JSON.stringify({ missing: [] })));
 
     const result = await verifyCompaction(originalMessages, narrative, blocks, 'ag/gemini-3-flash');
 
     expect(result.missing).toEqual([]);
+    expect(result.verified).toBe(true);
   });
 
-  it('ante respuesta de IA no parseable, devuelve missing: [] en vez de lanzar', async () => {
+  it('ante respuesta de IA no parseable, devuelve missing: [] y verified: false en vez de lanzar', async () => {
     generateFromAIMock.mockResolvedValueOnce(aiResponse('esto no es JSON'));
 
     const result = await verifyCompaction(originalMessages, narrative, blocks, 'ag/gemini-3-flash');
 
     expect(result.missing).toEqual([]);
+    expect(result.verified).toBe(false);
   });
 
-  it('ante error de la IA, devuelve missing: [] en vez de lanzar', async () => {
+  it('ante error de la IA, devuelve missing: [] y verified: false en vez de lanzar', async () => {
     generateFromAIMock.mockRejectedValueOnce(new Error('timeout'));
 
     const result = await verifyCompaction(originalMessages, narrative, blocks, 'ag/gemini-3-flash');
 
     expect(result.missing).toEqual([]);
+    expect(result.verified).toBe(false);
   });
 });

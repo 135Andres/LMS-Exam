@@ -207,9 +207,22 @@ export async function compactSession(sessionId: string, userId: string, force = 
     }
 
     // Paso 4 — Verificación cruzada OBLIGATORIA, sin excepción por presupuesto.
+    // Un fallo técnico (red, parseo) es distinto de "verificó y no faltó
+    // nada" — se reintenta una vez; si el reintento también falla, la
+    // narrativa y los bloques ya generados se guardan igual (son válidos por
+    // sí mismos), pero queda una nota auditable de que no se confirmó.
     const verifierModel = pickVerifierModel(model);
-    const verification = await verifyCompaction(newMessages, narrativeResult.summary, blocks, verifierModel);
-    const finalNarrative = appendMissingContent(narrativeResult.summary, verification.missing);
+    let verification = await verifyCompaction(newMessages, narrativeResult.summary, blocks, verifierModel);
+    if (!verification.verified) {
+      logger.warn('Verificación cruzada falló, reintentando una vez', { sessionId, verifierModel });
+      verification = await verifyCompaction(newMessages, narrativeResult.summary, blocks, verifierModel);
+    }
+
+    let finalNarrative = appendMissingContent(narrativeResult.summary, verification.missing);
+    if (!verification.verified) {
+      finalNarrative += '\n\n--- Nota: la verificación cruzada de esta pasada no pudo completarse (error técnico), no confirmada ---';
+      logger.warn('Verificación cruzada no se pudo completar tras reintento, se guarda narrativa sin confirmar', { sessionId, verifierModel });
+    }
 
     SessionSummaryService.saveNarrative(sessionId, finalNarrative, { model, confidence: narrativeResult.confidence });
     SessionSummaryService.resetNarrativeFailureCount(sessionId);
