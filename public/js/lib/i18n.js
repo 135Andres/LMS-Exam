@@ -83,6 +83,7 @@ const translations = {
     no: 'No',
     rename: 'Haz clic para renombrar',
     sessionCompacted: 'Sesión compactada',
+    blocksDetected: 'Además, se guardaron íntegros estos contenidos para que no se pierdan al resumir:',
     exportedToMarkdown: 'Conversación exportada a Markdown.',
     // Settings modal
     settingsConfig: 'Configuración',
@@ -243,6 +244,7 @@ const translations = {
     no: 'No',
     rename: 'Click to rename',
     sessionCompacted: 'Session compacted',
+    blocksDetected: "Also, these contents were saved in full so they wouldn't get lost in the summary:",
     exportedToMarkdown: 'Conversation exported to Markdown.',
     settingsConfig: 'Settings',
     tutorReplied: 'Your tutor has replied.',
