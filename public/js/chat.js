@@ -1794,6 +1794,11 @@ async function runSummaryCommand() {
     const data = await res.json();
     addSessionDivider(t('sessionCompacted'));
     addMessage(data.summary || t('notEnoughToSummarize'), 'ai');
+
+    if (Array.isArray(data.blocks) && data.blocks.length > 0) {
+      const list = data.blocks.map(b => `- **${b.title}** (${b.subject})`).join('\n');
+      addMessage(`${t('blocksDetected')}\n\n${list}`, 'ai');
+    }
   } catch (err) {
     hideTyping();
     addMessage(t('errorPrefix') + ' ' + (err.message || t('connectionError')), 'ai');
