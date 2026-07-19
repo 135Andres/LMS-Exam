@@ -6,6 +6,7 @@ import {
   SYSTEM_PROMPT_QUIZ_EXPLAIN,
   SYSTEM_PROMPT_COMPACTOR,
   SYSTEM_PROMPT_NARRATIVE_COMPACTOR,
+  SYSTEM_PROMPT_EXAM,
 } from './system.js';
 
 describe('prompts de cuestionario', () => {
@@ -73,5 +74,32 @@ describe('SYSTEM_PROMPT_NARRATIVE_COMPACTOR', () => {
   it('menciona referenciar bloques por id/título en vez de repetir contenido', () => {
     expect(SYSTEM_PROMPT_NARRATIVE_COMPACTOR.toLowerCase()).toContain('bloques');
     expect(SYSTEM_PROMPT_NARRATIVE_COMPACTOR.toLowerCase()).toMatch(/referenc/);
+  });
+});
+
+describe('LaTeX escape directives (Task 1 fix)', () => {
+  it('SYSTEM_PROMPT_TUTOR debe instruir backslash simple, NO doble escape', () => {
+    // Directriz 2 debe pedir backslash simple para streaming de texto plano, no doble escape
+    expect(SYSTEM_PROMPT_TUTOR).toContain('Usa backslash simple');
+    expect(SYSTEM_PROMPT_TUTOR).not.toContain('Escapa dobles barras invertidas');
+    // Verificar que no hay instrucción de doblar (el patrón \\\\ en la fuente se evalúa a \\)
+    expect(SYSTEM_PROMPT_TUTOR).not.toMatch(/escapa.*dobles/i);
+  });
+
+  it('SYSTEM_PROMPT_QUIZ_SOLVE debe conservar instrucción de doble escape (output JSON)', () => {
+    // Este prompt genera JSON que será parseado, necesita double escape
+    expect(SYSTEM_PROMPT_QUIZ_SOLVE).toContain('escapa backslashes dobles');
+  });
+
+  it('SYSTEM_PROMPT_EXAM debe conservar instrucción de doble escape (output JSON)', () => {
+    // Este prompt genera JSON que será parseado, necesita double escape
+    expect(SYSTEM_PROMPT_EXAM).toContain('Escapa dobles barras invertidas');
+  });
+
+  it('SYSTEM_PROMPT_QUIZ_EXPLAIN NO debe contener instrucción de doble escape (control test)', () => {
+    // Este prompt ya está limpio: es tutorización conversacional, no JSON
+    // Este test documenta el estado actual para detectar si alguien lo rompe a futuro
+    expect(SYSTEM_PROMPT_QUIZ_EXPLAIN).not.toContain('Escapa dobles barras');
+    expect(SYSTEM_PROMPT_QUIZ_EXPLAIN).not.toContain('escapa backslashes dobles');
   });
 });
