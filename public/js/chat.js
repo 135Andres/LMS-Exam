@@ -1,6 +1,7 @@
 import { formatTime, escapeHtml, svgIcon, formatAIResponse, renderAvatarInto } from './lib/utils.js';
 import { initSettingsModal, notifyIfEnabled } from './lib/settings-modal.js';
 import { initI18n, t } from './lib/i18n.js';
+import { wrapBareLatex } from './lib/latex-detect.js';
 
 async function checkSession() {
   try {
@@ -21,7 +22,10 @@ function renderKaTeX() {
     var el = elements[i];
     if (el.dataset.katexRendered) continue;
     var html = el.innerHTML;
-    var replaced = html.replace(/\\\[(.+?)\\\]/gs, function (_, expr) {
+    // Safety net: wrap bare LaTeX commands (no delimiter around them, e.g. a
+    // prompt slip-up) in $$...$$ before the 4 known-delimiter passes below.
+    var replaced = wrapBareLatex(html);
+    replaced = replaced.replace(/\\\[(.+?)\\\]/gs, function (_, expr) {
       try { return katex.renderToString(expr, { displayMode: true, throwOnError: false }); }
       catch (_) { return '\\[' + expr + '\\]'; }
     });
