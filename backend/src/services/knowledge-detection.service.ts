@@ -48,7 +48,7 @@ const DETECTION_RULES = {
 // Las keywords compartidas están sin tildes (ver subject-keywords.ts) — hay
 // que normalizar el texto de entrada igual, si no se pierden matches como
 // "cálculo" contra la keyword "calculo".
-function detectSubject(text: string): string {
+export function detectSubject(text: string): string {
   const lower = stripAccents(text.toLowerCase());
   for (const [subject, keywords] of Object.entries(SUBJECT_KEYWORDS)) {
     if (keywords.some(kw => lower.includes(kw))) return subject;
