@@ -17,7 +17,7 @@ export const SUBJECT_KEYWORDS: Record<string, string[]> = {
   psicologia: ['conducta', 'cognitivo', 'terapia', 'trastorno', 'desarrollo psicosocial', 'freud', 'piaget', 'psicoanalisis'],
   medicina: ['diagnostico', 'sintoma', 'patologia', 'farmaco', 'anatomia', 'sistema nervioso', 'sistema circulatorio', 'clinico'],
   ingenieria: ['resistencia de materiales', 'circuito', 'esfuerzo', 'termodinamica aplicada', 'planos', 'cad', 'estructural'],
-  artes: ['composicion', 'perspectiva', 'boceto', 'paleta', 'movimiento artistico', 'renacimiento', 'barroco', 'diseño grafico'],
+  artes: ['composicion', 'perspectiva', 'boceto', 'paleta', 'movimiento artistico', 'renacimiento', 'barroco', 'diseno grafico'],
   filosofia: ['etica', 'epistemologia', 'metafisica', 'kant', 'aristoteles', 'existencialismo', 'ontologia'],
   ciencias_politicas: ['estado', 'gobierno', 'politica publica', 'sociedad', 'democracia', 'ideologia', 'geopolitica'],
   pedagogia: ['curriculo', 'didactica', 'aprendizaje significativo', 'evaluacion formativa', 'plan de estudios'],
