@@ -26,7 +26,11 @@ Baseline confirmada antes de empezar: `npm test` en `backend/` da 176 passed / 1
 
 ---
 
-## Task 2 — Verificar y, si hace falta, migrar serialización de embeddings a BLOB Float32LE
+## Task 2 — Verificar y, si hace falta, migrar serialización de embeddings a BLOB Float32LE — ✅ CERRADA (confirmado, sin fix necesario)
+
+**Hallazgo:** `chat_embeddings_vec.embedding` y `knowledge_embeddings.embedding` ya son `BLOB NOT NULL` (`backend/src/db/migrate.ts`), serializados/deserializados vía `Float32Array` + `Buffer` en `vectorToBlob`/`blobToVector` (`backend/src/models/embedding.model.ts:3-9`) y en `backend/src/models/knowledge-embedding.model.ts:25-26,55` — nada de `JSON.stringify`/`JSON.parse` en esas rutas. Las lecturas (`getVectorByMessageId`, `getUserEmbeddings`, `countByUser`) ya priorizan la tabla BLOB (`chat_embeddings_vec`) sobre la legacy `chat_embeddings` (columna `vector_text`, JSON), que solo queda como fallback de lectura para filas viejas si la tabla BLOB está vacía para esa clave. `backend/src/db/backfill-embeddings.ts` ya existe para migrar filas legacy JSON → BLOB. El gap ya estaba cerrado desde antes en main; esta tarea era investigación, no fix.
+
+Nota de deuda técnica no accionada aquí (fuera de alcance): `saveEmbedding()` en `embedding.model.ts` sigue haciendo dual-write a la tabla legacy JSON en cada mensaje nuevo (overhead real, no solo filas viejas) — candidato a limpieza futura una vez confirmado que el backfill terminó.
 
 **Prioridad:** segunda — es investigación primero, fix solo si aplica.
 
