@@ -54,10 +54,10 @@ export async function buildCrossChatContext(message: string, userId: string, cur
 
   const blocks: string[] = [];
   for (const sessionId of sessionIds) {
-    let summary = SessionSummaryService.getSummary(sessionId);
+    let summary = SessionSummaryService.getNarrative(sessionId);
     if (!summary) {
       await compactSession(sessionId, userId, true);
-      summary = SessionSummaryService.getSummary(sessionId);
+      summary = SessionSummaryService.getNarrative(sessionId);
     }
     if (!summary) continue;
     const meta = candidates.find(c => c.session_id === sessionId);

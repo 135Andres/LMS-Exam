@@ -5,6 +5,7 @@ import {
   SYSTEM_PROMPT_QUIZ_VERIFY,
   SYSTEM_PROMPT_QUIZ_EXPLAIN,
   SYSTEM_PROMPT_COMPACTOR,
+  SYSTEM_PROMPT_NARRATIVE_COMPACTOR,
 } from './system.js';
 
 describe('prompts de cuestionario', () => {
@@ -54,5 +55,23 @@ describe('SYSTEM_PROMPT_COMPACTOR', () => {
   it('mantiene el contrato JSON summary + kbCandidates', () => {
     expect(SYSTEM_PROMPT_COMPACTOR).toContain('"summary"');
     expect(SYSTEM_PROMPT_COMPACTOR).toContain('"kbCandidates"');
+  });
+});
+
+describe('SYSTEM_PROMPT_NARRATIVE_COMPACTOR', () => {
+  it('no pide reviewedMessageCount ni kbCandidates (Fase 1, ya no se usan)', () => {
+    expect(SYSTEM_PROMPT_NARRATIVE_COMPACTOR).not.toContain('reviewedMessageCount');
+    expect(SYSTEM_PROMPT_NARRATIVE_COMPACTOR).not.toContain('kbCandidates');
+  });
+
+  it('el contrato JSON de respuesta es solo summary + confidence', () => {
+    expect(SYSTEM_PROMPT_NARRATIVE_COMPACTOR).toContain('"summary"');
+    expect(SYSTEM_PROMPT_NARRATIVE_COMPACTOR).toMatch(/"confidence"/);
+    expect(SYSTEM_PROMPT_NARRATIVE_COMPACTOR).toMatch(/high.*medium.*low/i);
+  });
+
+  it('menciona referenciar bloques por id/título en vez de repetir contenido', () => {
+    expect(SYSTEM_PROMPT_NARRATIVE_COMPACTOR.toLowerCase()).toContain('bloques');
+    expect(SYSTEM_PROMPT_NARRATIVE_COMPACTOR.toLowerCase()).toMatch(/referenc/);
   });
 });

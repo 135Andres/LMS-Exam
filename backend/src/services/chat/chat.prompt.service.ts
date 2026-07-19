@@ -5,6 +5,10 @@ import { SessionSummaryService } from '../session-summary.service.js';
 import { ImportedMemoryService } from '../imported-memory.service.js';
 import { ChatQuizModeService } from './chat.quiz-mode.service.js';
 
+// ponytail: presupuesto simple por caracteres, prioriza recencia — no hay
+// ranking por relevancia; si hace falta afinar, Fase 3 con la UI real.
+const MAX_BLOCKS_CONTEXT_CHARS = 6000;
+
 export interface Attachment {
   type: 'image' | 'audio' | 'file';
   mime: string;
@@ -19,9 +23,33 @@ export class ChatPromptService {
     let prompt = basePrompt.replace(/\{MODEL_NAME\}/g, modelLabel);
 
     if (sessionId) {
-      const summary = SessionSummaryService.getSummary(sessionId);
+      const summary = SessionSummaryService.getNarrative(sessionId);
       if (summary) {
         prompt += `\n\n--- Resumen de la conversación previa ---\n${summary}\n---`;
+      }
+
+      const blocks = SessionSummaryService.getBlocks(sessionId);
+      if (blocks.length > 0) {
+        const sorted = [...blocks].sort((a, b) => b.extractedAt.localeCompare(a.extractedAt));
+        const included: string[] = [];
+        let usedChars = 0;
+        for (const block of sorted) {
+          const remaining = MAX_BLOCKS_CONTEXT_CHARS - usedChars;
+          if (remaining <= 0) break;
+          const text = `### ${block.title}\n${block.content}`;
+          if (text.length > remaining) {
+            const marker = '... (truncado)';
+            const truncated = text.slice(0, Math.max(0, remaining - marker.length)) + marker;
+            included.push(truncated);
+            usedChars += truncated.length;
+            break;
+          }
+          included.push(text);
+          usedChars += text.length;
+        }
+        if (included.length > 0) {
+          prompt += `\n\n--- Contenido técnico ya extraído de esta sesión ---\n${included.join('\n\n')}\n---`;
+        }
       }
     }
 

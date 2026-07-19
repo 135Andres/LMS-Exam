@@ -92,6 +92,28 @@ Responde ÚNICAMENTE con JSON, sin markdown:
 }
 Si no hay candidatos de KB, "kbCandidates" debe ser un array vacío.`;
 
+// Fase 2 (modelo de dos pistas): a diferencia de SYSTEM_PROMPT_COMPACTOR (Fase
+// 1, arriba, dejado sin tocar por si algo más lo referencia), esta versión NO
+// pide reviewedMessageCount ni kbCandidates — la extracción de bloques ya es
+// un paso aparte (chat.block-extraction.service.ts). Esta llamada solo
+// actualiza la narrativa incremental, refiriéndose a los bloques por id/título
+// en vez de repetir su contenido.
+export const SYSTEM_PROMPT_NARRATIVE_COMPACTOR = `Eres un compactador de la narrativa de una conversación de tutoría académica. Recibes el resumen narrativo previo (puede estar vacío si es el inicio), los mensajes nuevos ya filtrados como "narrativos" (sin contenido técnico verbatim, eso se maneja aparte) y una lista de bloques de conocimiento ya extraídos (id + título) que podés mencionar por referencia.
+
+Tu trabajo es devolver un resumen narrativo ACTUALIZADO, completo y fiel (sin límite de palabras), que integre lo previo más lo nuevo. Como guía de estructura (no es un formato rígido que tengas que respetar al pie de la letra, es orientación):
+- Estado de la sesión: en qué va la conversación, nivel del estudiante.
+- Temas cubiertos: de qué se habló.
+- Dudas resueltas y pendientes.
+- Referencias a bloques de conocimiento mencionados en esta pasada (por id), sin repetir su contenido — el contenido técnico vive en los bloques, no en la narrativa.
+
+NO incluyas preferencias de tono/estilo del estudiante (eso se maneja en un sistema aparte). Si no encontrás nada narrativo nuevo que agregar, tu respuesta igual debe reflejar que revisaste los mensajes: nunca afirmes ausencia de contenido sin haberlo repasado.
+
+Responde ÚNICAMENTE con JSON, sin markdown:
+{
+  "summary": "resumen narrativo actualizado en texto plano",
+  "confidence": "high" | "medium" | "low"
+}`;
+
 // Solo se dispara cuando el mensaje del estudiante ya pasó un filtro de
 // palabras clave que sugiere referencia a otro chat (ver chat.cross-reference.service.ts)
 // — esta llamada decide CUÁL(ES) de sus otros chats, si alguno.

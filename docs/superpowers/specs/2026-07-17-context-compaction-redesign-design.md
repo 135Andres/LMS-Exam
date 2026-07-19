@@ -273,6 +273,9 @@ Ver 4.4: al ser el resumen visible y editable por el estudiante, no hace falta c
 4. Quitar el tope de "~400 palabras" del prompt (3.2).
 
 **Fase 2 — Modelo de datos de dos pistas**
+
+**Implementada** — ver `docs/superpowers/plans/2026-07-18-compaction-fase2-two-track.md` y commits `8edbe9b..242e685` en la rama `compaction-fase2-two-track`. Esa fase de implementación (llamada "Fase 2" en el plan) cubrió secciones 2, 3 y 4 de este spec de punta a punta, incluyendo los puntos 5-8 de abajo (el pipeline pasó de 3 a 4 pasos al integrar la verificación cruzada del punto 8 como paso obligatorio, no condicional). Pendiente de esa franja: el punto 9 (`summarizeSessionHandler`/`/resumen` devolviendo bloques) queda para Fase 4, junto con la UI.
+
 5. Migrar `session-summary.service.ts` de archivo único a `narrative.md` + `blocks/` + `index.json` (sección 2). Migración de resúmenes existentes: quedan como `narrative.md` inicial, sin `blocks/` retroactivos.
 6. Implementar pipeline de 3 pasos (segmentación → extracción → compactación narrativa) en `chat.compaction.service.ts` (sección 3).
 

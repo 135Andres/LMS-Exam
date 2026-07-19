@@ -204,7 +204,7 @@ export async function summarizeSessionHandler(req: Request, res: Response): Prom
   }
 
   await compactSession(sessionId, userId, true);
-  const summary = SessionSummaryService.getSummary(sessionId);
+  const summary = SessionSummaryService.getNarrative(sessionId);
   res.json({ summary });
 }
 
