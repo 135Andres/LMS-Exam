@@ -10,7 +10,6 @@ import { logger } from '../../utils/logger.js';
 const PROFILE_EDIT_TRIGGERS = [
   'quiero que', 'cambia mi', 'actualiza mi', 'prefiero que', 'configura mi', 'ajusta mi', 'modifica mi',
   'se mas', 'se menos', 'seas mas', 'seas menos',
-  'habla mas', 'habla menos', 'hablame',
   'actua mas', 'actua menos',
   'explica mas', 'explica menos', 'explicame mas', 'explicame menos',
   'responde mas', 'responde menos',
