@@ -84,6 +84,10 @@ describe('LaTeX escape directives (Task 1 fix)', () => {
     expect(SYSTEM_PROMPT_TUTOR).not.toContain('Escapa dobles barras invertidas');
     // Verificar que no hay instrucción de doblar (el patrón \\\\ en la fuente se evalúa a \\)
     expect(SYSTEM_PROMPT_TUTOR).not.toMatch(/escapa.*dobles/i);
+    // El ejemplo debe contener backslash simple literal, no un control char de template literal roto
+    expect(SYSTEM_PROMPT_TUTOR).toContain('\\frac{a}{b}');
+    expect(SYSTEM_PROMPT_TUTOR).toContain('\\int');
+    expect(SYSTEM_PROMPT_TUTOR).toContain('\\sum');
   });
 
   it('SYSTEM_PROMPT_QUIZ_SOLVE debe conservar instrucción de doble escape (output JSON)', () => {
