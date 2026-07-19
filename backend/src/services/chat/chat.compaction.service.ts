@@ -198,6 +198,7 @@ export async function compactSession(sessionId: string, userId: string, force = 
         logger.warn('Narrativa falló repetidamente, se fuerza el avance del cursor sin actualizarla — revisar sesión manualmente', {
           sessionId, model, failureCount,
         });
+        SessionSummaryService.resetNarrativeFailureCount(sessionId);
         ChatModel.setSummaryCursor(sessionId, newMessages[newMessages.length - 1].created_at);
         return;
       }

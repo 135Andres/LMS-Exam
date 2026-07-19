@@ -388,4 +388,15 @@ describe('compactSession — límite a reintentos indefinidos de narrativa (Fase
     expect(sessionSummaryMock.saveNarrative).not.toHaveBeenCalled();
     expect(chatModelMock.setSummaryCursor).toHaveBeenCalledWith('s1', NEW_MESSAGES[5].created_at);
   });
+
+  it('al forzar el avance por umbral, también resetea el contador para que el próximo rango tenga su propio presupuesto de 3 intentos', async () => {
+    sessionSummaryMock.recordNarrativeFailure.mockReturnValue(3); // ya llegó al umbral
+    generateFromAIMock
+      .mockResolvedValueOnce(aiResponse('{"summary": "cortado', 'length'))
+      .mockResolvedValueOnce(aiResponse('{"summary": "sigue cortado', 'length'));
+
+    await compactSession('s1', 'u1', true);
+
+    expect(sessionSummaryMock.resetNarrativeFailureCount).toHaveBeenCalledWith('s1');
+  });
 });
