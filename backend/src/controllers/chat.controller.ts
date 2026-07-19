@@ -205,7 +205,14 @@ export async function summarizeSessionHandler(req: Request, res: Response): Prom
 
   await compactSession(sessionId, userId, true);
   const summary = SessionSummaryService.getNarrative(sessionId);
-  res.json({ summary });
+  const blocks = SessionSummaryService.getBlocks(sessionId).map(b => ({
+    id: b.id,
+    title: b.title,
+    subject: b.subject,
+  })); // solo metadata liviana — el contenido completo del bloque no se manda acá,
+       // eso es para cuando exista la vista de detalle (Fase 4)
+
+  res.json({ summary, blocks });
 }
 
 // Comando /exportar (/export) — descarga la conversación sintetizada como
