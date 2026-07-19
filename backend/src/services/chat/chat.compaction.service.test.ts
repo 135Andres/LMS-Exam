@@ -93,7 +93,7 @@ describe('compactSession — modelo dinámico', () => {
     sessionSummaryMock.resetNarrativeFailureCount.mockReset();
     segmentMessagesMock.mockReset().mockResolvedValue(allNarrativo());
     extractBlocksMock.mockReset().mockResolvedValue([]);
-    verifyCompactionMock.mockReset().mockResolvedValue({ missing: [] });
+    verifyCompactionMock.mockReset().mockResolvedValue({ missing: [], verified: true });
     pickVerifierModelMock.mockReset().mockReturnValue('ag/gemini-3-flash');
   });
 
@@ -160,7 +160,7 @@ describe('compactSession — retry en truncamiento', () => {
     sessionSummaryMock.resetNarrativeFailureCount.mockReset();
     segmentMessagesMock.mockReset().mockResolvedValue(allNarrativo());
     extractBlocksMock.mockReset().mockResolvedValue([]);
-    verifyCompactionMock.mockReset().mockResolvedValue({ missing: [] });
+    verifyCompactionMock.mockReset().mockResolvedValue({ missing: [], verified: true });
     pickVerifierModelMock.mockReset().mockReturnValue('ag/gemini-3-flash');
   });
 
@@ -211,7 +211,7 @@ describe('compactSession — orquestación de 4 pasos (Fase 2)', () => {
     sessionSummaryMock.resetNarrativeFailureCount.mockReset();
     segmentMessagesMock.mockReset().mockResolvedValue(allNarrativo());
     extractBlocksMock.mockReset().mockResolvedValue([]);
-    verifyCompactionMock.mockReset().mockResolvedValue({ missing: [] });
+    verifyCompactionMock.mockReset().mockResolvedValue({ missing: [], verified: true });
     pickVerifierModelMock.mockReset().mockReturnValue('ag/gemini-3-flash');
     generateFromAIMock.mockResolvedValue(aiResponse(VALID_RESULT));
   });
@@ -241,7 +241,7 @@ describe('compactSession — orquestación de 4 pasos (Fase 2)', () => {
   });
 
   it('la verificación cruzada agrega el contenido faltante directo a la narrativa guardada, sin cola de revisión', async () => {
-    verifyCompactionMock.mockResolvedValue({ missing: [{ description: 'falta la derivación de la integral por partes' }] });
+    verifyCompactionMock.mockResolvedValue({ missing: [{ description: 'falta la derivación de la integral por partes' }], verified: true });
 
     await compactSession('s1', 'u1', true);
 
@@ -302,7 +302,7 @@ describe('compactSession — alucinación de ausencia (Fase 2 paso 6)', () => {
     sessionSummaryMock.resetNarrativeFailureCount.mockReset();
     segmentMessagesMock.mockReset().mockResolvedValue(allNarrativoFor(CODE_MESSAGES));
     extractBlocksMock.mockReset().mockResolvedValue([]);
-    verifyCompactionMock.mockReset().mockResolvedValue({ missing: [] });
+    verifyCompactionMock.mockReset().mockResolvedValue({ missing: [], verified: true });
     pickVerifierModelMock.mockReset().mockReturnValue('ag/gemini-3-flash');
   });
 
@@ -349,7 +349,7 @@ describe('compactSession — límite a reintentos indefinidos de narrativa (Fase
     sessionSummaryMock.resetNarrativeFailureCount.mockReset();
     segmentMessagesMock.mockReset().mockResolvedValue(allNarrativo());
     extractBlocksMock.mockReset().mockResolvedValue([]);
-    verifyCompactionMock.mockReset().mockResolvedValue({ missing: [] });
+    verifyCompactionMock.mockReset().mockResolvedValue({ missing: [], verified: true });
     pickVerifierModelMock.mockReset().mockReturnValue('ag/gemini-3-flash');
   });
 
@@ -398,5 +398,60 @@ describe('compactSession — límite a reintentos indefinidos de narrativa (Fase
     await compactSession('s1', 'u1', true);
 
     expect(sessionSummaryMock.resetNarrativeFailureCount).toHaveBeenCalledWith('s1');
+  });
+});
+
+describe('compactSession — retry de verificación cruzada tras fallo técnico (Task 1)', () => {
+  beforeEach(() => {
+    generateFromAIMock.mockReset();
+    chatModelMock.getSummaryCursor.mockReset().mockReturnValue(null);
+    chatModelMock.getMessagesSince.mockReset().mockReturnValue(NEW_MESSAGES);
+    chatModelMock.setSummaryCursor.mockReset();
+    chatModelMock.getLastAssistantModel.mockReset().mockReturnValue('nvidia/thinkingmachines/inkling');
+    sessionSummaryMock.getNarrative.mockReset().mockReturnValue(null);
+    sessionSummaryMock.saveNarrative.mockReset();
+    sessionSummaryMock.getNarrativeFailureCount.mockReset().mockReturnValue(0);
+    sessionSummaryMock.recordNarrativeFailure.mockReset().mockReturnValue(1);
+    sessionSummaryMock.resetNarrativeFailureCount.mockReset();
+    segmentMessagesMock.mockReset().mockResolvedValue(allNarrativo());
+    extractBlocksMock.mockReset().mockResolvedValue([]);
+    pickVerifierModelMock.mockReset().mockReturnValue('ag/gemini-3-flash');
+    generateFromAIMock.mockResolvedValue(aiResponse(VALID_RESULT));
+  });
+
+  it('si la primera verificación falla (verified: false), reintenta una vez', async () => {
+    verifyCompactionMock.mockReset()
+      .mockResolvedValueOnce({ missing: [], verified: false })
+      .mockResolvedValueOnce({ missing: [], verified: true });
+
+    await compactSession('s1', 'u1', true);
+
+    expect(verifyCompactionMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('si el reintento de verificación también falla, guarda la narrativa igual con la nota de "no confirmada" y lo loguea como warning', async () => {
+    verifyCompactionMock.mockReset().mockResolvedValue({ missing: [], verified: false });
+
+    await compactSession('s1', 'u1', true);
+
+    expect(verifyCompactionMock).toHaveBeenCalledTimes(2);
+    expect(sessionSummaryMock.saveNarrative).toHaveBeenCalledWith(
+      's1',
+      expect.stringContaining('no pudo completarse'),
+      expect.any(Object),
+    );
+    expect(chatModelMock.setSummaryCursor).toHaveBeenCalled();
+  });
+
+  it('si el reintento de verificación sí tiene éxito, usa ese resultado sin la nota de "no confirmada"', async () => {
+    verifyCompactionMock.mockReset()
+      .mockResolvedValueOnce({ missing: [], verified: false })
+      .mockResolvedValueOnce({ missing: [{ description: 'falta un dato' }], verified: true });
+
+    await compactSession('s1', 'u1', true);
+
+    const savedNarrative = sessionSummaryMock.saveNarrative.mock.calls[0][1] as string;
+    expect(savedNarrative).toContain('falta un dato');
+    expect(savedNarrative).not.toContain('no pudo completarse');
   });
 });

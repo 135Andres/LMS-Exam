@@ -42,6 +42,10 @@ function aiResponse(content: string) {
   return { content, usage: { promptTokens: 1, completionTokens: 1 }, finishReason: 'stop' };
 }
 
+function titlesBatchResponse(titles: Array<{ id: string; title: string }>) {
+  return aiResponse(JSON.stringify({ titles }));
+}
+
 const MODEL = 'nvidia/thinkingmachines/inkling';
 
 describe('extractBlocks', () => {
@@ -57,7 +61,7 @@ describe('extractBlocks', () => {
     getBlocksMock.mockReturnValue([]);
     existsByHashMock.mockReturnValue(false);
     addBlockMock.mockImplementation((sessionId: string, block: any) => ({ id: 'block_1', ...block }));
-    generateFromAIMock.mockResolvedValue(aiResponse('Título corto'));
+    generateFromAIMock.mockResolvedValue(titlesBatchResponse([]));
   });
 
   it('ignora mensajes narrativos, solo extrae los verificables', async () => {
@@ -99,7 +103,7 @@ describe('extractBlocks', () => {
     const segments = [
       { messageId: 'm1', class: 'verificable' as const, confidence: 'high' as const, method: 'heuristic' as const },
     ];
-    generateFromAIMock.mockResolvedValueOnce(aiResponse('Segunda ley de Newton'));
+    generateFromAIMock.mockResolvedValueOnce(titlesBatchResponse([{ id: 'm1', title: 'Segunda ley de Newton' }]));
 
     await extractBlocks('session1', messages, segments, MODEL);
 
@@ -107,6 +111,52 @@ describe('extractBlocks', () => {
     const call = addBlockMock.mock.calls[0][1];
     expect(call.title).toBe('Segunda ley de Newton');
     expect(call.content).toBe('La segunda ley de Newton establece que F = m·a.');
+  });
+
+  it('llama a generateFromAI exactamente una vez para 3+ bloques nuevos, y cada uno recibe su título correcto sin mezclarse', async () => {
+    const messages = [
+      { id: 'm1', role: 'assistant', content: 'La derivada de x^2 es 2x, aplicando la regla de la potencia paso a paso.' },
+      { id: 'm2', role: 'assistant', content: 'La segunda ley de Newton establece que F = m·a, paso a paso.' },
+      { id: 'm3', role: 'assistant', content: 'El teorema de Pitágoras dice que a^2 + b^2 = c^2, por lo tanto.' },
+    ];
+    const segments = messages.map(m => ({
+      messageId: m.id, class: 'verificable' as const, confidence: 'high' as const, method: 'heuristic' as const,
+    }));
+    // Respuesta deliberadamente en orden distinto al de los items pedidos,
+    // para probar que el match es por id y no por posición.
+    generateFromAIMock.mockResolvedValueOnce(titlesBatchResponse([
+      { id: 'm3', title: 'Teorema de Pitágoras' },
+      { id: 'm1', title: 'Derivada de x^2' },
+      { id: 'm2', title: 'Segunda ley de Newton' },
+    ]));
+
+    const blocks = await extractBlocks('session1', messages, segments, MODEL);
+
+    expect(generateFromAIMock).toHaveBeenCalledTimes(1);
+    expect(blocks).toHaveLength(3);
+    const byId = new Map(addBlockMock.mock.calls.map(call => [call[1].extractedFromMessages[0], call[1].title]));
+    expect(byId.get('m1')).toBe('Derivada de x^2');
+    expect(byId.get('m2')).toBe('Segunda ley de Newton');
+    expect(byId.get('m3')).toBe('Teorema de Pitágoras');
+  });
+
+  it('si el batch de títulos falla, cada bloque cae al fallback de truncamiento', async () => {
+    const messages = [
+      { id: 'm1', role: 'assistant', content: 'La derivada de x^2 es 2x, aplicando la regla de la potencia paso a paso, un contenido bien largo.' },
+      { id: 'm2', role: 'assistant', content: 'La segunda ley de Newton establece que F = m·a, paso a paso, otro contenido largo también.' },
+    ];
+    const segments = messages.map(m => ({
+      messageId: m.id, class: 'verificable' as const, confidence: 'high' as const, method: 'heuristic' as const,
+    }));
+    generateFromAIMock.mockRejectedValueOnce(new Error('AI down'));
+
+    const blocks = await extractBlocks('session1', messages, segments, MODEL);
+
+    expect(generateFromAIMock).toHaveBeenCalledTimes(1);
+    expect(blocks).toHaveLength(2);
+    const byId = new Map(addBlockMock.mock.calls.map(call => [call[1].extractedFromMessages[0], call[1].title]));
+    expect(byId.get('m1')).toBe(messages[0].content.slice(0, 60).trim());
+    expect(byId.get('m2')).toBe(messages[1].content.slice(0, 60).trim());
   });
 
   it('completa subject, extractedFromMessages, extractionModel y confidence en el bloque', async () => {
