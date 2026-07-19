@@ -14,4 +14,12 @@ describe('detectSubject', () => {
   it('devuelve general si no matchea ninguna keyword', () => {
     expect(detectSubject('hola, ¿cómo estás?')).toBe('general');
   });
+
+  it('no confunde "base de datos" con quimica via keyword ambigua "base"', () => {
+    expect(detectSubject('consulta la base de datos')).toBe('informatica');
+  });
+
+  it('no confunde "balance general" con biologia via keyword ambigua "gen"', () => {
+    expect(detectSubject('el balance general de la empresa')).toBe('contaduria');
+  });
 });

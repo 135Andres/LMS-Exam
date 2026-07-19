@@ -5,8 +5,8 @@
 export const SUBJECT_KEYWORDS: Record<string, string[]> = {
   matematicas: ['derivada', 'integral', 'limite', 'ecuacion', 'funcion', 'matriz', 'vector', 'probabilidad', 'estadistica', 'geometria', 'trigonometria', 'calculo', 'algebra', 'matematica'],
   fisica: ['fuerza', 'energia', 'velocidad', 'aceleracion', 'newton', 'cinematica', 'dinamica', 'termodinamica', 'electricidad', 'magnetismo', 'optica', 'ondas', 'fisica', 'movimiento'],
-  quimica: ['molecula', 'atomo', 'reaccion', 'enlace', 'acido', 'base', 'ph', 'estequiometria', 'tabla periodica', 'orbital', 'quimica', 'elemento', 'compuesto'],
-  biologia: ['celula', 'adn', 'gen', 'proteina', 'evolucion', 'ecosistema', 'fotosintesis', 'mitosis', 'meiosis', 'biologia', 'genetica', 'organismo'],
+  quimica: ['molecula', 'atomo', 'reaccion', 'enlace', 'acido', 'ph', 'estequiometria', 'tabla periodica', 'orbital', 'quimica', 'elemento', 'compuesto'],
+  biologia: ['celula', 'adn', 'proteina', 'evolucion', 'ecosistema', 'fotosintesis', 'mitosis', 'meiosis', 'biologia', 'genetica', 'organismo'],
   historia: ['guerra', 'revolucion', 'imperio', 'siglo', 'tratado', 'independencia', 'constitucion', 'historia', 'civilizacion'],
   lenguaje: ['sintaxis', 'gramatica', 'verbo', 'sustantivo', 'adjetivo', 'oracion', 'texto', 'lectura', 'escritura', 'espanol', 'literatura', 'ortografia', 'redaccion'],
   informatica: ['algoritmo', 'codigo', 'programa', 'variable', 'bucle', 'array', 'objeto', 'clase', 'api', 'base de datos'],
