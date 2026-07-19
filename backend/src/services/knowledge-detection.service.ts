@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { logger } from '../utils/logger.js';
-import { SUBJECT_KEYWORDS, stripAccents } from '../utils/subject-keywords.js';
+import { detectSubjectByKeywords } from '../utils/subject-keywords.js';
 import { KnowledgeModel, hashKnowledgeContent } from '../models/knowledge.model.js';
 
 interface ChatLogRow {
@@ -45,15 +45,8 @@ const DETECTION_RULES = {
   },
 };
 
-// Las keywords compartidas están sin tildes (ver subject-keywords.ts) — hay
-// que normalizar el texto de entrada igual, si no se pierden matches como
-// "cálculo" contra la keyword "calculo".
 export function detectSubject(text: string): string {
-  const lower = stripAccents(text.toLowerCase());
-  for (const [subject, keywords] of Object.entries(SUBJECT_KEYWORDS)) {
-    if (keywords.some(kw => lower.includes(kw))) return subject;
-  }
-  return 'general';
+  return detectSubjectByKeywords(text) ?? 'general';
 }
 
 export function detectKnowledgeOpportunity(messages: ChatLogRow[]): DetectionResult | null {

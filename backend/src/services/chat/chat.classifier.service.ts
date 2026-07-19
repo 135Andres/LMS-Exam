@@ -1,5 +1,5 @@
 // backend/src/services/chat/chat.classifier.service.ts
-import { SUBJECT_KEYWORDS, stripAccents } from '../../utils/subject-keywords.js';
+import { detectSubjectByKeywords, stripAccents } from '../../utils/subject-keywords.js';
 
 export type Complexity = 'low' | 'medium' | 'high';
 export type DelegateTarget = 'glm' | 'sonnet' | 'gemini-pro' | null;
@@ -44,11 +44,7 @@ export function hasCode(message: string): boolean {
 }
 
 export function detectSubjectExtended(query: string): string | undefined {
-  const lower = stripAccents(query.toLowerCase());
-  for (const [subject, keywords] of Object.entries(SUBJECT_KEYWORDS)) {
-    if (keywords.some(k => lower.includes(stripAccents(k)))) return subject;
-  }
-  return undefined;
+  return detectSubjectByKeywords(query);
 }
 
 function estimateComplexity(message: string): Complexity {

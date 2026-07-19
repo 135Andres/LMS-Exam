@@ -30,3 +30,26 @@ export const SUBJECT_KEYWORDS: Record<string, string[]> = {
 export function stripAccents(text: string): string {
   return text.normalize('NFD').replace(/[̀-ͯ]/g, '');
 }
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Matchea keyword como palabra completa (o frase completa), no como substring
+// suelto — evita falsos positivos tipo 'api' dentro de "terapia" o 'texto'
+// dentro de "contexto" que sí ocurrían con .includes().
+function matchesKeyword(normalizedText: string, keyword: string): boolean {
+  return new RegExp(`\\b${escapeRegExp(keyword)}\\b`).test(normalizedText);
+}
+
+// Detección compartida de materia por keywords — usada por
+// chat.classifier.service.ts y knowledge-detection.service.ts. El texto de
+// entrada debe venir ya en minúsculas; esta función se encarga de quitar
+// tildes antes de matchear.
+export function detectSubjectByKeywords(text: string): string | undefined {
+  const normalized = stripAccents(text.toLowerCase());
+  for (const [subject, keywords] of Object.entries(SUBJECT_KEYWORDS)) {
+    if (keywords.some(kw => matchesKeyword(normalized, kw))) return subject;
+  }
+  return undefined;
+}

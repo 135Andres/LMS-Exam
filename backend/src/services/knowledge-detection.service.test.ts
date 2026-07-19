@@ -22,4 +22,8 @@ describe('detectSubject', () => {
   it('no confunde "balance general" con biologia via keyword ambigua "gen"', () => {
     expect(detectSubject('el balance general de la empresa')).toBe('contaduria');
   });
+
+  it('no matchea "api" como substring dentro de "terapia" (match de palabra completa)', () => {
+    expect(detectSubject('necesito terapia para manejar la ansiedad')).toBe('psicologia');
+  });
 });
