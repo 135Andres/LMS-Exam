@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { logger } from '../utils/logger.js';
+import { detectSubjectByKeywords } from '../utils/subject-keywords.js';
 import { KnowledgeModel, hashKnowledgeContent } from '../models/knowledge.model.js';
 
 interface ChatLogRow {
@@ -44,22 +45,8 @@ const DETECTION_RULES = {
   },
 };
 
-const SUBJECT_KEYWORDS: Record<string, string[]> = {
-  matematicas: ['álgebra', 'cálculo', 'trigonometría', 'geometría', 'derivada', 'integral', 'matemática', 'ecuación', 'función'],
-  fisica: ['física', 'movimiento', 'fuerza', 'energía', 'newton', 'velocidad', 'aceleración'],
-  quimica: ['química', 'elemento', 'molécula', 'reacción', 'átomo', 'compuesto'],
-  historia: ['historia', 'revolución', 'guerra', 'imperio', 'civilización'],
-  lenguaje: ['español', 'literatura', 'gramática', 'ortografía', 'redacción'],
-  biologia: ['biología', 'célula', 'genética', 'organismo', 'evolución'],
-  informatica: ['algoritmo', 'código', 'programa', 'variable', 'bucle', 'array', 'base de datos'],
-};
-
-function detectSubject(text: string): string {
-  const lower = text.toLowerCase();
-  for (const [subject, keywords] of Object.entries(SUBJECT_KEYWORDS)) {
-    if (keywords.some(kw => lower.includes(kw))) return subject;
-  }
-  return 'general';
+export function detectSubject(text: string): string {
+  return detectSubjectByKeywords(text) ?? 'general';
 }
 
 export function detectKnowledgeOpportunity(messages: ChatLogRow[]): DetectionResult | null {
