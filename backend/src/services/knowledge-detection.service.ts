@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { logger } from '../utils/logger.js';
+import { SUBJECT_KEYWORDS, stripAccents } from '../utils/subject-keywords.js';
 import { KnowledgeModel, hashKnowledgeContent } from '../models/knowledge.model.js';
 
 interface ChatLogRow {
@@ -44,18 +45,11 @@ const DETECTION_RULES = {
   },
 };
 
-const SUBJECT_KEYWORDS: Record<string, string[]> = {
-  matematicas: ['álgebra', 'cálculo', 'trigonometría', 'geometría', 'derivada', 'integral', 'matemática', 'ecuación', 'función'],
-  fisica: ['física', 'movimiento', 'fuerza', 'energía', 'newton', 'velocidad', 'aceleración'],
-  quimica: ['química', 'elemento', 'molécula', 'reacción', 'átomo', 'compuesto'],
-  historia: ['historia', 'revolución', 'guerra', 'imperio', 'civilización'],
-  lenguaje: ['español', 'literatura', 'gramática', 'ortografía', 'redacción'],
-  biologia: ['biología', 'célula', 'genética', 'organismo', 'evolución'],
-  informatica: ['algoritmo', 'código', 'programa', 'variable', 'bucle', 'array', 'base de datos'],
-};
-
+// Las keywords compartidas están sin tildes (ver subject-keywords.ts) — hay
+// que normalizar el texto de entrada igual, si no se pierden matches como
+// "cálculo" contra la keyword "calculo".
 function detectSubject(text: string): string {
-  const lower = text.toLowerCase();
+  const lower = stripAccents(text.toLowerCase());
   for (const [subject, keywords] of Object.entries(SUBJECT_KEYWORDS)) {
     if (keywords.some(kw => lower.includes(kw))) return subject;
   }

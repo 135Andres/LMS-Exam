@@ -1,7 +1,7 @@
 import { findTopK } from '../utils/vector.js';
 import { EmbeddingModel } from '../models/embedding.model.js';
 import { KnowledgeEmbeddingModel } from '../models/knowledge-embedding.model.js';
-import { SUBJECT_KEYWORDS } from './chat/chat.classifier.service.js';
+import { SUBJECT_KEYWORDS } from '../utils/subject-keywords.js';
 
 interface SearchResult {
   content: string;

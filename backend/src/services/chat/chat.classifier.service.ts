@@ -1,4 +1,6 @@
 // backend/src/services/chat/chat.classifier.service.ts
+import { SUBJECT_KEYWORDS, stripAccents } from '../../utils/subject-keywords.js';
+
 export type Complexity = 'low' | 'medium' | 'high';
 export type DelegateTarget = 'glm' | 'sonnet' | 'gemini-pro' | null;
 
@@ -9,30 +11,6 @@ export interface ClassificationResult {
   hasCode: boolean;
   method: 'heuristic' | 'llm-fallback';
 }
-
-// Fuente única de materias — HybridRAGService.detectSubject() importa esta
-// misma constante para que las dos listas no diverjan.
-export const SUBJECT_KEYWORDS: Record<string, string[]> = {
-  matematicas: ['derivada', 'integral', 'limite', 'ecuacion', 'funcion', 'matriz', 'vector', 'probabilidad', 'estadistica', 'geometria', 'trigonometria', 'calculo', 'algebra'],
-  fisica: ['fuerza', 'energia', 'velocidad', 'aceleracion', 'newton', 'cinematica', 'dinamica', 'termodinamica', 'electricidad', 'magnetismo', 'optica', 'ondas'],
-  quimica: ['molecula', 'atomo', 'reaccion', 'enlace', 'acido', 'base', 'ph', 'estequiometria', 'tabla periodica', 'orbital'],
-  biologia: ['celula', 'adn', 'gen', 'proteina', 'evolucion', 'ecosistema', 'fotosintesis', 'mitosis', 'meiosis'],
-  historia: ['guerra', 'revolucion', 'imperio', 'siglo', 'tratado', 'independencia', 'constitucion'],
-  lenguaje: ['sintaxis', 'gramatica', 'verbo', 'sustantivo', 'adjetivo', 'oracion', 'texto', 'lectura', 'escritura'],
-  informatica: ['algoritmo', 'codigo', 'programa', 'variable', 'bucle', 'array', 'objeto', 'clase', 'api', 'base de datos'],
-  derecho: ['jurisprudencia', 'codigo civil', 'codigo penal', 'amparo', 'contrato', 'demanda', 'jurisdiccion', 'constitucional', 'litigio', 'tribunal', 'sentencia'],
-  contaduria: ['balance general', 'estado de resultados', 'activo', 'pasivo', 'depreciacion', 'impuestos', 'iva', 'isr', 'partida doble', 'flujo de efectivo', 'contabilidad'],
-  administracion: ['marketing', 'mercadotecnia', 'foda', 'kpi', 'presupuesto', 'organigrama', 'logistica', 'cadena de suministro', 'recursos humanos'],
-  economia: ['oferta y demanda', 'pib', 'inflacion', 'mercado', 'macroeconomia', 'microeconomia', 'tasa de interes'],
-  psicologia: ['conducta', 'cognitivo', 'terapia', 'trastorno', 'desarrollo psicosocial', 'freud', 'piaget', 'psicoanalisis'],
-  medicina: ['diagnostico', 'sintoma', 'patologia', 'farmaco', 'anatomia', 'sistema nervioso', 'sistema circulatorio', 'clinico'],
-  ingenieria: ['resistencia de materiales', 'circuito', 'esfuerzo', 'termodinamica aplicada', 'planos', 'cad', 'estructural'],
-  artes: ['composicion', 'perspectiva', 'boceto', 'paleta', 'movimiento artistico', 'renacimiento', 'barroco', 'diseño grafico'],
-  filosofia: ['etica', 'epistemologia', 'metafisica', 'kant', 'aristoteles', 'existencialismo', 'ontologia'],
-  ciencias_politicas: ['estado', 'gobierno', 'politica publica', 'sociedad', 'democracia', 'ideologia', 'geopolitica'],
-  pedagogia: ['curriculo', 'didactica', 'aprendizaje significativo', 'evaluacion formativa', 'plan de estudios'],
-  estadistica: ['hipotesis', 'muestra', 'varianza', 'regresion', 'chi cuadrada', 'desviacion estandar', 'intervalo de confianza'],
-};
 
 const CODE_PATTERNS = [
   /```/,
@@ -60,10 +38,6 @@ const EXPLICIT_MAX_EFFORT_MARKERS = [
 ];
 
 const RAG_CONTEXT_LENGTH_FOR_GEMINI = 4000;
-
-function stripAccents(text: string): string {
-  return text.normalize('NFD').replace(/[̀-ͯ]/g, '');
-}
 
 export function hasCode(message: string): boolean {
   return CODE_PATTERNS.some(re => re.test(message));
