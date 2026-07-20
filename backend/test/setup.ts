@@ -49,6 +49,18 @@ CREATE TABLE IF NOT EXISTS embedding_outbox (
   created_at TEXT DEFAULT (datetime('now')), processed_at TEXT,
   next_retry_at TEXT
 );
+CREATE TABLE IF NOT EXISTS user_profile (
+  user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  display_name TEXT, level TEXT, field TEXT,
+  subjects TEXT NOT NULL DEFAULT '[]',
+  goal TEXT,
+  depth TEXT NOT NULL DEFAULT 'auto',
+  register TEXT NOT NULL DEFAULT 'tuteo',
+  study_methods TEXT NOT NULL DEFAULT '[]',
+  profile_line TEXT,
+  version INTEGER NOT NULL DEFAULT 1,
+  updated_at INTEGER NOT NULL
+);
 `;
 
 testDb.exec(SCHEMA);
@@ -68,5 +80,6 @@ export function resetDb(): void {
   testDb.exec('DELETE FROM embedding_outbox');
   testDb.exec('DELETE FROM chat_logs');
   testDb.exec('DELETE FROM chat_sessions');
+  testDb.exec('DELETE FROM user_profile');
   testDb.exec('DELETE FROM users');
 }

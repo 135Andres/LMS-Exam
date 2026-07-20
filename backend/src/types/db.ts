@@ -120,3 +120,19 @@ export interface AllUsageTotals {
   totalCost: number;
   totalRequests: number;
 }
+
+// Perfil de usuario (customization/onboarding) — subjects/study_methods son JSON string de string[]
+export interface UserProfileRow {
+  user_id: string;
+  display_name: string | null;
+  level: string | null;
+  field: string | null;
+  subjects: string;
+  goal: string | null;
+  depth: string;
+  register: string;
+  study_methods: string;
+  profile_line: string | null;
+  version: number;
+  updated_at: number;
+}
