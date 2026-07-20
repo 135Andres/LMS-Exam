@@ -37,6 +37,11 @@ export type OnboardingSkipResult =
   | { type: 'onboarding_skipped' }
   | { type: 'chat_passthrough'; message: string; sessionId: string };
 
+export interface OnboardingStateResult {
+  state: 'pending' | 'skipped' | 'completed';
+  step: OnboardingStepPayload | null;
+}
+
 const FIELD_MAP: Record<string, keyof UserProfileInput> = {
   display_name: 'displayName',
   level: 'level',
@@ -166,6 +171,22 @@ export const OnboardingService = {
     const nextStep = currentStep + 1;
     UserModel.updateOnboarding(userId, { step: nextStep });
     return getStepPayload(nextStep, ctx);
+  },
+
+  // Lectura sin efectos secundarios — para que el frontend retome el paso
+  // guardado al recargar la página (el backend es la fuente de verdad,
+  // el frontend no persiste nada). No dispara IA ni toca la fila del usuario.
+  getState(userId: string): OnboardingStateResult {
+    const user = UserModel.findById(userId);
+    if (!user) return { state: 'pending', step: null };
+
+    if (user.onboarding_state === 'pending' && user.onboarding_current_step > 0) {
+      return {
+        state: 'pending',
+        step: getStepPayload(user.onboarding_current_step, { suggestedDisplayName: user.username ?? undefined }),
+      };
+    }
+    return { state: user.onboarding_state, step: null };
   },
 
   skip(userId: string): OnboardingSkipResult {

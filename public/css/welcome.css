@@ -3167,4 +3167,270 @@ body[data-font="mono"] {
   font-family: 'Space Mono', monospace;
 }
 
+/* ══════════════ Wizard de personalización (plan 05) ══════════════
+   Burbujas dentro del chat, no modal — misma familia visual que .bubble-ai
+   (msg-row/bubble-ai/bubble-text), con chips y barra de progreso encima. */
+.onboarding-step-bubble {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  max-width: 480px;
+}
+
+.onboarding-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.onboarding-progress-bar {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(var(--ink-rgb), 0.08);
+  overflow: hidden;
+}
+
+.onboarding-progress-fill {
+  height: 100%;
+  background: #8b9aff;
+  border-radius: 2px;
+  transition: width 250ms ease;
+}
+
+.onboarding-progress-label {
+  font-size: 0.7rem;
+  font-family: 'Space Mono', monospace;
+  color: rgba(var(--ink-rgb), 0.4);
+  white-space: nowrap;
+}
+
+.onboarding-prompt {
+  font-weight: 600;
+}
+
+.onboarding-note {
+  font-size: 0.8rem;
+  color: #e0664a;
+}
+
+.onboarding-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+/* ── Chips: single/multi — target táctil >=44px, wrap en móvil ── */
+.onboarding-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.onboarding-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1rem;
+  min-height: 44px;
+  padding: 0.5rem 0.9rem;
+  border: 1.5px solid rgba(var(--ink-rgb), 0.12);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: border-color 150ms ease, background 150ms ease, color 150ms ease;
+}
+
+.onboarding-chip:hover {
+  border-color: rgba(139, 154, 255, 0.6);
+}
+
+.onboarding-chip:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.onboarding-chip.selected {
+  border-color: #8b9aff;
+  background: rgba(139, 154, 255, 0.12);
+  color: #8b9aff;
+}
+
+.onboarding-chip-label {
+  font-weight: 500;
+}
+
+.onboarding-chip-preview {
+  font-size: 0.72rem;
+  color: rgba(var(--ink-rgb), 0.45);
+  font-weight: 400;
+}
+
+.onboarding-chip.selected .onboarding-chip-preview {
+  color: rgba(139, 154, 255, 0.75);
+}
+
+/* ── Input de texto libre (display_name, field, "Otra" materia) ── */
+.onboarding-text-row {
+  display: flex;
+}
+
+.onboarding-text-input,
+.onboarding-otra-input {
+  width: 100%;
+  min-height: 44px;
+  padding: 0.5rem 0.85rem;
+  border: 1.5px solid rgba(var(--ink-rgb), 0.12);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+
+.onboarding-text-input:focus,
+.onboarding-otra-input:focus {
+  outline: none;
+  border-color: #8b9aff;
+}
+
+.onboarding-otra-input {
+  margin-top: 0.3rem;
+}
+
+/* ── Confirmar (aparece cuando todos los inputs del paso tienen valor) ── */
+.onboarding-confirm-btn {
+  align-self: flex-start;
+  min-height: 40px;
+  padding: 0.5rem 1.1rem;
+  border: none;
+  border-radius: 10px;
+  background: #8b9aff;
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(4px);
+  pointer-events: none;
+  transition: opacity 150ms ease, transform 150ms ease, background 150ms ease;
+}
+
+.onboarding-confirm-btn.visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.onboarding-confirm-btn:hover:not(:disabled) {
+  background: #7788ee;
+}
+
+.onboarding-confirm-btn:disabled {
+  cursor: default;
+}
+
+/* ── Link "Configurar después" — pequeño, siempre visible, nunca secuestra ── */
+.onboarding-skip-link {
+  align-self: flex-start;
+  margin-top: 0.1rem;
+  padding: 0;
+  border: none;
+  background: none;
+  color: rgba(var(--ink-rgb), 0.4);
+  font-family: inherit;
+  font-size: 0.75rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.onboarding-skip-link:hover {
+  color: rgba(var(--ink-rgb), 0.65);
+}
+
+.onboarding-step-row.onboarding-step-done .onboarding-chip,
+.onboarding-step-row.onboarding-step-done .onboarding-confirm-btn,
+.onboarding-step-row.onboarding-step-done .onboarding-text-input {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+/* ── Banner diferido: "Configura tu perfil" sobre el input, discreto ── */
+.onboarding-banner {
+  position: absolute;
+  left: 50%;
+  bottom: 78px;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  max-width: min(560px, calc(100% - 2rem));
+  padding: 0.6rem 1rem;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid rgba(var(--ink-rgb), 0.1);
+  box-shadow: 0 4px 16px rgba(var(--ink-rgb), 0.12);
+}
+
+.onboarding-banner-text {
+  flex: 1;
+  font-size: 0.82rem;
+  color: var(--text-primary);
+}
+
+.onboarding-banner-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.onboarding-banner-btn {
+  min-height: 36px;
+  padding: 0.35rem 0.75rem;
+  border-radius: 8px;
+  border: 1.5px solid rgba(var(--ink-rgb), 0.12);
+  background: var(--surface-alt);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.onboarding-banner-now {
+  border-color: #8b9aff;
+  background: #8b9aff;
+  color: #fff;
+}
+
+.onboarding-banner-now:hover {
+  background: #7788ee;
+}
+
+.onboarding-banner-dismiss:hover {
+  background: rgba(var(--ink-rgb), 0.06);
+}
+
+@media (max-width: 768px) {
+  .onboarding-step-bubble {
+    max-width: 100%;
+  }
+
+  .onboarding-banner {
+    flex-direction: column;
+    align-items: stretch;
+    bottom: 88px;
+    max-width: calc(100% - 1.5rem);
+  }
+
+  .onboarding-banner-actions {
+    justify-content: flex-end;
+  }
+}
+
 

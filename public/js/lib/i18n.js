@@ -170,6 +170,18 @@ const translations = {
     otpSubPrefix: 'Introduce el código de 6 dígitos que enviamos a',
     attemptSingular: 'intento restante',
     attemptPlural: 'intentos restantes',
+    // Wizard de personalización (onboarding.js)
+    onboardingStepLabel: 'Paso {n} de {total}',
+    onboardingConfirm: 'Listo',
+    onboardingSkipLink: 'Configurar después',
+    onboardingTypeAnswer: 'Escribe tu respuesta...',
+    onboardingOtraPlaceholder: 'Escribe tu materia...',
+    onboardingDone: 'Listo',
+    onboardingRetryNote: 'Hubo un problema de conexión, intenta de nuevo.',
+    onboardingBannerText: '⚙️ Personaliza cómo te respondo — 30 segundos',
+    onboardingBannerNow: 'Ahora',
+    onboardingBannerDismiss: 'No, gracias',
+    onboardingStartTrigger: 'Quiero configurar mi perfil',
   },
   en: {
     brand: 'LMS Exams',
@@ -326,6 +338,18 @@ const translations = {
     otpSubPrefix: 'Enter the 6-digit code we sent to',
     attemptSingular: 'attempt remaining',
     attemptPlural: 'attempts remaining',
+    // Personalization wizard (onboarding.js)
+    onboardingStepLabel: 'Step {n} of {total}',
+    onboardingConfirm: 'Done',
+    onboardingSkipLink: 'Set up later',
+    onboardingTypeAnswer: 'Type your answer...',
+    onboardingOtraPlaceholder: 'Type your subject...',
+    onboardingDone: 'Done',
+    onboardingRetryNote: 'There was a connection issue, try again.',
+    onboardingBannerText: '⚙️ Personalize how I respond — 30 seconds',
+    onboardingBannerNow: 'Now',
+    onboardingBannerDismiss: 'No, thanks',
+    onboardingStartTrigger: 'I want to set up my profile',
   },
 };
 

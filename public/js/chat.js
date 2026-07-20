@@ -2,6 +2,7 @@ import { formatTime, escapeHtml, svgIcon, formatAIResponse, renderAvatarInto } f
 import { initSettingsModal, notifyIfEnabled } from './lib/settings-modal.js';
 import { initI18n, t } from './lib/i18n.js';
 import { wrapBareLatex } from './lib/latex-detect.js';
+import { initOnboarding, renderOnboardingStep, maybeOfferDeferredBanner } from './onboarding.js';
 
 async function checkSession() {
   try {
@@ -1255,7 +1256,7 @@ function appendNextStepButton(actions, quizMarker) {
   actions.appendChild(nextStepBtn);
 }
 
-function addMessage(text, sender, attachments, msgId, isPinned) {
+export function addMessage(text, sender, attachments, msgId, isPinned) {
   const chatMessages = document.getElementById('chatMessages');
 
   const msgRow = document.createElement('div');
@@ -1430,7 +1431,7 @@ function showTyping() {
   chatMessages.scrollTop = 0;
 }
 
-function hideTyping() {
+export function hideTyping() {
   const typing = document.getElementById('typingIndicator');
   if (typing) typing.remove();
 }
@@ -2126,7 +2127,7 @@ async function handleReport(aiText, msgRow, btn) {
   } catch {}
 }
 
-async function handleSend() {
+export async function handleSend() {
   const input = document.getElementById('messageInput');
   const text = input.value.trim();
   if (!text) return;
@@ -2275,6 +2276,7 @@ async function handleSend() {
     let thinkingRow = null;
     let thinkingTextDiv = null;
     let thinkingOpen = false;
+    let onboardingHandled = false;
 
     while (true) {
       const { done, value } = await reader.read();
@@ -2293,6 +2295,13 @@ async function handleSend() {
           if (json.sessionId) {
             sessionId = json.sessionId;
             sessionStorage.setItem('chatSessionId', sessionId);
+          }
+          // Plan 04/05 — el mensaje fue interceptado por el wizard de
+          // personalización en vez de generar una respuesta de IA.
+          if (json.type === 'onboarding_step') {
+            onboardingHandled = true;
+            renderOnboardingStep(json);
+            continue;
           }
           if (json.done) {
             if (aiBubble && json.msgId) aiBubble.dataset.msgId = json.msgId;
@@ -2359,8 +2368,15 @@ async function handleSend() {
         handleQuizExplainDone();
       }
       renderKaTeX();
-    } else if (!aiBubble && !thinkingRow) {
+    } else if (!onboardingHandled && !aiBubble && !thinkingRow) {
       addMessage(t('processingError'), 'ai');
+    }
+
+    // El mensaje pasó de largo el interceptor del wizard (primer mensaje
+    // largo o tipo cuestionario) — es el único momento en que el banner
+    // diferido tiene sentido mostrarse (plan 05).
+    if (!onboardingHandled && fullTextRef) {
+      maybeOfferDeferredBanner();
     }
   } catch (err) {
     hideTyping();
@@ -2698,6 +2714,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   await historyPromise;
   setupChatInput();
   setupChatTitleEditing();
+  initOnboarding();
 
   // Viene de dashboard.html con un prompt preparado (ej. "Recomendaciones" de
   // una materia) — se autoenvía y se limpia el query param para que un

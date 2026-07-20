@@ -478,6 +478,15 @@ export async function endQuizExplainHandler(req: Request, res: Response): Promis
   res.json({ success: true });
 }
 
+// Plan 05 — lectura sin efectos secundarios, para que el frontend sepa al
+// cargar la página si debe retomar un paso guardado o mostrar el banner
+// diferido (primer mensaje fue un cuestionario/largo, wizard nunca inició).
+export async function onboardingStateHandler(req: Request, res: Response): Promise<void> {
+  const userId = req.user!.id;
+  const result = OnboardingService.getState(userId);
+  res.json(result);
+}
+
 // Plan 04 — cliente → servidor: { type: 'onboarding_answer', step, values }
 export async function onboardingAnswerHandler(req: Request, res: Response): Promise<void> {
   const { step, values } = req.validatedBody as { step: number; values: Record<string, unknown> };

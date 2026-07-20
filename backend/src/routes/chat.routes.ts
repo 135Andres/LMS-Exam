@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { sendChatMessageHandler, sendChatMessageStreamHandler, getChatHistoryHandler, getSessionsHandler, reportMessageHandler, archiveSessionHandler, unarchiveSessionHandler, deleteSessionHandler, getArchivedSessionsHandler, regenerateMessageStreamHandler, summarizeSessionHandler, pinMessageHandler, unpinMessageHandler, getPinnedMessagesHandler, renameSessionHandler, exportSessionHandler, resolveQuizHandler, startQuizExplainHandler, endQuizExplainHandler, onboardingAnswerHandler, onboardingSkipHandler } from '../controllers/chat.controller.js';
+import { sendChatMessageHandler, sendChatMessageStreamHandler, getChatHistoryHandler, getSessionsHandler, reportMessageHandler, archiveSessionHandler, unarchiveSessionHandler, deleteSessionHandler, getArchivedSessionsHandler, regenerateMessageStreamHandler, summarizeSessionHandler, pinMessageHandler, unpinMessageHandler, getPinnedMessagesHandler, renameSessionHandler, exportSessionHandler, resolveQuizHandler, startQuizExplainHandler, endQuizExplainHandler, onboardingAnswerHandler, onboardingSkipHandler, onboardingStateHandler } from '../controllers/chat.controller.js';
 import { authenticate } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { chatMessageSchema, regenerateSchema, summarySchema, exportSchema, quizResolveSchema, quizExplainSchema, onboardingAnswerSchema } from '../validators/chat.js';
@@ -18,6 +18,7 @@ router.post('/tutor/quiz/explain-start', validate(quizExplainSchema), startQuizE
 router.post('/tutor/quiz/explain-end', validate(quizExplainSchema), endQuizExplainHandler);
 router.post('/tutor/onboarding/answer', validate(onboardingAnswerSchema), onboardingAnswerHandler);
 router.post('/tutor/onboarding/skip', onboardingSkipHandler);
+router.get('/tutor/onboarding/state', onboardingStateHandler);
 router.post('/export', validate(exportSchema), exportSessionHandler);
 router.get('/tutor/history', getChatHistoryHandler);
 router.get('/tutor/sessions', getSessionsHandler);

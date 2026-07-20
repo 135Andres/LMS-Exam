@@ -197,6 +197,22 @@ describe('OnboardingService', () => {
     expect(result.step).toBe(1);
   });
 
+  it('getState: usuario sin wizard iniciado (step 0) → pending sin step', () => {
+    expect(OnboardingService.getState(USER_A)).toEqual({ state: 'pending', step: null });
+  });
+
+  it('getState: wizard en curso → pending con el payload del paso guardado', () => {
+    OnboardingService.intercept(USER_A, 'hola', SESSION_A);
+    const result = OnboardingService.getState(USER_A) as any;
+    expect(result.state).toBe('pending');
+    expect(result.step.step).toBe(1);
+  });
+
+  it('getState: completed/skipped → sin step', () => {
+    getTestDb().prepare("UPDATE users SET onboarding_state = 'completed', onboarding_current_step = 0 WHERE id = ?").run(USER_A);
+    expect(OnboardingService.getState(USER_A)).toEqual({ state: 'completed', step: null });
+  });
+
   it('respuesta en texto libre sobre chips matchea por contains (lowercase)', async () => {
     OnboardingService.intercept(USER_A, 'hola', SESSION_A);
     await OnboardingService.answer(USER_A, 1, { display_name: 'Andrés' });
