@@ -36,11 +36,64 @@ function subjectLabel(key: string): string {
 
 // Misma fuente de verdad que el detector de materias del chat (subject-keywords.ts)
 // — las 19 materias generadas en runtime, sin lista paralela que se desincronice.
-function subjectOptions(): OnboardingChip[] {
+// Exportada (no solo usada internamente) para que settings (plan 06) sirva las
+// mismas opciones que el wizard vía GET, en vez de duplicar la lista.
+export function subjectOptions(): OnboardingChip[] {
   return [
     ...Object.keys(SUBJECT_KEYWORDS).map(key => ({ value: key, label: subjectLabel(key) })),
     { value: 'otra', label: 'Otra…' },
   ];
+}
+
+// Opciones de cada campo enum — única fuente de verdad, reusada por el wizard
+// (buildStep) y por el GET de opciones de Settings → Perfil de estudio (plan 06).
+export const LEVEL_OPTIONS: OnboardingChip[] = [
+  { value: 'prepa', label: 'Prepa' },
+  { value: 'uni', label: 'Universidad' },
+  { value: 'posgrado', label: 'Posgrado' },
+  { value: 'otro', label: 'Otro' },
+];
+
+export const FIELD_SUGGESTIONS: OnboardingChip[] = [
+  { value: 'Ingeniería', label: 'Ingeniería' },
+  { value: 'Medicina', label: 'Medicina' },
+  { value: 'Derecho', label: 'Derecho' },
+  { value: 'Ciencias', label: 'Ciencias' },
+  { value: 'Humanidades', label: 'Humanidades' },
+  { value: 'Negocios', label: 'Negocios' },
+];
+
+export const GOAL_OPTIONS: OnboardingChip[] = [
+  { value: 'examenes', label: 'Pasar exámenes' },
+  { value: 'entender', label: 'Entender los temas' },
+  { value: 'tareas', label: 'Hacer tareas' },
+  { value: 'repaso', label: 'Repasar' },
+  { value: 'mixto', label: 'Un poco de todo' },
+];
+
+export const DEPTH_OPTIONS: OnboardingChip[] = [
+  { value: 'breve', label: 'Directas y breves', preview: 'Al grano: resultado, fórmula, listo.' },
+  { value: 'detallado', label: 'Detalladas siempre', preview: 'Contexto completo, cada paso justificado.' },
+  { value: 'auto', label: 'Según el tema', preview: 'Yo decido por complejidad.' },
+];
+
+export const REGISTER_OPTIONS: OnboardingChip[] = [
+  { value: 'tuteo', label: 'Háblame de tú' },
+  { value: 'formal', label: 'Háblame de usted' },
+  { value: 'neutro', label: 'Solo dame la información' },
+];
+
+// Todas las opciones de campos enum del perfil, para el GET de Settings →
+// Perfil de estudio (plan 06) — mismos chips que ve el wizard, una sola fuente.
+export function getProfileFieldOptions() {
+  return {
+    levels: LEVEL_OPTIONS,
+    fieldSuggestions: FIELD_SUGGESTIONS,
+    subjects: subjectOptions(),
+    goals: GOAL_OPTIONS,
+    depths: DEPTH_OPTIONS,
+    registers: REGISTER_OPTIONS,
+  };
 }
 
 function buildStep(step: number, ctx: OnboardingStepContext): Omit<OnboardingStepPayload, 'type'> {
@@ -67,29 +120,8 @@ function buildStep(step: number, ctx: OnboardingStepContext): Omit<OnboardingSte
         total: ONBOARDING_TOTAL_STEPS,
         prompt: '¿En qué nivel estás y qué estudias?',
         inputs: [
-          {
-            id: 'level',
-            kind: 'single',
-            options: [
-              { value: 'prepa', label: 'Prepa' },
-              { value: 'uni', label: 'Universidad' },
-              { value: 'posgrado', label: 'Posgrado' },
-              { value: 'otro', label: 'Otro' },
-            ],
-          },
-          {
-            id: 'field',
-            kind: 'text',
-            allowFreeText: true,
-            options: [
-              { value: 'Ingeniería', label: 'Ingeniería' },
-              { value: 'Medicina', label: 'Medicina' },
-              { value: 'Derecho', label: 'Derecho' },
-              { value: 'Ciencias', label: 'Ciencias' },
-              { value: 'Humanidades', label: 'Humanidades' },
-              { value: 'Negocios', label: 'Negocios' },
-            ],
-          },
+          { id: 'level', kind: 'single', options: LEVEL_OPTIONS },
+          { id: 'field', kind: 'text', allowFreeText: true, options: FIELD_SUGGESTIONS },
         ],
       };
     case 3:
@@ -107,17 +139,7 @@ function buildStep(step: number, ctx: OnboardingStepContext): Omit<OnboardingSte
         total: ONBOARDING_TOTAL_STEPS,
         prompt: '¿Cuál es tu objetivo principal en el chat?',
         inputs: [
-          {
-            id: 'goal',
-            kind: 'single',
-            options: [
-              { value: 'examenes', label: 'Pasar exámenes' },
-              { value: 'entender', label: 'Entender los temas' },
-              { value: 'tareas', label: 'Hacer tareas' },
-              { value: 'repaso', label: 'Repasar' },
-              { value: 'mixto', label: 'Un poco de todo' },
-            ],
-          },
+          { id: 'goal', kind: 'single', options: GOAL_OPTIONS },
         ],
       };
     case 5:
@@ -126,24 +148,8 @@ function buildStep(step: number, ctx: OnboardingStepContext): Omit<OnboardingSte
         total: ONBOARDING_TOTAL_STEPS,
         prompt: '¿Cómo prefieres mis respuestas?',
         inputs: [
-          {
-            id: 'depth',
-            kind: 'single',
-            options: [
-              { value: 'breve', label: 'Directas y breves', preview: 'Al grano: resultado, fórmula, listo.' },
-              { value: 'detallado', label: 'Detalladas siempre', preview: 'Contexto completo, cada paso justificado.' },
-              { value: 'auto', label: 'Según el tema', preview: 'Yo decido por complejidad.' },
-            ],
-          },
-          {
-            id: 'register',
-            kind: 'single',
-            options: [
-              { value: 'tuteo', label: 'Háblame de tú' },
-              { value: 'formal', label: 'Háblame de usted' },
-              { value: 'neutro', label: 'Solo dame la información' },
-            ],
-          },
+          { id: 'depth', kind: 'single', options: DEPTH_OPTIONS },
+          { id: 'register', kind: 'single', options: REGISTER_OPTIONS },
         ],
       };
     default:

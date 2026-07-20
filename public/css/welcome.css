@@ -3416,6 +3416,39 @@ body[data-font="mono"] {
   background: rgba(var(--ink-rgb), 0.06);
 }
 
+/* ── Settings → Perfil de estudio (plan 06) — reusa los chips del wizard
+   (.onboarding-chip / .onboarding-chip-row) para materias y para las
+   opciones de profundidad/trato con preview, misma familia visual. ── */
+.settings-save-btn {
+  align-self: flex-start;
+  padding: 0.5rem 1.2rem;
+  border: none;
+  border-radius: 10px;
+  background: #8b9aff;
+  color: #fff;
+  font-family: 'Space Mono', monospace;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.settings-save-btn:hover:not(:disabled) {
+  background: #7788ee;
+}
+
+.settings-save-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.settings-guided-setup-stub {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.6rem;
+  text-align: left;
+}
+
 @media (max-width: 768px) {
   .onboarding-step-bubble {
     max-width: 100%;

@@ -7,6 +7,7 @@ import { t, setLanguage } from './i18n.js';
 
 const SETTINGS_CATEGORIES = [
   { key: 'config', labelKey: 'settingsConfig', icon: 'user' },
+  { key: 'perfil', labelKey: 'settingsProfile', icon: 'chatText' },
   { key: 'capacidades', labelKey: 'settingsCapabilities', icon: 'puzzle' },
   { key: 'customize', labelKey: 'settingsCustomize', icon: 'palette' },
 ];
@@ -45,6 +46,12 @@ const DEFAULT_SETTINGS = {
 let settingsData = null;
 let settingsActiveCategory = 'config';
 let currentUser = { name: '', email: '' };
+
+// Perfil de estudio (plan 06) — profileData se refresca cada vez que se abre
+// la pestaña (puede haber cambiado desde el wizard); profileOptions es
+// estático por sesión (mismos catálogos que sirve onboarding.steps.ts).
+let profileData = null;
+let profileOptions = null;
 
 async function fetchCurrentUser() {
   try {
@@ -139,6 +146,7 @@ function renderSettingsSidebar() {
 function renderSettingsSection(key) {
   const content = document.getElementById('settingsContent');
   if (key === 'config') { content.innerHTML = configSectionHtml(); wireConfigSection(); }
+  else if (key === 'perfil') { renderPerfilSection(); }
   else if (key === 'capacidades') { content.innerHTML = capacidadesSectionHtml(); wireCapacidadesSection(); }
   else { content.innerHTML = customizeSectionHtml(); }
 }
@@ -251,6 +259,189 @@ function wireConfigSection() {
       if (perm !== 'granted') { e.target.checked = false; return; }
     }
     patchSettings({ notify_on_response: e.target.checked });
+  });
+}
+
+// ── Perfil de estudio (plan 06) — mismos campos que el wizard, editables en
+// cualquier momento. GET /api/profile trae el perfil actual + onboarding_state;
+// GET /api/profile/options trae los mismos catálogos que ve el wizard (fuente
+// única, onboarding.steps.ts) — nunca se duplica la lista de materias/niveles aquí. ──
+async function fetchProfileData() {
+  try {
+    const res = await fetch('/api/profile', { credentials: 'same-origin' });
+    if (res.ok) profileData = await res.json();
+  } catch {}
+}
+
+async function fetchProfileOptions() {
+  if (profileOptions) return;
+  try {
+    const res = await fetch('/api/profile/options', { credentials: 'same-origin' });
+    if (res.ok) profileOptions = await res.json();
+  } catch {}
+}
+
+async function renderPerfilSection() {
+  const content = document.getElementById('settingsContent');
+  content.innerHTML = `<h3 class="settings-section-title">${escapeHtml(t('settingsProfile'))}</h3><div class="settings-stub">${escapeHtml(t('loading'))}</div>`;
+  await Promise.all([fetchProfileData(), fetchProfileOptions()]);
+  if (settingsActiveCategory !== 'perfil') return; // cambió de pestaña mientras cargaba
+  content.innerHTML = perfilSectionHtml();
+  wirePerfilSection();
+}
+
+function radioChipGroup(name, options, currentValue) {
+  return `<div class="onboarding-chip-row" data-radio-group="${name}">` + options.map(opt => `
+    <button type="button" class="onboarding-chip settings-profile-chip${opt.value === currentValue ? ' selected' : ''}" data-value="${escapeHtml(opt.value)}">
+      <span class="onboarding-chip-label">${escapeHtml(opt.label)}</span>
+      ${opt.preview ? `<span class="onboarding-chip-preview">${escapeHtml(opt.preview)}</span>` : ''}
+    </button>
+  `).join('') + '</div>';
+}
+
+function subjectChipGroup(catalog, selected) {
+  const known = catalog.filter(o => o.value !== 'otra');
+  const knownValues = new Set(known.map(o => o.value));
+  const custom = (selected || []).filter(v => !knownValues.has(v)).map(v => ({ value: v, label: v }));
+  const all = [...known, ...custom];
+  return `<div class="onboarding-chip-row" data-multi-group="subjects">` + all.map(opt => `
+    <button type="button" class="onboarding-chip settings-profile-chip${(selected || []).includes(opt.value) ? ' selected' : ''}" data-value="${escapeHtml(opt.value)}">
+      <span class="onboarding-chip-label">${escapeHtml(opt.label)}</span>
+    </button>
+  `).join('') + '</div>';
+}
+
+function perfilSectionHtml() {
+  const profile = profileData?.profile;
+  const onboardingState = profileData?.onboardingState;
+  const opts = profileOptions || { levels: [], fieldSuggestions: [], subjects: [], goals: [], depths: [], registers: [] };
+
+  const levelOptionsHtml = opts.levels.map(o => `<option value="${escapeHtml(o.value)}"${profile?.level === o.value ? ' selected' : ''}>${escapeHtml(o.label)}</option>`).join('');
+  const goalOptionsHtml = opts.goals.map(o => `<option value="${escapeHtml(o.value)}"${profile?.goal === o.value ? ' selected' : ''}>${escapeHtml(o.label)}</option>`).join('');
+
+  return `
+    <h3 class="settings-section-title">${escapeHtml(t('settingsProfile'))}</h3>
+
+    ${onboardingState === 'skipped' ? `
+      <div class="settings-group">
+        <div class="settings-stub settings-guided-setup-stub">
+          <p>${escapeHtml(t('settingsProfileSkippedNote'))}</p>
+          <button class="settings-save-btn" id="settingsGuidedSetupBtn" type="button">${escapeHtml(t('settingsProfileGuidedSetup'))}</button>
+        </div>
+      </div>
+      <div class="settings-divider"></div>
+    ` : ''}
+
+    <div class="settings-group">
+      <div class="settings-group-label">${escapeHtml(t('settingsProfileBasics'))}</div>
+      <div class="settings-row">
+        <span class="settings-row-label">${escapeHtml(t('settingsProfileName'))}</span>
+        <input type="text" class="settings-text-input" id="profileNameInput" maxlength="60" value="${escapeHtml(profile?.displayName || '')}">
+      </div>
+      <div class="settings-row">
+        <span class="settings-row-label">${escapeHtml(t('settingsProfileLevel'))}</span>
+        <select class="settings-select" id="profileLevelSelect">
+          <option value=""${!profile?.level ? ' selected' : ''}>—</option>
+          ${levelOptionsHtml}
+        </select>
+      </div>
+      <div class="settings-row">
+        <span class="settings-row-label">${escapeHtml(t('settingsProfileField'))}</span>
+        <input type="text" class="settings-text-input" id="profileFieldInput" maxlength="60" list="profileFieldSuggestions" value="${escapeHtml(profile?.field || '')}">
+        <datalist id="profileFieldSuggestions">
+          ${opts.fieldSuggestions.map(o => `<option value="${escapeHtml(o.value)}">`).join('')}
+        </datalist>
+      </div>
+      <div class="settings-row">
+        <span class="settings-row-label">${escapeHtml(t('settingsProfileGoal'))}</span>
+        <select class="settings-select" id="profileGoalSelect">
+          <option value=""${!profile?.goal ? ' selected' : ''}>—</option>
+          ${goalOptionsHtml}
+        </select>
+      </div>
+    </div>
+
+    <div class="settings-divider"></div>
+
+    <div class="settings-group">
+      <div class="settings-group-label">${escapeHtml(t('settingsProfileSubjects'))}</div>
+      ${subjectChipGroup(opts.subjects, profile?.subjects)}
+    </div>
+
+    <div class="settings-divider"></div>
+
+    <div class="settings-group">
+      <div class="settings-group-label">${escapeHtml(t('settingsProfileDepth'))}</div>
+      ${radioChipGroup('depth', opts.depths, profile?.depth || 'auto')}
+    </div>
+
+    <div class="settings-group">
+      <div class="settings-group-label">${escapeHtml(t('settingsProfileRegister'))}</div>
+      ${radioChipGroup('register', opts.registers, profile?.register || 'tuteo')}
+    </div>
+
+    <div class="settings-divider"></div>
+
+    <button class="settings-save-btn" id="profileSaveBtn" type="button">${escapeHtml(t('save'))}</button>
+  `;
+}
+
+function wirePerfilSection() {
+  const content = document.getElementById('settingsContent');
+
+  content.querySelectorAll('[data-radio-group] .settings-profile-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      chip.closest('[data-radio-group]').querySelectorAll('.settings-profile-chip').forEach(c => c.classList.remove('selected'));
+      chip.classList.add('selected');
+    });
+  });
+
+  content.querySelectorAll('[data-multi-group] .settings-profile-chip').forEach(chip => {
+    chip.addEventListener('click', () => chip.classList.toggle('selected'));
+  });
+
+  const guidedBtn = document.getElementById('settingsGuidedSetupBtn');
+  if (guidedBtn) {
+    guidedBtn.addEventListener('click', async () => {
+      guidedBtn.disabled = true;
+      try {
+        await fetch('/api/profile/restart-wizard', { method: 'POST', credentials: 'same-origin' });
+        guidedBtn.textContent = t('settingsProfileGuidedSetupDone');
+      } catch {
+        guidedBtn.disabled = false;
+      }
+    });
+  }
+
+  document.getElementById('profileSaveBtn').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    const patch = {
+      displayName: document.getElementById('profileNameInput').value.trim(),
+      level: document.getElementById('profileLevelSelect').value || undefined,
+      field: document.getElementById('profileFieldInput').value.trim(),
+      subjects: Array.from(content.querySelectorAll('[data-multi-group="subjects"] .settings-profile-chip.selected')).map(c => c.dataset.value),
+      goal: document.getElementById('profileGoalSelect').value || undefined,
+      depth: content.querySelector('[data-radio-group="depth"] .selected')?.dataset.value,
+      register: content.querySelector('[data-radio-group="register"] .selected')?.dataset.value,
+    };
+    if (!patch.displayName) delete patch.displayName;
+    if (!patch.field) delete patch.field;
+
+    btn.disabled = true;
+    try {
+      const res = await fetch('/api/profile', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin',
+        body: JSON.stringify(patch),
+      });
+      if (res.ok) {
+        profileData = { profile: (await res.json()).profile, onboardingState: profileData?.onboardingState };
+        const original = btn.textContent;
+        btn.textContent = t('settingsProfileSaved');
+        setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 1500);
+        return;
+      }
+    } catch {}
+    btn.disabled = false;
   });
 }
 
