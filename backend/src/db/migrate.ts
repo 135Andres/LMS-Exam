@@ -284,6 +284,23 @@ BEGIN
     updated_at = datetime('now')
   WHERE user_id = new.user_id;
 END;
+
+-- ── Perfil de usuario (customization/onboarding) ──
+-- Fila creada lazy la primera vez que se guarda algo; ausencia de fila = perfil vacío.
+CREATE TABLE IF NOT EXISTS user_profile (
+  user_id       TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  display_name  TEXT,
+  level         TEXT,
+  field         TEXT,
+  subjects      TEXT NOT NULL DEFAULT '[]',
+  goal          TEXT,
+  depth         TEXT NOT NULL DEFAULT 'auto',
+  register      TEXT NOT NULL DEFAULT 'tuteo',
+  study_methods TEXT NOT NULL DEFAULT '[]',
+  profile_line  TEXT,
+  version       INTEGER NOT NULL DEFAULT 1,
+  updated_at    INTEGER NOT NULL
+);
 `;
 
 function migrateUsersTable(db: Database.Database): void {
@@ -327,12 +344,30 @@ function migrateUsersTable(db: Database.Database): void {
 
 // PRAGMA-based check before ALTER TABLE — idempotente y sin try/catch silenciado.
 // Reutiliza el mismo patrón de migrateUsersTable() para verificar columnas nuevas.
-function addColumnIfMissing(db: Database.Database, table: string, column: string, definition: string): void {
+function columnExists(db: Database.Database, table: string, column: string): boolean {
   const tableInfo = db.prepare(`PRAGMA table_info('${table}')`).all() as Array<{ name: string }>;
-  const exists = tableInfo.some(c => c.name === column);
-  if (exists) return;
+  return tableInfo.some(c => c.name === column);
+}
+
+function addColumnIfMissing(db: Database.Database, table: string, column: string, definition: string): void {
+  if (columnExists(db, table, column)) return;
   db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
   logger.info(`Columna añadida: ${table}.${column}`);
+}
+
+// Backfill: cuentas con historial previo (ya usan la app) nacen 'skipped' para
+// que el wizard de onboarding no las interrumpa. Solo cuentas nuevas nacen 'pending'.
+// Se corre una única vez, en el mismo ALTER que crea la columna.
+function backfillOnboardingState(db: Database.Database): void {
+  const existed = columnExists(db, 'users', 'onboarding_state');
+  addColumnIfMissing(db, 'users', 'onboarding_state', "TEXT NOT NULL DEFAULT 'pending'");
+  if (existed) return;
+
+  db.prepare(`
+    UPDATE users SET onboarding_state = 'skipped'
+    WHERE id IN (SELECT DISTINCT user_id FROM chat_sessions)
+  `).run();
+  logger.info('Backfill onboarding_state: usuarios con historial marcados como skipped');
 }
 
 function deduplicateChatEmbeddings(db: Database.Database): void {
@@ -442,6 +477,9 @@ function migrate(): void {
   // Switch maestro sobre chat.cross-reference.service.ts — si es 0, ni se
   // corre el filtro de palabras clave para leer otros chats.
   addColumnIfMissing(db, 'users', 'cross_chat_enabled', 'INTEGER DEFAULT 1');
+
+  // Customization/onboarding — estado del wizard de perfil (plan 01)
+  backfillOnboardingState(db);
 
   logger.info('Migración completada: tablas creadas/verificadas');
   closeDb();
