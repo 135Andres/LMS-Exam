@@ -1228,18 +1228,31 @@ function stripQuizMarker(text) {
   return { text, marker: null };
 }
 
-function appendQuizButtons(actions, msgRow) {
+// Plan 07 — orden/énfasis según el goal del perfil (viaja en el evento SSE
+// 'done' como quizGoal, ver chat.streaming.service.ts): examenes → Responder
+// primero y destacado; entender → Explicar primero y destacado. Otros goals
+// o sin perfil → orden actual, sin cambios. Ambos botones SIEMPRE disponibles,
+// esto es solo orden/énfasis visual, nunca oculta ninguno.
+function appendQuizButtons(actions, msgRow, quizGoal) {
   const responderBtn = document.createElement('button');
   responderBtn.className = 'msg-action msg-action-quiz msg-action-quiz-responder';
   responderBtn.textContent = t('respondBtn');
   responderBtn.addEventListener('click', () => handleQuizResolve(msgRow));
-  actions.appendChild(responderBtn);
 
   const explicarBtn = document.createElement('button');
   explicarBtn.className = 'msg-action msg-action-quiz msg-action-quiz-explicar';
   explicarBtn.textContent = t('explainBtn');
   explicarBtn.addEventListener('click', () => handleQuizExplain());
-  actions.appendChild(explicarBtn);
+
+  if (quizGoal === 'entender') {
+    explicarBtn.classList.add('msg-action-quiz-preferred');
+    actions.appendChild(explicarBtn);
+    actions.appendChild(responderBtn);
+  } else {
+    if (quizGoal === 'examenes') responderBtn.classList.add('msg-action-quiz-preferred');
+    actions.appendChild(responderBtn);
+    actions.appendChild(explicarBtn);
+  }
 }
 
 // Modo "Explicar": mientras está activo, cada mensaje de IA subsecuente
@@ -1918,6 +1931,7 @@ async function runRegenerate(targetRow, instruction) {
 
   let fullTextRef = '';
   let fullReasoningRef = '';
+  let quizGoalRef;
   let aiBubble = null;
   let textDiv = null;
   let thinkingRow = null;
@@ -2024,6 +2038,7 @@ async function runRegenerate(targetRow, instruction) {
           if (json.done) {
             if (aiBubble && json.msgId) aiBubble.dataset.msgId = json.msgId;
             setLastUserMsgId(json.userMsgId);
+            quizGoalRef = json.quizGoal;
             notifyIfEnabled();
             continue;
           }
@@ -2076,7 +2091,7 @@ async function runRegenerate(targetRow, instruction) {
       const { text: cleanText, marker: quizMarker } = stripQuizMarker(fullTextRef);
       const actions = aiBubble ? aiBubble.querySelector('.msg-actions') : null;
       if (actions) {
-        if (quizMarker === 'QUIZ_DETECTED') appendQuizButtons(actions, aiBubble);
+        if (quizMarker === 'QUIZ_DETECTED') appendQuizButtons(actions, aiBubble, quizGoalRef);
         appendNextStepButton(actions, quizMarker);
       }
       if (quizMarker === 'QUIZ_EXPLAIN_DONE') {
@@ -2178,6 +2193,7 @@ export async function handleSend() {
   const chatMessages = document.getElementById('chatMessages');
   let fullTextRef = '';
   let fullReasoningRef = '';
+  let quizGoalRef;
 
   function createAIBubble() {
     const msgRow = document.createElement('div');
@@ -2307,6 +2323,7 @@ export async function handleSend() {
             if (aiBubble && json.msgId) aiBubble.dataset.msgId = json.msgId;
             if (aiBubble && json.userMsgId) aiBubble.dataset.userMsgId = json.userMsgId;
             setLastUserMsgId(json.userMsgId);
+            quizGoalRef = json.quizGoal;
             continue;
           }
           if (json.reasoning) {
@@ -2361,7 +2378,7 @@ export async function handleSend() {
       const { text: cleanText, marker: quizMarker } = stripQuizMarker(fullTextRef);
       const actions = aiBubble ? aiBubble.querySelector('.msg-actions') : null;
       if (actions) {
-        if (quizMarker === 'QUIZ_DETECTED') appendQuizButtons(actions, aiBubble);
+        if (quizMarker === 'QUIZ_DETECTED') appendQuizButtons(actions, aiBubble, quizGoalRef);
         appendNextStepButton(actions, quizMarker);
       }
       if (quizMarker === 'QUIZ_EXPLAIN_DONE') {

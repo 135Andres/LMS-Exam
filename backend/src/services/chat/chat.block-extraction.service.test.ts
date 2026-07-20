@@ -36,6 +36,11 @@ vi.mock('../../models/knowledge.model.js', () => ({
   hashKnowledgeContent: (content: string) => `hash:${content}`,
 }));
 
+const { getProfileMock } = vi.hoisted(() => ({ getProfileMock: vi.fn() }));
+vi.mock('../user-profile.service.js', () => ({
+  UserProfileService: { getProfile: (...args: unknown[]) => getProfileMock(...args) },
+}));
+
 import { extractBlocks } from './chat.block-extraction.service.js';
 
 function aiResponse(content: string) {
@@ -56,10 +61,12 @@ describe('extractBlocks', () => {
     getBlocksMock.mockReset();
     existsByHashMock.mockReset();
     createMock.mockReset();
+    getProfileMock.mockReset();
 
     getIndexMock.mockReturnValue({ narrativeCompactions: [], blocks: [] });
     getBlocksMock.mockReturnValue([]);
     existsByHashMock.mockReturnValue(false);
+    getProfileMock.mockReturnValue(null);
     addBlockMock.mockImplementation((sessionId: string, block: any) => ({ id: 'block_1', ...block }));
     generateFromAIMock.mockResolvedValue(titlesBatchResponse([]));
   });
@@ -224,6 +231,38 @@ describe('extractBlocks', () => {
     const blocks = await extractBlocks('session1', messages, segments, MODEL);
 
     expect(blocks).toHaveLength(1);
+    const call = addBlockMock.mock.calls[0][1];
+    expect(call.subject).toBe('fisica');
+  });
+
+  // Plan 07 — boost de profile.subjects, misma fuente unificada que el clasificador de chat.
+  it('boost del perfil desempata la materia heurística cuando hay userId', async () => {
+    const messages = [
+      { id: 'm1', role: 'assistant', content: 'necesito entender la velocidad y el elemento' },
+    ];
+    const segments = [
+      { messageId: 'm1', class: 'verificable' as const, confidence: 'high' as const, method: 'heuristic' as const },
+    ];
+    getProfileMock.mockReturnValue({ subjects: ['quimica'] });
+
+    await extractBlocks('session1', messages, segments, MODEL, 'user-1');
+
+    expect(getProfileMock).toHaveBeenCalledWith('user-1');
+    const call = addBlockMock.mock.calls[0][1];
+    expect(call.subject).toBe('quimica');
+  });
+
+  it('sin userId, no consulta el perfil y usa la materia heurística sin boost', async () => {
+    const messages = [
+      { id: 'm1', role: 'assistant', content: 'necesito entender la velocidad y el elemento' },
+    ];
+    const segments = [
+      { messageId: 'm1', class: 'verificable' as const, confidence: 'high' as const, method: 'heuristic' as const },
+    ];
+
+    await extractBlocks('session1', messages, segments, MODEL);
+
+    expect(getProfileMock).not.toHaveBeenCalled();
     const call = addBlockMock.mock.calls[0][1];
     expect(call.subject).toBe('fisica');
   });

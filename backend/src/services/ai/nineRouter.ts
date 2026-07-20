@@ -16,6 +16,10 @@ export type StreamChunk = {
   content: string;
   msgId?: string;
   userMsgId?: string;
+  // Plan 07 — solo presente cuando la respuesta trae [[QUIZ_DETECTED]]: el
+  // goal del perfil del estudiante, para que el frontend preseleccione
+  // Responder/Explicar sin pedir el perfil aparte.
+  quizGoal?: string;
 };
 
 const EMBEDDINGS_BASE_URL = 'https://integrate.api.nvidia.com/v1';

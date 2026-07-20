@@ -149,7 +149,7 @@ export async function sendChatMessageStreamHandler(req: Request, res: Response):
       if (chunk.type === 'reasoning') {
         write(`data: ${JSON.stringify({ reasoning: chunk.content })}\n\n`);
       } else if (chunk.type === 'done') {
-        write(`data: ${JSON.stringify({ done: true, msgId: chunk.msgId, userMsgId: chunk.userMsgId })}\n\n`);
+        write(`data: ${JSON.stringify({ done: true, msgId: chunk.msgId, userMsgId: chunk.userMsgId, quizGoal: chunk.quizGoal })}\n\n`);
       } else {
         write(`data: ${JSON.stringify({ content: chunk.content })}\n\n`);
       }
@@ -191,7 +191,7 @@ export async function regenerateMessageStreamHandler(req: Request, res: Response
       if (chunk.type === 'reasoning') {
         write(`data: ${JSON.stringify({ reasoning: chunk.content })}\n\n`);
       } else if (chunk.type === 'done') {
-        write(`data: ${JSON.stringify({ done: true, msgId: chunk.msgId, userMsgId: chunk.userMsgId })}\n\n`);
+        write(`data: ${JSON.stringify({ done: true, msgId: chunk.msgId, userMsgId: chunk.userMsgId, quizGoal: chunk.quizGoal })}\n\n`);
       } else {
         write(`data: ${JSON.stringify({ content: chunk.content })}\n\n`);
       }

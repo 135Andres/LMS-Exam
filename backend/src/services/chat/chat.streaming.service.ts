@@ -4,6 +4,7 @@ import { logger } from '../../utils/logger.js';
 import { ChatModel } from '../../models/chat.model.js';
 import { UserModel } from '../../models/user.model.js';
 import { EmbeddingModel } from '../../models/embedding.model.js';
+import { UserProfileService } from '../user-profile.service.js';
 import { detectAndSuggestKnowledge } from '../knowledge-detection.service.js';
 import { compactSession } from './chat.compaction.service.js';
 import { mightReferenceOtherChat, buildCrossChatContext } from './chat.cross-reference.service.js';
@@ -104,7 +105,7 @@ export class ChatStreamingService {
 
     // Si el usuario forzó un modelo desde el selector, se respeta esa elección
     // manual y no se orquesta.
-    const decision = modelId ? undefined : this.orchestrator.decide(message, ragContext.length, attachments);
+    const decision = modelId ? undefined : this.orchestrator.decide(message, ragContext.length, attachments, UserProfileService.getProfile(userId)?.subjects);
     const resolved = this.modelRouter.resolve(decision?.model ?? modelId);
     this.modelRouter.validateMultimodal(resolved, attachments);
 
@@ -164,7 +165,13 @@ export class ChatStreamingService {
     } finally {
       if (fullResponse) {
         const msgId = this.persistence.saveAssistantMessageWithOutbox(userId, sessionId, fullResponse, model);
-        yield { type: 'done', content: '', msgId, userMsgId };
+        // Plan 07 — el goal del perfil viaja en el evento 'done' solo cuando
+        // hay cuestionario detectado, para que el frontend preseleccione
+        // Responder/Explicar sin una llamada aparte.
+        const quizGoal = fullResponse.includes('[[QUIZ_DETECTED]]')
+          ? UserProfileService.getProfile(userId)?.goal
+          : undefined;
+        yield { type: 'done', content: '', msgId, userMsgId, quizGoal };
         const recentMessages = ChatModel.getSessionMessages(sessionId, 10);
         detectAndSuggestKnowledge(userId, sessionId, recentMessages, hadCollectiveMatch).catch(
           err => logger.warn('Knowledge detection async failed', { error: (err as Error).message })
@@ -196,7 +203,7 @@ export class ChatStreamingService {
       ? await this.ragService.buildContext(userId, prev.id, queryVector, prev.content)
       : { context: '', hadCollectiveMatch: false };
 
-    const decision = modelId ? undefined : this.orchestrator.decide(prev.content, ragContext.length);
+    const decision = modelId ? undefined : this.orchestrator.decide(prev.content, ragContext.length, undefined, UserProfileService.getProfile(userId)?.subjects);
     const resolved = this.modelRouter.resolve(decision?.model ?? modelId);
     ChatModel.deleteMessage(last.id, userId);
 

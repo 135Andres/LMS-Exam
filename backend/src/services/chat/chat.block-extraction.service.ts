@@ -4,6 +4,7 @@ import { generateFromAI } from '../ai/index.js';
 import { SUBJECT_KEYWORDS, detectSubjectByKeywords } from '../../utils/subject-keywords.js';
 import { SessionSummaryService, type KnowledgeBlock } from '../session-summary.service.js';
 import { KnowledgeModel, hashKnowledgeContent } from '../../models/knowledge.model.js';
+import { UserProfileService } from '../user-profile.service.js';
 import { logger } from '../../utils/logger.js';
 import type { SegmentationResult } from './chat.segmentation.service.js';
 
@@ -153,7 +154,10 @@ export async function extractBlocks(
 
   if (pending.length === 0) return [];
 
-  const heuristics = new Map(pending.map(({ msg }) => [msg.id, detectSubjectByKeywords(msg.content)]));
+  // Mismo boost del clasificador de chat (plan 07) — fuente unificada
+  // (detectSubjectByKeywords), así routing y block-extraction razonan igual.
+  const boostSubjects = userId ? UserProfileService.getProfile(userId)?.subjects : undefined;
+  const heuristics = new Map(pending.map(({ msg }) => [msg.id, detectSubjectByKeywords(msg.content, boostSubjects)]));
 
   const results = await generateTitlesAndSubjectsBatch(
     pending.map(({ msg }) => ({

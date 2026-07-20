@@ -43,8 +43,8 @@ export function hasCode(message: string): boolean {
   return CODE_PATTERNS.some(re => re.test(message));
 }
 
-export function detectSubjectExtended(query: string): string | undefined {
-  return detectSubjectByKeywords(query).subject;
+export function detectSubjectExtended(query: string, boostSubjects?: string[]): string | undefined {
+  return detectSubjectByKeywords(query, boostSubjects).subject;
 }
 
 function estimateComplexity(message: string): Complexity {
@@ -58,9 +58,10 @@ function estimateComplexity(message: string): Complexity {
 }
 
 // Síncrona, sin llamadas de red — se ejecuta antes de armar el prompt.
-export function classifyMessage(message: string, ragContextLength: number): ClassificationResult {
+// boostSubjects: profile.subjects del usuario (plan 07) — ver detectSubjectByKeywords.
+export function classifyMessage(message: string, ragContextLength: number, boostSubjects?: string[]): ClassificationResult {
   const code = hasCode(message);
-  const subject = detectSubjectExtended(message);
+  const subject = detectSubjectExtended(message, boostSubjects);
   const complexity = estimateComplexity(message);
 
   let delegateTo: DelegateTarget = null;

@@ -1,6 +1,7 @@
 import { generateFromAI } from '../ai/index.js';
 import { logger } from '../../utils/logger.js';
 import { ChatModel } from '../../models/chat.model.js';
+import { UserProfileService } from '../user-profile.service.js';
 import { detectAndSuggestKnowledge } from '../knowledge-detection.service.js';
 import { compactSession } from './chat.compaction.service.js';
 import type { ChatPersistenceService } from './chat.persistence.service.js';
@@ -69,7 +70,7 @@ export class ChatCompletionService {
 
     // Si el usuario forzó un modelo desde el selector, se respeta esa elección
     // manual y no se orquesta.
-    const decision = modelId ? undefined : this.orchestrator.decide(message, ragContext.length, attachments);
+    const decision = modelId ? undefined : this.orchestrator.decide(message, ragContext.length, attachments, UserProfileService.getProfile(userId)?.subjects);
     const resolved = this.modelRouter.resolve(decision?.model ?? modelId);
     this.modelRouter.validateMultimodal(resolved, attachments);
 

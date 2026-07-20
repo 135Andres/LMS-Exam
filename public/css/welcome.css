@@ -1899,6 +1899,18 @@ body.exam-mode #showArchivedBtn {
   opacity: 1;
 }
 
+/* Preselección según goal del perfil (plan 07) — solo énfasis visual y
+   orden, el otro botón sigue siempre disponible al lado. */
+.msg-action-quiz-preferred {
+  color: #8b9aff;
+  font-weight: 700;
+}
+
+.msg-action-quiz-preferred:hover {
+  color: #7788ee;
+  background: rgba(139, 154, 255, 0.12);
+}
+
 .msg-action {
   background: none;
   border: none;

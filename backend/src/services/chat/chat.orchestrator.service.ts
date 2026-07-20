@@ -30,7 +30,10 @@ const MULTIMODAL_CLASSIFICATION: ClassificationResult = {
 };
 
 export class ChatOrchestratorService {
-  decide(message: string, ragContextLength: number, attachments?: Attachment[]): OrchestrationDecision {
+  // boostSubjects: profile.subjects del usuario (plan 07) — desempata el
+  // clasificador heurístico de materias, nunca lo secuestra (ver
+  // detectSubjectByKeywords en subject-keywords.ts).
+  decide(message: string, ragContextLength: number, attachments?: Attachment[], boostSubjects?: string[]): OrchestrationDecision {
     // Inkling es el único modelo con visión + audio nativo de la lista — un
     // adjunto de imagen/audio nunca se delega, se manda directo.
     if (attachments?.some(a => a.type === 'image' || a.type === 'audio')) {
@@ -39,7 +42,7 @@ export class ChatOrchestratorService {
       return decision;
     }
 
-    const classification = classifyMessage(message, ragContextLength);
+    const classification = classifyMessage(message, ragContextLength, boostSubjects);
 
     const decision: OrchestrationDecision = classification.delegateTo
       ? { model: DELEGATE_MODEL_MAP[classification.delegateTo], classification }

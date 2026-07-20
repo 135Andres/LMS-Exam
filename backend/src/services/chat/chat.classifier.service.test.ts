@@ -35,4 +35,16 @@ describe('classifyMessage', () => {
   it('no encuentra materia si el texto no matchea ninguna palabra clave', () => {
     expect(detectSubjectExtended('hola, ¿cómo estás?')).toBeUndefined();
   });
+
+  // Plan 07 — boost de profile.subjects pasado a través de classifyMessage/detectSubjectExtended.
+  it('boostSubjects rompe un empate ambiguo a favor de la materia declarada', () => {
+    const text = 'necesito entender la velocidad y el elemento';
+    expect(detectSubjectExtended(text)).toBe('fisica');
+    expect(detectSubjectExtended(text, ['quimica'])).toBe('quimica');
+  });
+
+  it('boostSubjects no cambia el resultado cuando la señal ya es clara', () => {
+    const result = classifyMessage('necesito ayuda con la derivada de esta ecuacion', 0, ['fisica']);
+    expect(result.subject).toBe('matematicas');
+  });
 });

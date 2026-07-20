@@ -33,6 +33,13 @@ describe('ChatOrchestratorService', () => {
     const decision = orchestrator.decide('Redacta un ensayo argumentando sobre el existencialismo', 5000);
     expect(decision.model).toBe('ag/gemini-3.1-pro-low');
   });
+
+  // Plan 07 — boostSubjects llega hasta la clasificación final.
+  it('boostSubjects se propaga hasta classification.subject', () => {
+    const text = 'necesito entender la velocidad y el elemento';
+    expect(orchestrator.decide(text, 0).classification.subject).toBe('fisica');
+    expect(orchestrator.decide(text, 0, undefined, ['quimica']).classification.subject).toBe('quimica');
+  });
 });
 
 describe('buildEffortInstruction', () => {

@@ -35,7 +35,7 @@ export async function sendChatMessageStream(
   attachments: Attachment[] | undefined,
   userId: string,
   sessionId: string,
-): Promise<AsyncGenerator<{ type: string; content: string; msgId?: string; userMsgId?: string }>> {
+): Promise<AsyncGenerator<{ type: string; content: string; msgId?: string; userMsgId?: string; quizGoal?: string }>> {
   return streamingService.execute(message, modelId, attachments, userId, sessionId);
 }
 
@@ -44,7 +44,7 @@ export async function regenerateChatMessageStream(
   modelId: string | undefined,
   userId: string,
   instruction: string | undefined,
-): Promise<AsyncGenerator<{ type: string; content: string; msgId?: string; userMsgId?: string }>> {
+): Promise<AsyncGenerator<{ type: string; content: string; msgId?: string; userMsgId?: string; quizGoal?: string }>> {
   return streamingService.regenerate(sessionId, modelId, userId, instruction);
 }
 

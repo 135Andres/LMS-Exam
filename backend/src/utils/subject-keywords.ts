@@ -145,6 +145,15 @@ export interface SubjectDetectionResult {
   confidence: 'high' | 'low';
 }
 
+// Boost del perfil de usuario (plan 07) — desempata/refuerza, nunca crea
+// señal de la nada: solo se aplica a materias que YA matchearon al menos una
+// keyword (score > 0). Un multiplicador chico (no una suma fija) para que el
+// efecto sea proporcional al score existente y nunca alcance para tapar una
+// diferencia grande como la de "Movimiento Romántico" (frase específica,
+// weight 2) vs física (keyword suelta genérica, weight 0.5) — ver test de
+// regresión "el boost no secuestra" en subject-keywords.test.ts.
+export const PROFILE_SUBJECT_BOOST_MULTIPLIER = 1.2;
+
 // Detección compartida de materia por keywords — usada por
 // chat.classifier.service.ts, chat.block-extraction.service.ts y
 // knowledge-detection.service.ts. El texto de entrada debe venir ya en
@@ -154,8 +163,14 @@ export interface SubjectDetectionResult {
 // orden de diccionario), acá se suman los pesos de todas las keywords que
 // matchean por materia y gana el score más alto — el orden de declaración
 // solo desempata scores iguales.
-export function detectSubjectByKeywords(text: string): SubjectDetectionResult {
+//
+// boostSubjects (plan 07): materias declaradas en profile.subjects — reciben
+// PROFILE_SUBJECT_BOOST_MULTIPLIER sobre su score ya calculado. Opcional y
+// sin efecto si se omite, para no alterar comportamiento en los call sites
+// que todavía no tienen perfil a mano (ej. knowledge-detection.service.ts).
+export function detectSubjectByKeywords(text: string, boostSubjects?: string[]): SubjectDetectionResult {
   const normalized = stripAccents(text.toLowerCase());
+  const boostSet = boostSubjects && boostSubjects.length > 0 ? new Set(boostSubjects) : null;
 
   const scores: Array<{ subject: string; score: number }> = [];
   for (const [subject, entries] of Object.entries(SUBJECT_KEYWORD_ENTRIES)) {
@@ -163,7 +178,10 @@ export function detectSubjectByKeywords(text: string): SubjectDetectionResult {
     for (const entry of entries) {
       if (matchesKeyword(normalized, entry.keyword)) score += keywordWeight(entry);
     }
-    if (score > 0) scores.push({ subject, score });
+    if (score > 0) {
+      if (boostSet?.has(subject)) score *= PROFILE_SUBJECT_BOOST_MULTIPLIER;
+      scores.push({ subject, score });
+    }
   }
 
   if (scores.length === 0) return { subject: undefined, confidence: 'low' };
