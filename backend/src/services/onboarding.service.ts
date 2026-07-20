@@ -96,7 +96,13 @@ function resolveStepValues(payload: OnboardingStepPayload, values: Record<string
 }
 
 async function generateWelcome(profile: ReturnType<typeof UserProfileService.getProfile>, pendingMessage: string | null): Promise<string> {
-  const systemPrompt = composeSystemPrompt(SYSTEM_PROMPT_TUTOR, profile, 'full') + WELCOME_APPENDIX;
+  // SYSTEM_PROMPT_TUTOR trae un placeholder {MODEL_NAME} que buildSystemPrompt()
+  // resuelve en el flujo normal de chat (chat.prompt.service.ts) — acá no hay
+  // "modelLabel" de por medio, así que se resuelve igual a mano para no dejar
+  // el literal "{MODEL_NAME}" sin reemplazar en el prompt real.
+  const modelLabel = config.models.chat.split('/').pop() || config.models.chat;
+  const basePrompt = SYSTEM_PROMPT_TUTOR.replace(/\{MODEL_NAME\}/g, modelLabel);
+  const systemPrompt = composeSystemPrompt(basePrompt, profile, 'full') + WELCOME_APPENDIX;
   const userPrompt = pendingMessage || '(El estudiante no tenía un mensaje pendiente — solo dale la bienvenida.)';
   const result = await generateFromAI('nineRouter', systemPrompt, userPrompt, null, { model: config.models.chat });
   return result.content;
@@ -119,8 +125,16 @@ export const OnboardingService = {
     }
 
     // Wizard ya en curso (reconexión o el usuario escribió en el chat en vez
-    // de responder vía UI) — se retoma en el paso guardado, sin tocar el
-    // pending_message ya persistido.
+    // de responder vía UI) — se retoma en el paso guardado. Si esto es una
+    // reconexión real (el frontend siempre abre una sesión nueva al cargar,
+    // ver chat.js initHeroView), sessionId ya no es el mismo donde se guardó
+    // pending_message. Sin realinear, el mensaje pendiente y la bienvenida
+    // final se persistirían en la sesión vieja (invisible) mientras el
+    // usuario ve el wizard en la nueva — re-apuntamos pending_session_id a
+    // donde el wizard es visible AHORA, así el cierre queda consistente.
+    if (user.onboarding_pending_session_id !== sessionId) {
+      UserModel.updateOnboarding(userId, { pendingSessionId: sessionId });
+    }
     return getStepPayload(user.onboarding_current_step, { suggestedDisplayName: user.username ?? undefined });
   },
 
@@ -154,7 +168,18 @@ export const OnboardingService = {
       const pendingMessage = user.onboarding_pending_message;
       const pendingSessionId = user.onboarding_pending_session_id;
 
-      const welcome = await generateWelcome(profile, pendingMessage);
+      // El perfil ya quedó guardado arriba (lo importante) — si la única
+      // llamada a IA de todo el wizard falla acá, no se debe perder el
+      // mensaje pendiente ni dejar al usuario con un 500 sin respuesta.
+      let welcome: string;
+      try {
+        welcome = await generateWelcome(profile, pendingMessage);
+      } catch (err) {
+        logger.warn('Falló la IA en el cierre del onboarding, cae a bienvenida genérica', { userId, error: (err as Error).message });
+        welcome = profile?.displayName
+          ? `¡Listo, ${profile.displayName}! Tu perfil quedó configurado. ¿En qué te ayudo?`
+          : '¡Listo! Tu perfil quedó configurado. ¿En qué te ayudo?';
+      }
 
       if (pendingSessionId) {
         if (pendingMessage) {

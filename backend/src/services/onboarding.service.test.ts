@@ -100,6 +100,35 @@ describe('OnboardingService', () => {
     expect(row.onboarding_pending_message).toBe('hola'); // no se pisó con "sigo aquí"
   });
 
+  it('reconexión con sessionId distinto (reload real) realinea pending_session_id a la sesión visible', async () => {
+    const SESSION_B = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+    OnboardingService.intercept(USER_A, 'hola', SESSION_A);
+    await OnboardingService.answer(USER_A, 1, { display_name: 'Andrés' });
+
+    // El frontend siempre abre una sesión nueva al recargar — simula eso.
+    const result = OnboardingService.intercept(USER_A, 'sigo aquí', SESSION_B) as any;
+    expect(result.type).toBe('onboarding_step');
+    expect(result.step).toBe(2);
+    expect(userRow().onboarding_pending_session_id).toBe(SESSION_B);
+
+    // Al completar, la bienvenida se guarda en la sesión donde el usuario
+    // realmente está viendo el wizard (B), no en la vieja e invisible (A).
+    await OnboardingService.answer(USER_A, 2, { level: 'uni', field: 'Ingeniería' });
+    await OnboardingService.answer(USER_A, 3, { subjects: ['matematicas'] });
+    await OnboardingService.answer(USER_A, 4, { goal: 'examenes' });
+    const final = await OnboardingService.answer(USER_A, 5, { depth: 'detallado', register: 'formal' }) as any;
+    expect(final.sessionId).toBe(SESSION_B);
+
+    const messagesInB = getTestDb().prepare(
+      "SELECT role FROM chat_logs WHERE session_id = ? ORDER BY created_at ASC"
+    ).all(SESSION_B);
+    expect(messagesInB).toHaveLength(2);
+    const messagesInA = getTestDb().prepare(
+      "SELECT role FROM chat_logs WHERE session_id = ?"
+    ).all(SESSION_A);
+    expect(messagesInA).toHaveLength(0);
+  });
+
   it('máquina de pasos completa: pending → 5 respuestas → completed, perfil correcto en BD', async () => {
     OnboardingService.intercept(USER_A, 'hola', SESSION_A);
 
@@ -144,6 +173,35 @@ describe('OnboardingService', () => {
     expect(messages[0]).toEqual({ role: 'user', content: 'hola' });
     expect(messages[1].role).toBe('assistant');
     expect(messages[1].content).toContain('Bienvenido');
+  });
+
+  it('si la IA falla en el cierre, no revienta: perfil queda guardado y cae a una bienvenida genérica', async () => {
+    (generateFromAI as any).mockRejectedValueOnce(new Error('AI down'));
+
+    OnboardingService.intercept(USER_A, 'hola', SESSION_A);
+    await OnboardingService.answer(USER_A, 1, { display_name: 'Andrés' });
+    await OnboardingService.answer(USER_A, 2, { level: 'uni', field: 'Ingeniería' });
+    await OnboardingService.answer(USER_A, 3, { subjects: ['matematicas'] });
+    await OnboardingService.answer(USER_A, 4, { goal: 'examenes' });
+    const final = await OnboardingService.answer(USER_A, 5, { depth: 'detallado', register: 'formal' }) as any;
+
+    expect(final.type).toBe('onboarding_complete');
+    expect(final.response).toContain('Andrés');
+    expect(final.sessionId).toBe(SESSION_A);
+
+    const row = userRow();
+    expect(row.onboarding_state).toBe('completed');
+    expect(row.onboarding_pending_message).toBeNull();
+    expect(row.onboarding_pending_session_id).toBeNull();
+
+    const profile = UserProfileService.getProfile(USER_A);
+    expect(profile!.depth).toBe('detallado'); // el perfil se guarda igual, pase lo que pase con la IA
+
+    const messages = getTestDb().prepare(
+      "SELECT role, content FROM chat_logs WHERE session_id = ? ORDER BY created_at ASC"
+    ).all(SESSION_A) as Array<{ role: string; content: string }>;
+    expect(messages).toHaveLength(2);
+    expect(messages[1].content).toContain('Andrés');
   });
 
   it('skip en el paso 3 → skipped + responde el mensaje pendiente por el canal normal', async () => {

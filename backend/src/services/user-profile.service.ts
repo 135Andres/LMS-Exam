@@ -50,7 +50,10 @@ export function sanitizeFreeText(input: string): string {
     .replace(/[[\]|`]/g, '')
     .trim()
     .replace(/\s+/g, ' ');
-  return collapsed.slice(0, 60).trim();
+  // Array.from en vez de .slice(): recorta por code point, no por code unit
+  // UTF-16 — un emoji u otro carácter fuera del BMP justo en el límite no
+  // termina partido en un surrogate huérfano.
+  return Array.from(collapsed).slice(0, 60).join('').trim();
 }
 
 export function compileProfileLine(profile: UserProfile): string {

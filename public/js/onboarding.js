@@ -303,9 +303,19 @@ async function onAnswer(row, bubble, payload, values) {
       finishWizard(result.response);
     }
   } catch {
-    // Reintenta emitiendo el mismo paso — no se pierde el progreso ya
-    // guardado en el backend (el estado ahí es la fuente de verdad).
-    renderOnboardingStep({ ...payload, note: t('onboardingRetryNote') });
+    // La request pudo fallar en el trayecto de vuelta después de que el
+    // backend ya guardó la respuesta y avanzó de paso — re-emitir el mismo
+    // `payload` a ciegas mostraría un paso viejo. El backend es la fuente
+    // de verdad: se le pregunta el estado real en vez de asumir que falló
+    // del todo.
+    const state = await apiGet('/api/chat/tutor/onboarding/state');
+    if (state?.state === 'pending' && state.step) {
+      renderOnboardingStep({ ...state.step, note: t('onboardingRetryNote') });
+    } else if (state?.state === 'completed' || state?.state === 'skipped') {
+      finishWizard(null);
+    } else {
+      renderOnboardingStep({ ...payload, note: t('onboardingRetryNote') });
+    }
   }
 }
 

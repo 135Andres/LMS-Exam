@@ -44,7 +44,11 @@ export const quizExplainSchema = z.object({
   sessionId: uuidV4,
 });
 
+// Mismos límites que updateProfileSchema (profile.ts) — resolveStepValues()
+// termina guardando esto en el mismo perfil, así que las cotas deben ser
+// consistentes entre wizard y Settings.
+const onboardingValueString = z.string().max(200);
 export const onboardingAnswerSchema = z.object({
   step: z.number().int().min(1).max(5),
-  values: z.record(z.union([z.string(), z.array(z.string())])),
+  values: z.record(z.union([onboardingValueString, z.array(onboardingValueString).max(30)])),
 });
