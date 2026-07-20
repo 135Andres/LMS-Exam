@@ -14,6 +14,7 @@ import { dirname, join } from 'path';
 import { resolveQuiz } from '../services/chat/chat.quiz.service.js';
 import { ChatQuizModeService } from '../services/chat/chat.quiz-mode.service.js';
 import { ChatPersistenceService } from '../services/chat/chat.persistence.service.js';
+import { OnboardingService } from '../services/onboarding.service.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const reportsDir = join(__dirname, '..', 'data');
@@ -78,6 +79,15 @@ export async function sendChatMessageHandler(req: Request, res: Response): Promi
     sessionId: sid,
   });
 
+  // Plan 04 — antes de llamar a la IA: si el wizard de personalización está
+  // pendiente para este usuario, intercepta y devuelve el paso en vez de
+  // generar una respuesta (cero llamadas a IA durante los pasos).
+  const interception = OnboardingService.intercept(userId, message, sid);
+  if (interception.type !== 'passthrough') {
+    res.json(interception);
+    return;
+  }
+
   const result = await sendChatMessage(appendLinks(message, links), modelId, attachments, userId, sid);
 
   res.json({ response: result.response, sessionId: sid });
@@ -122,6 +132,16 @@ export async function sendChatMessageStreamHandler(req: Request, res: Response):
 
   // Enviar sessionId como primer evento para que el frontend lo capture
   write(`data: ${JSON.stringify({ sessionId: sid })}\n\n`);
+
+  // Plan 04 — mismo interceptor que el endpoint sin streaming, pero emitido
+  // como único evento SSE seguido de [DONE] para no romper el parseo del cliente.
+  const interception = OnboardingService.intercept(userId, message, sid);
+  if (interception.type !== 'passthrough') {
+    write(`data: ${JSON.stringify(interception)}\n\n`);
+    write('data: [DONE]\n\n');
+    res.end();
+    return;
+  }
 
   try {
     const stream = await sendChatMessageStream(appendLinks(message, links), modelId, attachments, userId, sid);
@@ -456,4 +476,27 @@ export async function endQuizExplainHandler(req: Request, res: Response): Promis
 
   ChatQuizModeService.deactivate(sessionId);
   res.json({ success: true });
+}
+
+// Plan 04 — cliente → servidor: { type: 'onboarding_answer', step, values }
+export async function onboardingAnswerHandler(req: Request, res: Response): Promise<void> {
+  const { step, values } = req.validatedBody as { step: number; values: Record<string, unknown> };
+  const userId = req.user!.id;
+
+  const result = await OnboardingService.answer(userId, step, values);
+  res.json(result);
+}
+
+// Plan 04 — cliente → servidor: { type: 'onboarding_skip' }. Si había un
+// mensaje pendiente, se responde por el canal normal de chat (sin wizard).
+export async function onboardingSkipHandler(req: Request, res: Response): Promise<void> {
+  const userId = req.user!.id;
+
+  const result = OnboardingService.skip(userId);
+  if (result.type === 'chat_passthrough') {
+    const aiResult = await sendChatMessage(result.message, undefined, undefined, userId, result.sessionId);
+    res.json({ response: aiResult.response, sessionId: result.sessionId });
+    return;
+  }
+  res.json(result);
 }

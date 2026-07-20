@@ -480,6 +480,12 @@ function migrate(): void {
 
   // Customization/onboarding — estado del wizard de perfil (plan 01)
   backfillOnboardingState(db);
+  // Plan 04 — máquina de pasos del wizard: paso actual (0 = no iniciado) y el
+  // primer mensaje real del usuario, retenido mientras dura el wizard para
+  // responderlo tras el cierre (o si el usuario hace skip a mitad de camino).
+  addColumnIfMissing(db, 'users', 'onboarding_current_step', 'INTEGER NOT NULL DEFAULT 0');
+  addColumnIfMissing(db, 'users', 'onboarding_pending_message', 'TEXT');
+  addColumnIfMissing(db, 'users', 'onboarding_pending_session_id', 'TEXT');
 
   logger.info('Migración completada: tablas creadas/verificadas');
   closeDb();

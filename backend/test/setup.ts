@@ -16,7 +16,11 @@ CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, username TEXT,
   password_hash TEXT, role TEXT DEFAULT 'user',
   created_at TEXT DEFAULT (datetime('now')),
-  exams_generated INTEGER DEFAULT 0, total_api_cost REAL DEFAULT 0.0
+  exams_generated INTEGER DEFAULT 0, total_api_cost REAL DEFAULT 0.0,
+  onboarding_state TEXT NOT NULL DEFAULT 'pending',
+  onboarding_current_step INTEGER NOT NULL DEFAULT 0,
+  onboarding_pending_message TEXT,
+  onboarding_pending_session_id TEXT
 );
 CREATE TABLE IF NOT EXISTS chat_logs (
   id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id),

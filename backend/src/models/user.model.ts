@@ -75,6 +75,26 @@ export const UserModel = {
     getDb().prepare('UPDATE users SET avatar_data = ? WHERE id = ?').run(avatarDataUrl, id);
   },
 
+  // Wizard de personalización (plan 04) — UPDATE dinámico solo de los campos
+  // presentes en el patch, mismo patrón que updateSettings.
+  updateOnboarding(id: string, patch: {
+    state?: 'pending' | 'skipped' | 'completed';
+    step?: number;
+    pendingMessage?: string | null;
+    pendingSessionId?: string | null;
+  }): void {
+    const columns: Array<[string, unknown]> = [];
+    if (patch.state !== undefined) columns.push(['onboarding_state', patch.state]);
+    if (patch.step !== undefined) columns.push(['onboarding_current_step', patch.step]);
+    if (patch.pendingMessage !== undefined) columns.push(['onboarding_pending_message', patch.pendingMessage]);
+    if (patch.pendingSessionId !== undefined) columns.push(['onboarding_pending_session_id', patch.pendingSessionId]);
+    if (columns.length === 0) return;
+
+    const setClause = columns.map(([col]) => `${col} = ?`).join(', ');
+    const values = columns.map(([, val]) => val);
+    getDb().prepare(`UPDATE users SET ${setClause} WHERE id = ?`).run(...values, id);
+  },
+
   listAll(): UserRow[] {
     return getDb().prepare(
       'SELECT id, email, username, role, created_at, exams_generated, total_api_cost FROM users ORDER BY created_at DESC',

@@ -43,3 +43,8 @@ export const quizResolveSchema = z.object({
 export const quizExplainSchema = z.object({
   sessionId: uuidV4,
 });
+
+export const onboardingAnswerSchema = z.object({
+  step: z.number().int().min(1).max(5),
+  values: z.record(z.union([z.string(), z.array(z.string())])),
+});

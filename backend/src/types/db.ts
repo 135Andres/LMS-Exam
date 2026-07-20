@@ -23,6 +23,11 @@ export interface UserRow {
   reduced_motion: number;
   notify_on_response: number;
   cross_chat_enabled: number;
+  // Wizard de personalización (plan 01/04) — distinto de onboarding_status (perfil adaptativo de examenes, legacy)
+  onboarding_state: 'pending' | 'skipped' | 'completed';
+  onboarding_current_step: number;
+  onboarding_pending_message: string | null;
+  onboarding_pending_session_id: string | null;
 }
 
 export interface ExamRow {
