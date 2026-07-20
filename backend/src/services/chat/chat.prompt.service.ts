@@ -1,5 +1,7 @@
 import { SYSTEM_PROMPT_TUTOR, SYSTEM_PROMPT_TUTOR_ADMIN_OVERRIDE, SYSTEM_PROMPT_QUIZ_EXPLAIN } from '../../prompts/system.js';
+import { composeSystemPrompt, type ProfileMode } from '../../prompts/prompt-composer.js';
 import { ProfileService } from '../profile.service.js';
+import { UserProfileService } from '../user-profile.service.js';
 import { UserModel } from '../../models/user.model.js';
 import { SessionSummaryService } from '../session-summary.service.js';
 import { ImportedMemoryService } from '../imported-memory.service.js';
@@ -17,9 +19,8 @@ export interface Attachment {
 
 export class ChatPromptService {
   buildSystemPrompt(modelLabel: string, ragContext: string, userId: string, regenerateInstruction?: string, sessionId?: string, crossChatContext?: string): string {
-    const basePrompt = sessionId && ChatQuizModeService.isActive(sessionId)
-      ? SYSTEM_PROMPT_QUIZ_EXPLAIN
-      : SYSTEM_PROMPT_TUTOR;
+    const isQuizExplain = !!(sessionId && ChatQuizModeService.isActive(sessionId));
+    const basePrompt = isQuizExplain ? SYSTEM_PROMPT_QUIZ_EXPLAIN : SYSTEM_PROMPT_TUTOR;
     let prompt = basePrompt.replace(/\{MODEL_NAME\}/g, modelLabel);
 
     if (sessionId) {
@@ -85,6 +86,14 @@ export class ChatPromptService {
     if (crossChatContext) {
       prompt += crossChatContext;
     }
+
+    // Plan 03: la profile_line del perfil estructurado (distinto del
+    // ProfileService de arriba, que es un perfil narrativo en markdown)
+    // SIEMPRE va al final del prompt — ver prompt-composer.ts.
+    const profileMode: ProfileMode = isQuizExplain ? 'format-only' : 'full';
+    const newProfile = UserProfileService.getProfile(userId);
+    prompt = composeSystemPrompt(prompt, newProfile, profileMode);
+
     return prompt;
   }
 

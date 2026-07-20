@@ -13,8 +13,66 @@ vi.mock('../session-summary.service.js', () => ({
 import { ChatPromptService } from './chat.prompt.service.js';
 import { ChatQuizModeService } from './chat.quiz-mode.service.js';
 import { SessionSummaryService, type KnowledgeBlock } from '../session-summary.service.js';
+import { UserProfileService, compileProfileLine, type UserProfile } from '../user-profile.service.js';
 
 const SESSION_ID = 'prompt-swap-test-session';
+
+function fullProfile(): UserProfile {
+  const profile: UserProfile = {
+    userId: 'user-1',
+    displayName: 'Andrés',
+    level: 'uni',
+    field: 'ing. software',
+    subjects: ['cálculo'],
+    goal: 'examenes',
+    depth: 'detallado',
+    register: 'formal',
+    studyMethods: ['práctica'],
+    profileLine: null,
+    version: 1,
+  };
+  profile.profileLine = compileProfileLine(profile);
+  return profile;
+}
+
+describe('ChatPromptService inyección del perfil estructurado (plan 03)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    ChatQuizModeService.deactivate(SESSION_ID);
+  });
+
+  it('modo tutor (full): agrega la profile_line completa, con materias/objetivo, al final', () => {
+    vi.spyOn(UserProfileService, 'getProfile').mockReturnValue(fullProfile());
+    const service = new ChatPromptService();
+    const prompt = service.buildSystemPrompt('Modelo X', '', 'user-1', undefined, SESSION_ID);
+
+    expect(prompt).toContain('materias: cálculo');
+    expect(prompt).toContain('objetivo: pasar exámenes');
+    expect(prompt).toContain('Trato: de usted.');
+    expect(prompt.trimEnd().endsWith('Trato: de usted.')).toBe(true);
+  });
+
+  it('modo Explicar (format-only): agrega solo nombre + formato, sin materias/objetivo', () => {
+    ChatQuizModeService.activate(SESSION_ID);
+    vi.spyOn(UserProfileService, 'getProfile').mockReturnValue(fullProfile());
+    const service = new ChatPromptService();
+    const prompt = service.buildSystemPrompt('Modelo X', '', 'user-1', undefined, SESSION_ID);
+
+    expect(prompt).toContain('Andrés');
+    expect(prompt).toContain('Trato: de usted.');
+    expect(prompt).not.toContain('materias:');
+    expect(prompt).not.toContain('objetivo:');
+  });
+
+  it('perfil null → no agrega nada relacionado al perfil estructurado', () => {
+    vi.spyOn(UserProfileService, 'getProfile').mockReturnValue(null);
+    const service = new ChatPromptService();
+    const prompt = service.buildSystemPrompt('Modelo X', '', 'user-1', undefined, SESSION_ID);
+
+    expect(prompt).not.toContain('[PERFIL');
+    expect(prompt).not.toContain('[FORMATO ELEGIDO');
+  });
+});
 
 describe('ChatPromptService modo Explicar', () => {
   afterEach(() => {
