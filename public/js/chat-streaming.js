@@ -7,8 +7,9 @@ import { stripQuizMarker, appendQuizButtons, appendNextStepButton, handleQuizExp
 import {
   addMessage, showTyping, hideTyping, handleCopy, togglePinMessage, handleReport, renderKaTeX,
   clearAttachments, updatePlusButton, SLASH_COMMANDS, closeSlashMenu, executeSlashCommand,
-  updateSessionInfo, refreshSidebarSessions,
+  updateSessionInfo,
 } from './chat.js';
+import { refreshSidebarSessions } from './chat-sessions.js';
 
 let reExplicarModeActive = false;
 let reExplicarTargetRow = null;
