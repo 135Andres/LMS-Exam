@@ -9,6 +9,7 @@ import {
   SYSTEM_PROMPT_EXAM,
   FORMAT_MATH_RULES_SIMPLE,
   FORMAT_MATH_RULES_ESCAPED,
+  FORMAT_JSON_NEWLINE_RULE,
 } from './system.js';
 
 describe('prompts de cuestionario', () => {
@@ -155,5 +156,40 @@ describe('FORMAT_MATH_RULES_SIMPLE / FORMAT_MATH_RULES_ESCAPED (Task 3 consolida
   it('SYSTEM_PROMPT_EXAM y SYSTEM_PROMPT_QUIZ_SOLVE interpolan FORMAT_MATH_RULES_ESCAPED', () => {
     expect(SYSTEM_PROMPT_EXAM).toContain(FORMAT_MATH_RULES_ESCAPED);
     expect(SYSTEM_PROMPT_QUIZ_SOLVE).toContain(FORMAT_MATH_RULES_ESCAPED);
+  });
+});
+
+describe('regla de saltos de línea en JSON + few-shot (plan 11)', () => {
+  it('FORMAT_JSON_NEWLINE_RULE instruye escapar saltos de línea como \\n dentro de strings', () => {
+    expect(FORMAT_JSON_NEWLINE_RULE).toContain('\\n');
+    expect(FORMAT_JSON_NEWLINE_RULE.toLowerCase()).toContain('salto de línea');
+  });
+
+  it('SYSTEM_PROMPT_EXAM, SYSTEM_PROMPT_QUIZ_SOLVE y SYSTEM_PROMPT_QUIZ_VERIFY interpolan la regla de \\n', () => {
+    expect(SYSTEM_PROMPT_EXAM).toContain(FORMAT_JSON_NEWLINE_RULE);
+    expect(SYSTEM_PROMPT_QUIZ_SOLVE).toContain(FORMAT_JSON_NEWLINE_RULE);
+    expect(SYSTEM_PROMPT_QUIZ_VERIFY).toContain(FORMAT_JSON_NEWLINE_RULE);
+  });
+
+  it('los 3 prompts JSON estrictos traen un few-shot que combina LaTeX escapado y \\n en un mismo campo', () => {
+    for (const prompt of [SYSTEM_PROMPT_EXAM, SYSTEM_PROMPT_QUIZ_SOLVE, SYSTEM_PROMPT_QUIZ_VERIFY]) {
+      expect(prompt.toLowerCase()).toContain('ejemplo');
+      expect(prompt).toContain('\\\\sqrt');
+      // "\n" aparece al menos 2 veces: una vez descrito en la regla, otra vez
+      // usado de verdad dentro del JSON del few-shot.
+      const occurrences = prompt.split('\\n').length - 1;
+      expect(occurrences).toBeGreaterThanOrEqual(2);
+    }
+  });
+});
+
+describe('directiva 4 de SYSTEM_PROMPT_TUTOR — criterio numérico de "bloque de ejercicios" (plan 11)', () => {
+  it('define "bloque de ejercicios" como 3 o más preguntas diferenciables', () => {
+    expect(SYSTEM_PROMPT_TUTOR).toMatch(/3 o más/);
+  });
+
+  it('aclara que una sola pregunta con varios incisos NO cuenta como bloque', () => {
+    expect(SYSTEM_PROMPT_TUTOR.toLowerCase()).toContain('incisos');
+    expect(SYSTEM_PROMPT_TUTOR).toMatch(/incisos.*no cuenta como bloque/i);
   });
 });

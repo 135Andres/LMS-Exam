@@ -27,4 +27,29 @@ describe('repairBackslashEscapes', () => {
     const raw = JSON.stringify({ ok: true, n: 1 });
     expect(JSON.parse(repairBackslashEscapes(raw))).toEqual({ ok: true, n: 1 });
   });
+
+  it('repara un salto de línea real dentro de un string (JSON.parse lo rechaza por spec)', () => {
+    const raw = '{"desarrollo": "primera línea\nsegunda línea"}';
+    expect(() => JSON.parse(raw)).toThrow();
+
+    const repaired = repairBackslashEscapes(raw);
+    const parsed = JSON.parse(repaired) as { desarrollo: string };
+    expect(parsed.desarrollo).toBe('primera línea\nsegunda línea');
+  });
+
+  it('repara LaTeX sin escapar y un salto de línea real combinados en el mismo string (fixture del plan 11)', () => {
+    const raw = '{"num": 1, "pregunta": "Resuelve \\sqrt{16}", "desarrollo": "Buscamos el número que al cuadrado da 16.\nComo 4^2 = 16, la raíz es 4.", "respuesta": "4"}';
+    expect(() => JSON.parse(raw)).toThrow();
+
+    const repaired = repairBackslashEscapes(raw);
+    const parsed = JSON.parse(repaired) as { pregunta: string; desarrollo: string };
+    expect(parsed.pregunta).toBe('Resuelve \\sqrt{16}');
+    expect(parsed.desarrollo).toBe('Buscamos el número que al cuadrado da 16.\nComo 4^2 = 16, la raíz es 4.');
+  });
+
+  it('no toca saltos de línea reales que quedan FUERA de un string (whitespace de formato entre tokens)', () => {
+    const raw = '{\n  "ok": true\n}';
+    expect(JSON.parse(raw)).toEqual({ ok: true }); // ya válido sin reparar
+    expect(JSON.parse(repairBackslashEscapes(raw))).toEqual({ ok: true });
+  });
 });

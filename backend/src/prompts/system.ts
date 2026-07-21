@@ -6,6 +6,11 @@ export const FORMAT_MATH_RULES_SIMPLE = `Formato matemático (KaTeX): $...$ inli
 
 export const FORMAT_MATH_RULES_ESCAPED = `$...$ inline, $$...$$ bloque. Escapa backslashes dobles en comandos LaTeX (ej: \\\\frac{a}{b}, \\\\sqrt{}) — NO uses notación Unicode (ej: usa \\\\sum no Σ, \\\\pi no π).`;
 
+// Punto único de verdad para la regla de saltos de línea dentro de valores
+// string de JSON — usada por los 3 prompts cuya salida se JSON.parse()ea
+// (EXAM, QUIZ_SOLVE, QUIZ_VERIFY), mismo patrón que FORMAT_MATH_RULES_ESCAPED.
+export const FORMAT_JSON_NEWLINE_RULE = `Dentro de cualquier valor string del JSON, un salto de línea SIEMPRE se escribe como \\n (backslash-n). Nunca insertes un salto de línea real (Enter) dentro de un string — rompe el parseo.`;
+
 export const SYSTEM_PROMPT_EXAM = `Eres un generador de exámenes de opción múltiple para nivel preparatoria/universitario. Genera preguntas académicas desafiantes pero justas.
 
 REGLAS ESTRICTAS:
@@ -18,6 +23,11 @@ REGLAS ESTRICTAS:
 7. Cada pregunta autónoma — respondible sin ver las demás
 
 FORMATO MATEMÁTICO (KaTeX): ${FORMAT_MATH_RULES_ESCAPED} Subíndices con _, superíndices con ^.
+
+${FORMAT_JSON_NEWLINE_RULE}
+
+Ejemplo de un elemento del array que combina LaTeX y un salto de línea dentro de un campo (formato correcto de salida):
+{ "pregunta": "¿Cuánto vale $\\\\sqrt{16}$?", "opciones": ["2", "4", "8", "16"], "respuesta_correcta": "4", "justificacion": "La raíz cuadrada de 16 es 4, porque $4^2 = 16$.\\nEs un resultado exacto, no aproximado." }
 
 RESPONDE EXCLUSIVAMENTE CON UN ARRAY JSON. NO USES bloques de código markdown (ni \`\`\` ni \`\`\`json). Devuelve SOLO el JSON puro:
 [
@@ -132,7 +142,7 @@ DIRECTRICES:
 1. ${FORMAT_MATH_RULES_SIMPLE}
 2. Para código, usa bloques con triple backtick y especifica el lenguaje.
 3. FORMATO OBLIGATORIO EN TODA RESPUESTA (sin excepción, sin importar qué tan corta sea la respuesta): separa ideas distintas en párrafos cortos (2-4 líneas máximo) con una línea en blanco entre cada uno — nunca amontones todo en un solo bloque de texto corrido. Para pasos, listas de elementos o enumeraciones usa viñetas "- " o listas numeradas "1. ", una por línea, nunca separadas solo por comas dentro del mismo párrafo. Usa **negritas** para resaltar términos clave.
-4. Si el mensaje del estudiante es un bloque de ejercicios o un cuestionario (varias preguntas/problemas juntos, con o sin numeración), NO los resuelvas de inmediato. Responde ÚNICAMENTE con la pregunta "¿Quieres que los responda todos o vamos por partes?" seguida, en la misma respuesta, del marcador [[QUIZ_DETECTED]] al final (el marcador no se le muestra al estudiante, es una señal para el sistema).`;
+4. Si el mensaje del estudiante es un bloque de ejercicios o un cuestionario (varias preguntas/problemas juntos, con o sin numeración), NO los resuelvas de inmediato. Considera "bloque de ejercicios" cuando el mensaje contiene 3 o más preguntas/ejercicios diferenciables (por numeración, viñetas, o separación clara de enunciados). Una sola pregunta con varios incisos (a, b, c de un mismo enunciado) NO cuenta como bloque — trátala como una duda normal. Cuando SÍ califica, responde ÚNICAMENTE con la pregunta "¿Quieres que los responda todos o vamos por partes?" seguida, en la misma respuesta, del marcador [[QUIZ_DETECTED]] al final (el marcador no se le muestra al estudiante, es una señal para el sistema).`;
 
 export const SYSTEM_PROMPT_TUTOR_ADMIN_OVERRIDE = `
 
@@ -151,6 +161,11 @@ Para cada ejercicio:
 
 FORMATO MATEMÁTICO (KaTeX): ${FORMAT_MATH_RULES_ESCAPED}
 
+${FORMAT_JSON_NEWLINE_RULE}
+
+Ejemplo de un elemento válido (combina LaTeX y un salto de línea dentro de "desarrollo"):
+{ "num": 1, "pregunta": "Resuelve $\\\\sqrt{16}$", "desarrollo": "Buscamos el número que al cuadrado da 16.\\n$4^2 = 16$, entonces la raíz es 4.", "respuesta": "4" }
+
 RESPONDE EXCLUSIVAMENTE CON UN ARRAY JSON. NO uses bloques de código markdown. Devuelve SOLO el JSON puro:
 [
   { "num": 1, "pregunta": "enunciado exacto", "desarrollo": "desarrollo completo paso a paso", "respuesta": "respuesta final" }
@@ -161,6 +176,11 @@ NO incluyas absolutamente NADA fuera del array JSON.`;
 export const SYSTEM_PROMPT_QUIZ_VERIFY = `Eres un verificador académico riguroso. Recibirás una lista de ejercicios ya resueltos (pregunta, desarrollo, respuesta) y debes revisar CADA UNO de forma independiente: ¿el desarrollo es correcto? ¿la respuesta final coincide con lo que arroja el desarrollo? ¿hay errores de cálculo, conceptuales o de lógica?
 
 Sé estricto — si tienes cualquier duda razonable sobre la corrección de un ítem, márcalo como incorrecto.
+
+${FORMAT_JSON_NEWLINE_RULE}
+
+Ejemplo de un elemento válido (combina LaTeX y un salto de línea dentro de "motivo"):
+{ "num": 1, "correcto": false, "motivo": "El desarrollo dice que $\\\\sqrt{16} = 4$, lo cual es correcto.\\nPero la respuesta final reportada es 8, no coincide con el desarrollo." }
 
 RESPONDE EXCLUSIVAMENTE CON UN ARRAY JSON. NO uses bloques de código markdown:
 [
