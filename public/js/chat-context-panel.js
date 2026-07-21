@@ -1,7 +1,7 @@
-import { renderAvatarInto } from './lib/utils.js';
+import { renderAvatarInto, escapeHtml, formatAIResponse } from './lib/utils.js';
 import { t } from './lib/i18n.js';
 import { state } from './chat-state.js';
-import { fetchPinnedMessages, renderPinnedSection } from './chat-messages.js';
+import { fetchPinnedMessages, renderPinnedSection, renderKaTeX } from './chat-messages.js';
 
 /* ── Context Ring & Panel ── */
 
@@ -183,12 +183,119 @@ export function toggleContextPanel() {
   const panel = document.getElementById('contextPanel');
   const isOpen = panel.classList.toggle('open');
   document.querySelector('.page-content').classList.toggle('panel-open', isOpen);
-  if (isOpen) fetchPinnedMessages().then(renderPinnedSection);
+  if (isOpen) {
+    fetchPinnedMessages().then(renderPinnedSection);
+    fetchSessionSummary().then(renderSessionSummary);
+  }
 }
 
 export function closeContextPanel() {
   document.getElementById('contextPanel').classList.remove('open');
   document.querySelector('.page-content').classList.remove('panel-open');
+}
+
+/* ── Resumen de la sesión (Fase 4 de compactación) — mismo patrón visual
+   que "Notas rápidas" arriba (pinnedMessagesSection/renderPinnedSection) ── */
+
+let lastFetchedSummary = null; // para poder "Cancelar" sin re-fetch
+
+export async function fetchSessionSummary() {
+  try {
+    const res = await fetch(`/api/chat/summary?session_id=${state.sessionId}`, { credentials: 'same-origin' });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+export function renderSessionSummary(data) {
+  lastFetchedSummary = data;
+  const countEl = document.getElementById('sessionSummaryBlockCount');
+  const body = document.getElementById('sessionSummaryBody');
+  if (!body) return;
+  if (countEl) countEl.textContent = data?.blocks?.length ?? 0;
+
+  if (!data || (!data.narrative && data.blocks.length === 0)) {
+    body.innerHTML = `<div class="raw-message-item">${t('noSummaryYet')}</div>`;
+    return;
+  }
+
+  const warningHtml = data.failedRecently
+    ? `<div class="summary-warning">${escapeHtml(t('summaryCompactionIssue'))}</div>`
+    : '';
+
+  const narrativeHtml = data.narrative
+    ? formatAIResponse(data.narrative)
+    : `<div class="raw-message-item">${t('noSummaryYet')}</div>`;
+
+  const blocksHtml = data.blocks.map(b => `
+    <div class="summary-block-item" data-block-id="${b.id}">
+      <div class="summary-block-title">${escapeHtml(b.title)} <span class="summary-block-subject">${escapeHtml(b.subject)}</span></div>
+      <div class="summary-block-content hidden"></div>
+    </div>
+  `).join('');
+
+  body.innerHTML = `
+    ${warningHtml}
+    <div class="summary-narrative" id="summaryNarrativeView">${narrativeHtml}</div>
+    <button class="summary-edit-btn" id="summaryEditBtn">${escapeHtml(t('editSummary'))}</button>
+    <div class="summary-blocks-list">${blocksHtml}</div>
+  `;
+  renderKaTeX();
+
+  document.getElementById('summaryEditBtn')?.addEventListener('click', () => enterEditMode(data.narrative || ''));
+
+  body.querySelectorAll('.summary-block-item').forEach(el => {
+    el.addEventListener('click', () => {
+      const contentEl = el.querySelector('.summary-block-content');
+      const block = data.blocks.find(b => b.id === el.dataset.blockId);
+      if (contentEl.classList.contains('hidden') && !contentEl.dataset.rendered) {
+        contentEl.innerHTML = formatAIResponse(block.content);
+        contentEl.dataset.rendered = '1';
+        renderKaTeX();
+      }
+      contentEl.classList.toggle('hidden');
+    });
+  });
+}
+
+function enterEditMode(currentText) {
+  const narrativeView = document.getElementById('summaryNarrativeView');
+  if (!narrativeView) return;
+  narrativeView.innerHTML = `<textarea class="summary-edit-textarea" id="summaryEditTextarea">${escapeHtml(currentText)}</textarea>
+    <div class="summary-edit-actions">
+      <button id="summarySaveBtn">${escapeHtml(t('saveSummary'))}</button>
+      <button id="summaryCancelBtn">${escapeHtml(t('cancelEdit'))}</button>
+    </div>
+    <div id="summaryEditError" class="hidden"></div>`;
+  document.getElementById('summarySaveBtn').addEventListener('click', saveEditedSummary);
+  document.getElementById('summaryCancelBtn').addEventListener('click', () => renderSessionSummary(lastFetchedSummary));
+}
+
+async function saveEditedSummary() {
+  const textarea = document.getElementById('summaryEditTextarea');
+  const content = textarea.value;
+  try {
+    const res = await fetch('/api/chat/summary', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ sessionId: state.sessionId, content }),
+    });
+    if (!res.ok) throw new Error('save failed');
+    const fresh = await fetchSessionSummary();
+    renderSessionSummary(fresh);
+  } catch {
+    // Falla silenciosa con el texto tal cual quedó en el textarea es peor
+    // que avisar (ajuste Fase 4, Task 2) — el textarea NO se toca, el
+    // usuario no debe perder lo que escribió.
+    const errorEl = document.getElementById('summaryEditError');
+    if (errorEl) {
+      errorEl.textContent = t('summarySaveError');
+      errorEl.classList.remove('hidden');
+    }
+  }
 }
 
 /* ── Cronómetro (widget del sidebar) ── */
