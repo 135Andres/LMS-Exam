@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-const uuidV4 = z.string().uuid().refine(
+export const uuidV4 = z.string().uuid().refine(
   val => val[14] === '4',
   'sessionId debe ser UUID v4'
 );
@@ -29,6 +29,16 @@ export const regenerateSchema = z.object({
 
 export const summarySchema = z.object({
   sessionId: uuidV4,
+});
+
+// Fase 4 — edición manual de la narrativa de sesión. Tope propio (no
+// MAX_PROFILE_BYTES de ProfileService — ese es para perfiles, contenido
+// mucho más corto por naturaleza; la narrativa de sesión es texto largo por
+// diseño). 20000 caracteres es punto de partida razonable, ajustable con
+// uso real, no un número medido.
+export const summaryUpdateSchema = z.object({
+  sessionId: uuidV4,
+  content: z.string().min(1, 'content requerido').max(20000, 'content muy largo'),
 });
 
 export const exportSchema = z.object({

@@ -7,7 +7,8 @@ import { AiRetryError } from '../services/ai/index.js';
 import { SessionSummaryService } from '../services/session-summary.service.js';
 import { ChatModel } from '../models/chat.model.js';
 import { logger } from '../utils/logger.js';
-import type { Attachment } from '../validators/chat.js';
+import { z } from 'zod';
+import { uuidV4, type Attachment } from '../validators/chat.js';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -236,6 +237,68 @@ export async function summarizeSessionHandler(req: Request, res: Response): Prom
        // eso es para cuando exista la vista de detalle (Fase 4)
 
   res.json({ summary, blocks });
+}
+
+// Fase 4 — GET /api/chat/summary: vista persistente/editable del resumen en
+// el sidebar. A diferencia de summarizeSessionHandler (comando /resumen, que
+// fuerza una compactación real vía compactSession(..., true)), este
+// endpoint es de solo lectura — nunca llama a compactSession. session_id
+// llega por query string (no hay body en un GET), se valida con el mismo
+// uuidV4 que usan los demás schemas de este archivo.
+const sessionSummaryQuerySchema = z.object({ session_id: uuidV4 });
+
+export async function getSessionSummaryHandler(req: Request, res: Response): Promise<void> {
+  const userId = req.user!.id;
+  const parsed = sessionSummaryQuerySchema.safeParse(req.query);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'session_id inválido' });
+    return;
+  }
+  const { session_id: sessionId } = parsed.data;
+
+  try {
+    ChatModel.assertSessionOwnership(sessionId, userId);
+  } catch {
+    res.status(403).json({ error: 'No tienes acceso a esta sesión' });
+    return;
+  }
+
+  const narrative = SessionSummaryService.getNarrative(sessionId);
+  const blocks = SessionSummaryService.getBlocks(sessionId).map(b => ({
+    id: b.id,
+    title: b.title,
+    subject: b.subject,
+    content: b.content, // a diferencia del comando /resumen (Fase 3), acá SÍ va el
+                         // contenido completo — este endpoint alimenta la vista de
+                         // detalle que Fase 3 dejó pendiente a propósito.
+  }));
+  const failedRecently = SessionSummaryService.getNarrativeFailureCount(sessionId) > 0;
+
+  res.json({ narrative, blocks, failedRecently });
+}
+
+// Fase 4 — PUT /api/chat/summary: único punto de escritura directa sobre
+// narrative.md sin pasar por el modelo. La edición manual NUNCA pasa por IA
+// ni por el verificador cruzado (spec 4.4/7.2) — se marca meta.model:
+// 'user_edit' para que quede auditable en index.json que esa entrada fue
+// manual, no generada; la próxima compactación automática la toma como
+// "resumen previo" sin distinción especial (getNarrative ya es agnóstico a
+// quién escribió el contenido).
+export async function updateSessionSummaryHandler(req: Request, res: Response): Promise<void> {
+  const { sessionId, content } = req.validatedBody as { sessionId: string; content: string };
+  const userId = req.user!.id;
+
+  try {
+    ChatModel.assertSessionOwnership(sessionId, userId);
+  } catch {
+    res.status(403).json({ error: 'No tienes acceso a esta sesión' });
+    return;
+  }
+
+  SessionSummaryService.saveNarrative(sessionId, content, { model: 'user_edit', confidence: 'manual' });
+  logger.info('Resumen de sesión editado manualmente', { sessionId, userId, bytes: Buffer.byteLength(content, 'utf-8') });
+
+  res.json({ narrative: content });
 }
 
 // Comando /exportar (/export) — descarga la conversación sintetizada como

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { chatMessageSchema, attachmentSchema } from './chat.js';
+import { chatMessageSchema, attachmentSchema, summaryUpdateSchema } from './chat.js';
 
 describe('chatMessageSchema', () => {
   it('accepts valid message', () => {
@@ -70,5 +70,39 @@ describe('attachmentSchema', () => {
 
   it('rejects unknown type', () => {
     expect(attachmentSchema.safeParse({ type: 'video', mime: 'video/mp4', data: 'x' }).success).toBe(false);
+  });
+});
+
+describe('summaryUpdateSchema (Fase 4 — edición manual del resumen)', () => {
+  const validSessionId = '550e8400-e29b-41d4-a716-446655440000';
+
+  it('accepts valid sessionId + content', () => {
+    const r = summaryUpdateSchema.safeParse({ sessionId: validSessionId, content: 'narrativa editada a mano' });
+    expect(r.success).toBe(true);
+  });
+
+  it('rejects empty content', () => {
+    const r = summaryUpdateSchema.safeParse({ sessionId: validSessionId, content: '' });
+    expect(r.success).toBe(false);
+  });
+
+  it('rejects content que excede el tope de 20000 caracteres', () => {
+    const r = summaryUpdateSchema.safeParse({ sessionId: validSessionId, content: 'a'.repeat(20001) });
+    expect(r.success).toBe(false);
+  });
+
+  it('accepts content en el límite exacto de 20000 caracteres', () => {
+    const r = summaryUpdateSchema.safeParse({ sessionId: validSessionId, content: 'a'.repeat(20000) });
+    expect(r.success).toBe(true);
+  });
+
+  it('rejects sessionId inválido', () => {
+    const r = summaryUpdateSchema.safeParse({ sessionId: 'not-a-uuid', content: 'x' });
+    expect(r.success).toBe(false);
+  });
+
+  it('rejects sessionId ausente', () => {
+    const r = summaryUpdateSchema.safeParse({ content: 'x' });
+    expect(r.success).toBe(false);
   });
 });
