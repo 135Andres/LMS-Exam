@@ -3,6 +3,7 @@ import { initSettingsModal, notifyIfEnabled } from './lib/settings-modal.js';
 import { initI18n, t } from './lib/i18n.js';
 import { wrapBareLatex } from './lib/latex-detect.js';
 import { initOnboarding, renderOnboardingStep, maybeOfferDeferredBanner } from './onboarding.js';
+import { state } from './chat-state.js';
 
 async function checkSession() {
   try {
@@ -49,12 +50,7 @@ function renderKaTeX() {
   }
 }
 
-let selectedModelId = '';
-let availableModels = [];
-let pendingAttachments = [];
-let sessionId = sessionStorage.getItem('chatSessionId') || '';
 let linkModeActive = false;
-let activeLinks = [];
 let reExplicarModeActive = false;
 let reExplicarTargetRow = null;
 
@@ -78,9 +74,9 @@ const REEXPLICAR_SUGGESTIONS = [
 checkSession();
 
 const historyPromise = loadChatHistory().then(data => {
-  if (!sessionId && data && data.sessionId) {
-    sessionId = data.sessionId;
-    sessionStorage.setItem('chatSessionId', sessionId);
+  if (!state.sessionId && data && data.sessionId) {
+    state.sessionId = data.sessionId;
+    sessionStorage.setItem('chatSessionId', state.sessionId);
   }
 });
 
@@ -94,9 +90,9 @@ async function fetchModels(attempt = 1) {
     const res = await fetch('/api/chat/models', { credentials: 'same-origin' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
-    availableModels = data.models || [];
-    if (availableModels.length > 0) {
-      selectedModelId = availableModels[0].id;
+    state.availableModels = data.models || [];
+    if (state.availableModels.length > 0) {
+      state.selectedModelId = state.availableModels[0].id;
     }
   } catch (e) {
     console.warn('Error fetching models (intento ' + attempt + '):', e);
@@ -115,8 +111,8 @@ async function loadChatHistory() {
     if (!res.ok) return;
     const data = await res.json();
     if (data.sessionId) {
-      sessionId = data.sessionId;
-      sessionStorage.setItem('chatSessionId', sessionId);
+      state.sessionId = data.sessionId;
+      sessionStorage.setItem('chatSessionId', state.sessionId);
     }
     return data;
   } catch {
@@ -166,7 +162,7 @@ function renderSidebarSessions(sessions) {
     items.forEach(s => {
       const raw = s.title || s.preview || t('chatFallback');
       const preview = raw.slice(0, 40) + (raw.length > 40 ? '…' : '');
-      const isActive = s.session_id === sessionId;
+      const isActive = s.session_id === state.sessionId;
       let icon = 'chatText';
       if (isActive && isGenerating) icon = 'chatMore';
       html += `<div class="sidebar-chat-item${isActive ? ' active' : ''}" data-session="${s.session_id}">
@@ -213,7 +209,7 @@ function setChatTitleRaw(raw) {
 function updateTopBarTitle(sessions) {
   const input = document.getElementById('chatTitleInput');
   if (input && !input.classList.contains('hidden')) return; // no pisar mientras el usuario edita
-  const active = sessions.find(s => s.session_id === sessionId);
+  const active = sessions.find(s => s.session_id === state.sessionId);
   const raw = active?.title || active?.preview || t('newChatTitle');
   setChatTitleRaw(raw.length > 50 ? raw.slice(0, 50) + '…' : raw);
 }
@@ -241,7 +237,7 @@ function setupChatTitleEditing() {
     try {
       await fetch('/api/chat/rename', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin',
-        body: JSON.stringify({ sessionId, title: value }),
+        body: JSON.stringify({ sessionId: state.sessionId, title: value }),
       });
     } catch {}
     refreshSidebarSessions();
@@ -261,8 +257,8 @@ async function refreshSidebarSessions() {
 }
 
 async function loadSession(sid) {
-  if (!sid || sid === sessionId) return;
-  sessionId = sid;
+  if (!sid || sid === state.sessionId) return;
+  state.sessionId = sid;
   sessionStorage.setItem('chatSessionId', sid);
   const chatMessages = document.getElementById('chatMessages');
   chatMessages.classList.remove('open');
@@ -283,8 +279,8 @@ async function loadSession(sid) {
       }
     } catch {}
     chatMessages.classList.add('open');
-    if (!sessionState.chatCreated) {
-      sessionState.chatCreated = formatTime();
+    if (!state.sessionState.chatCreated) {
+      state.sessionState.chatCreated = formatTime();
     }
     // Mantener vista actual (archivados/normales) al abrir un chat
     const sidebarMode = document.getElementById('sidebar')?.dataset.mode;
@@ -314,8 +310,8 @@ async function archiveSession(sid) {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin',
       body: JSON.stringify({ sessionId: sid }),
     });
-    if (sid === sessionId) {
-      sessionId = '';
+    if (sid === state.sessionId) {
+      state.sessionId = '';
       sessionStorage.removeItem('chatSessionId');
       document.getElementById('chatMessages').classList.remove('open');
       document.getElementById('chatMessages').innerHTML = '';
@@ -344,8 +340,8 @@ async function deleteSession(sid) {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin',
       body: JSON.stringify({ sessionId: sid }),
     });
-    if (sid === sessionId) {
-      sessionId = '';
+    if (sid === state.sessionId) {
+      state.sessionId = '';
       sessionStorage.removeItem('chatSessionId');
       document.getElementById('chatMessages').classList.remove('open');
       document.getElementById('chatMessages').innerHTML = '';
@@ -385,7 +381,7 @@ async function fetchArchivedSessions() {
 }
 
 function updatePlusButton() {
-  const model = availableModels.find(m => m.id === selectedModelId);
+  const model = state.availableModels.find(m => m.id === state.selectedModelId);
   const plusBtn = document.getElementById('plusBtn');
   if (!plusBtn) return;
   if (model && model.multimodal) {
@@ -399,7 +395,7 @@ function updatePlusButton() {
   }
   // Sync dropdowns
   const topSelect = document.getElementById('topBarModelSelect');
-  if (topSelect && selectedModelId) topSelect.value = selectedModelId;
+  if (topSelect && state.selectedModelId) topSelect.value = state.selectedModelId;
 }
 
 /* ── Sidebar ── */
@@ -441,10 +437,9 @@ function toggleSidebar() {
 }
 
 /* ── Modo chat / examen ── */
-let currentMode = 'chat';
 
 function setMode(mode) {
-  currentMode = mode;
+  state.currentMode = mode;
   const examActive = mode === 'exam';
   document.body.classList.toggle('exam-mode', examActive);
 
@@ -462,19 +457,19 @@ function populateTopBarModels() {
   // primera llamada aunque availableModels siguiera vacío por una carga
   // lenta/fallida, y el selector se quedaba vacío hasta recargar la página.
   topSelect.innerHTML = '';
-  availableModels.forEach(m => {
+  state.availableModels.forEach(m => {
     const opt = document.createElement('option');
     opt.value = m.id;
     opt.textContent = m.label;
     topSelect.appendChild(opt);
   });
-  if (selectedModelId) topSelect.value = selectedModelId;
+  if (state.selectedModelId) topSelect.value = state.selectedModelId;
   updatePlusButton();
 
   if (!topSelect._changeWired) {
     topSelect._changeWired = true;
     topSelect.addEventListener('change', () => {
-      selectedModelId = topSelect.value;
+      state.selectedModelId = topSelect.value;
       updatePlusButton();
       updateSessionInfo();
     });
@@ -487,12 +482,12 @@ function newChat() {
   document.getElementById('contextPanel').classList.remove('open');
   document.querySelector('.page-content').classList.remove('panel-open');
 
-  sessionId = crypto.randomUUID();
-  sessionStorage.setItem('chatSessionId', sessionId);
+  state.sessionId = crypto.randomUUID();
+  sessionStorage.setItem('chatSessionId', state.sessionId);
   setChatTitleRaw(t('newChatTitle'));
 
   document.getElementById('chatMessages').classList.add('open');
-  sessionState.chatCreated = formatTime();
+  state.sessionState.chatCreated = formatTime();
   addMessage(t('tutorGreeting'), 'ai');
   updateSessionInfo();
   refreshSidebarSessions();
@@ -687,19 +682,19 @@ function setupChatInput() {
 
   function renderLinksList() {
     if (!chatLinksList) return;
-    if (activeLinks.length === 0) {
+    if (state.activeLinks.length === 0) {
       chatLinksList.innerHTML = '';
       chatLinksList.style.display = 'none';
       return;
     }
     chatLinksList.style.display = 'flex';
-    chatLinksList.innerHTML = activeLinks.map((link, i) =>
+    chatLinksList.innerHTML = state.activeLinks.map((link, i) =>
       `<span class="link-chip">${escapeHtml(link)}<button class="link-chip-remove" data-index="${i}">&times;</button></span>`
     ).join('');
     chatLinksList.querySelectorAll('.link-chip-remove').forEach(btn => {
       btn.addEventListener('click', () => {
         const idx = parseInt(btn.dataset.index);
-        activeLinks.splice(idx, 1);
+        state.activeLinks.splice(idx, 1);
         renderLinksList();
       });
     });
@@ -800,7 +795,7 @@ function setupChatInput() {
       reader.onload = (e) => {
         const data = e.target.result.split(',')[1];
         const att = { type: 'image', mime: file.type, data, name: file.name };
-        pendingAttachments.push(att);
+        state.pendingAttachments.push(att);
         renderAttachmentPreviews();
       };
       reader.readAsDataURL(file);
@@ -814,7 +809,7 @@ function setupChatInput() {
       reader.onload = (e) => {
         const data = e.target.result.split(',')[1];
         const att = { type: 'file', mime: file.type, data, name: file.name };
-        pendingAttachments.push(att);
+        state.pendingAttachments.push(att);
         renderAttachmentPreviews();
       };
       reader.readAsDataURL(file);
@@ -846,7 +841,7 @@ function setupChatInput() {
         reader.onload = (ev) => {
           const data = ev.target.result.split(',')[1];
           const type = file.type.startsWith('image/') ? 'image' : 'file';
-          pendingAttachments.push({ type, mime: file.type, data, name: file.name });
+          state.pendingAttachments.push({ type, mime: file.type, data, name: file.name });
           renderAttachmentPreviews();
         };
         reader.readAsDataURL(file);
@@ -856,8 +851,8 @@ function setupChatInput() {
 
     // Arrastrado desde otra web (imagen o link) — viene como URL, no archivo.
     const draggedUrl = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text/plain');
-    if (draggedUrl && /^https?:\/\//i.test(draggedUrl) && !activeLinks.includes(draggedUrl)) {
-      activeLinks.push(draggedUrl);
+    if (draggedUrl && /^https?:\/\//i.test(draggedUrl) && !state.activeLinks.includes(draggedUrl)) {
+      state.activeLinks.push(draggedUrl);
       renderLinksList();
     }
   });
@@ -903,7 +898,7 @@ function setupChatInput() {
       if (linkModeActive) {
         const url = msgInput.value.trim();
         if (url) {
-          if (activeLinks.includes(url)) {
+          if (state.activeLinks.includes(url)) {
             const label = linkModeBar.querySelector('span');
             label.textContent = t('linkAlreadyAdded');
             msgInput.value = '';
@@ -911,7 +906,7 @@ function setupChatInput() {
               label.textContent = t('linkModePlaceholder');
             }, 1500);
           } else {
-            activeLinks.push(url);
+            state.activeLinks.push(url);
             msgInput.value = '';
             renderLinksList();
             const label = linkModeBar.querySelector('span');
@@ -1006,8 +1001,8 @@ function setupChatInput() {
   }
 
   document.getElementById('chatMessages').classList.add('open');
-  if (!sessionState.chatCreated) {
-    sessionState.chatCreated = formatTime();
+  if (!state.sessionState.chatCreated) {
+    state.sessionState.chatCreated = formatTime();
   }
   // Al entrar a la página siempre arranca en "new" (hero) — el historial de
   // la última sesión solo se retoma si el usuario lo abre a propósito desde
@@ -1023,8 +1018,8 @@ async function initHeroView() {
   // El hero siempre representa un chat todavía sin crear — genera un
   // sessionId nuevo aquí (mismo patrón que newChat()) para no arrastrar el
   // de la sesión anterior que quedó en sessionStorage.
-  sessionId = crypto.randomUUID();
-  sessionStorage.setItem('chatSessionId', sessionId);
+  state.sessionId = crypto.randomUUID();
+  sessionStorage.setItem('chatSessionId', state.sessionId);
   setChatTitleRaw(t('newChatTitle'));
 
   // El ancho final de la fila depende de si hay chip de nombre o no — hay
@@ -1464,7 +1459,7 @@ function renderAttachmentPreviews() {
     }
   }
   container.innerHTML = '';
-  pendingAttachments.forEach((att, i) => {
+  state.pendingAttachments.forEach((att, i) => {
     const chip = document.createElement('div');
     chip.className = 'att-chip';
     if (att.type === 'image') {
@@ -1485,7 +1480,7 @@ function renderAttachmentPreviews() {
         <span class="att-remove" data-index="${i}">×</span>`;
     }
     chip.querySelector('.att-remove').addEventListener('click', () => {
-      pendingAttachments.splice(i, 1);
+      state.pendingAttachments.splice(i, 1);
       renderAttachmentPreviews();
     });
     container.appendChild(chip);
@@ -1550,8 +1545,8 @@ function openLightbox(src, name, triggerImg) {
 }
 
 function clearAttachments() {
-  pendingAttachments = [];
-  activeLinks = [];
+  state.pendingAttachments = [];
+  state.activeLinks = [];
   const container = document.getElementById('attachmentPreviews');
   if (container) container.innerHTML = '';
   const linksList = document.getElementById('chatLinksList');
@@ -1767,7 +1762,7 @@ function renderPinnedSection(pinned) {
 
 async function jumpToPinnedMessage(targetSessionId, targetMsgId) {
   closeContextPanel();
-  if (targetSessionId !== sessionId) {
+  if (targetSessionId !== state.sessionId) {
     await loadSession(targetSessionId);
   }
   requestAnimationFrame(() => {
@@ -1800,7 +1795,7 @@ async function runSummaryCommand() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'same-origin',
-      body: JSON.stringify({ sessionId }),
+      body: JSON.stringify({ sessionId: state.sessionId }),
     });
     hideTyping();
     if (res.status === 401) { window.location.href = 'login.html'; return; }
@@ -1835,7 +1830,7 @@ async function runExportCommand() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'same-origin',
-      body: JSON.stringify({ sessionId }),
+      body: JSON.stringify({ sessionId: state.sessionId }),
     });
     hideTyping();
     if (res.status === 401) { window.location.href = 'login.html'; return; }
@@ -2008,7 +2003,7 @@ async function runRegenerate(targetRow, instruction) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'same-origin',
-      body: JSON.stringify({ sessionId, modelId: selectedModelId || undefined, instruction }),
+      body: JSON.stringify({ sessionId: state.sessionId, modelId: state.selectedModelId || undefined, instruction }),
     });
 
     if (res.status === 401) { window.location.href = 'login.html'; return; }
@@ -2125,7 +2120,7 @@ async function handleReport(aiText, msgRow, btn) {
       body: JSON.stringify({
         aiMessage: aiText,
         userPrompt: userPrompt,
-        sessionId: sessionId,
+        sessionId: state.sessionId,
       }),
     });
     if (res.ok) {
@@ -2165,16 +2160,16 @@ export async function handleSend() {
     return;
   }
 
-  if (pendingAttachments.length > 0) {
-    const model = availableModels.find(m => m.id === selectedModelId);
+  if (state.pendingAttachments.length > 0) {
+    const model = state.availableModels.find(m => m.id === state.selectedModelId);
     if (!model || !model.multimodal) {
       if (!confirm(t('confirmSwitchModel'))) {
         clearAttachments();
         return;
       }
-      const mmModel = availableModels.find(m => m.multimodal);
+      const mmModel = state.availableModels.find(m => m.multimodal);
       if (mmModel) {
-        selectedModelId = mmModel.id;
+        state.selectedModelId = mmModel.id;
         const topSelect2 = document.getElementById('topBarModelSelect');
         if (topSelect2) topSelect2.value = mmModel.id;
         updatePlusButton();
@@ -2182,8 +2177,8 @@ export async function handleSend() {
     }
   }
 
-  const attSnapshot = pendingAttachments.slice();
-  const linksSnapshot = activeLinks.slice();
+  const attSnapshot = state.pendingAttachments.slice();
+  const linksSnapshot = state.activeLinks.slice();
   addMessage(text, 'user', attSnapshot);
   input.value = '';
   input.style.height = 'auto';
@@ -2263,7 +2258,7 @@ export async function handleSend() {
   }
 
   try {
-    const body = { message: text, modelId: selectedModelId || undefined, sessionId };
+    const body = { message: text, modelId: state.selectedModelId || undefined, sessionId: state.sessionId };
     if (attSnapshot.length > 0) {
       body.attachments = attSnapshot.map(a => ({ type: a.type, mime: a.mime, data: a.data }));
     }
@@ -2309,8 +2304,8 @@ export async function handleSend() {
           const json = JSON.parse(payload);
           if (json.error) throw new Error(json.error);
           if (json.sessionId) {
-            sessionId = json.sessionId;
-            sessionStorage.setItem('chatSessionId', sessionId);
+            state.sessionId = json.sessionId;
+            sessionStorage.setItem('chatSessionId', state.sessionId);
           }
           // Plan 04/05 — el mensaje fue interceptado por el wizard de
           // personalización en vez de generar una respuesta de IA.
@@ -2406,25 +2401,6 @@ export async function handleSend() {
 
 /* ── Context Ring & Panel ── */
 
-const sessionState = {
-  email: '',
-  name: '',
-  role: '',
-  createdAt: '',
-  examsGenerated: 0,
-  totalApiCost: 0,
-  userMessages: 0,
-  assistantMessages: 0,
-  totalTokens: 0,
-  inputTokens: 0,
-  outputTokens: 0,
-  provider: 'NVIDIA',
-  model: '',
-  contextLength: 128000,
-  chatCreated: '',
-  lastActivity: '',
-};
-
 function getRingColor(pct) {
   if (pct <= 0.5) return '#4ade80';
   if (pct <= 0.8) return '#facc15';
@@ -2432,8 +2408,8 @@ function getRingColor(pct) {
 }
 
 function getContextUsage() {
-  const limit = sessionState.contextLength || 128000;
-  return Math.min(sessionState.totalTokens / limit, 1);
+  const limit = state.sessionState.contextLength || 128000;
+  return Math.min(state.sessionState.totalTokens / limit, 1);
 }
 
 function renderContextRing() {
@@ -2467,9 +2443,9 @@ async function updateSessionInfo() {
       if (res.status === 401) { window.location.href = 'login.html'; return; }
       if (res.ok) {
         const data = await res.json();
-        sessionState.email = data.email || '';
-        sessionState.name = data.name || data.email || '';
-        sessionState.role = data.role || '';
+        state.sessionState.email = data.email || '';
+        state.sessionState.name = data.name || data.email || '';
+        state.sessionState.role = data.role || '';
       }
     } catch (_) {}
 
@@ -2478,13 +2454,13 @@ async function updateSessionInfo() {
       if (res.ok) {
         const data = await res.json();
         const u = data.user || data;
-        sessionState.email = u.email || sessionState.email;
-        sessionState.name = u.username || u.name || sessionState.name;
-        sessionState.role = u.role || sessionState.role;
-        sessionState.createdAt = u.created_at || u.createdAt || '';
-        sessionState.examsGenerated = u.exams_generated ?? u.examsGenerated ?? 0;
-        sessionState.totalApiCost = u.total_api_cost ?? u.totalApiCost ?? 0;
-        sessionState.avatarData = u.avatar_data || null;
+        state.sessionState.email = u.email || state.sessionState.email;
+        state.sessionState.name = u.username || u.name || state.sessionState.name;
+        state.sessionState.role = u.role || state.sessionState.role;
+        state.sessionState.createdAt = u.created_at || u.createdAt || '';
+        state.sessionState.examsGenerated = u.exams_generated ?? u.examsGenerated ?? 0;
+        state.sessionState.totalApiCost = u.total_api_cost ?? u.totalApiCost ?? 0;
+        state.sessionState.avatarData = u.avatar_data || null;
       }
     } catch (_) {}
 
@@ -2492,7 +2468,7 @@ async function updateSessionInfo() {
       const exRes = await fetch('/api/exams', { credentials: 'same-origin' });
       if (exRes.ok) {
         const exData = await exRes.json();
-        sessionState.examsGenerated = (exData.exams && exData.exams.length) || 0;
+        state.sessionState.examsGenerated = (exData.exams && exData.exams.length) || 0;
       }
     } catch (_) {}
 
@@ -2500,8 +2476,8 @@ async function updateSessionInfo() {
     if (chatMessages) {
       const userRows = chatMessages.querySelectorAll('.msg-row.msg-user');
       const aiRows = chatMessages.querySelectorAll('.msg-row.msg-ai');
-      sessionState.userMessages = userRows.length;
-      sessionState.assistantMessages = aiRows.length;
+      state.sessionState.userMessages = userRows.length;
+      state.sessionState.assistantMessages = aiRows.length;
 
       let userChars = 0;
       let aiChars = 0;
@@ -2515,30 +2491,30 @@ async function updateSessionInfo() {
       });
       const totalChars = userChars + aiChars;
       const ratio = totalChars > 0 ? userChars / totalChars : 0.5;
-      sessionState.totalTokens = Math.round(totalChars / 4);
-      sessionState.inputTokens = Math.round(sessionState.totalTokens * ratio);
-      sessionState.outputTokens = sessionState.totalTokens - sessionState.inputTokens;
+      state.sessionState.totalTokens = Math.round(totalChars / 4);
+      state.sessionState.inputTokens = Math.round(state.sessionState.totalTokens * ratio);
+      state.sessionState.outputTokens = state.sessionState.totalTokens - state.sessionState.inputTokens;
     }
 
     const modelSelect = document.getElementById('modelSelect') || document.getElementById('topBarModelSelect');
     if (modelSelect && modelSelect.value) {
-      const m = availableModels.find(x => x.id === modelSelect.value);
+      const m = state.availableModels.find(x => x.id === modelSelect.value);
       if (m) {
-        sessionState.model = m.label || m.id;
-        sessionState.provider = m.provider || 'NVIDIA';
-        sessionState.contextLength = m.contextLength || 128000;
+        state.sessionState.model = m.label || m.id;
+        state.sessionState.provider = m.provider || 'NVIDIA';
+        state.sessionState.contextLength = m.contextLength || 128000;
       } else {
-        sessionState.model = modelSelect.value;
+        state.sessionState.model = modelSelect.value;
       }
     }
 
     // Update sidebar user info
     const userNameEl = document.getElementById('sidebarUserName');
     const avatarEl = document.getElementById('sidebarUserAvatar');
-    if (userNameEl) userNameEl.textContent = sessionState.name || sessionState.email || t('user');
-    if (avatarEl) renderAvatarInto(avatarEl, sessionState.avatarData, sessionState.name || sessionState.email);
+    if (userNameEl) userNameEl.textContent = state.sessionState.name || state.sessionState.email || t('user');
+    if (avatarEl) renderAvatarInto(avatarEl, state.sessionState.avatarData, state.sessionState.name || state.sessionState.email);
 
-    sessionState.lastActivity = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+    state.sessionState.lastActivity = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
 
     renderContextRing();
     renderContextPanel();
@@ -2553,55 +2529,55 @@ function renderContextPanel() {
     <div class="session-info-grid">
       <div class="session-info-item">
         <span class="session-info-label">Email</span>
-        <span class="session-info-value">${sessionState.email || '—'}</span>
+        <span class="session-info-value">${state.sessionState.email || '—'}</span>
       </div>
       <div class="session-info-item">
         <span class="session-info-label">Rol</span>
-        <span class="session-info-value">${sessionState.role || '—'}</span>
+        <span class="session-info-value">${state.sessionState.role || '—'}</span>
       </div>
       <div class="session-info-item">
         <span class="session-info-label">Exámenes disponibles</span>
-        <span class="session-info-value">${sessionState.examsGenerated}</span>
+        <span class="session-info-value">${state.sessionState.examsGenerated}</span>
       </div>
       <div class="session-info-item">
         <span class="session-info-label">Límite de contexto</span>
-        <span class="session-info-value">${(sessionState.contextLength / 1000).toFixed(0)}K</span>
+        <span class="session-info-value">${(state.sessionState.contextLength / 1000).toFixed(0)}K</span>
       </div>
       <div class="session-info-item">
         <span class="session-info-label">Chat creado</span>
-        <span class="session-info-value">${sessionState.chatCreated || '—'}</span>
+        <span class="session-info-value">${state.sessionState.chatCreated || '—'}</span>
       </div>
       <div class="session-info-item">
         <span class="session-info-label">Mensajes de usuario</span>
-        <span class="session-info-value">${sessionState.userMessages}</span>
+        <span class="session-info-value">${state.sessionState.userMessages}</span>
       </div>
       <div class="session-info-item">
         <span class="session-info-label">Mensajes del asistente</span>
-        <span class="session-info-value">${sessionState.assistantMessages}</span>
+        <span class="session-info-value">${state.sessionState.assistantMessages}</span>
       </div>
       <div class="session-info-item">
         <span class="session-info-label">Total tokens estimados</span>
-        <span class="session-info-value">${sessionState.totalTokens.toLocaleString()}</span>
+        <span class="session-info-value">${state.sessionState.totalTokens.toLocaleString()}</span>
       </div>
       <div class="session-info-item">
         <span class="session-info-label">Tokens de entrada</span>
-        <span class="session-info-value">${sessionState.inputTokens.toLocaleString()}</span>
+        <span class="session-info-value">${state.sessionState.inputTokens.toLocaleString()}</span>
       </div>
       <div class="session-info-item">
         <span class="session-info-label">Tokens de salida</span>
-        <span class="session-info-value">${sessionState.outputTokens.toLocaleString()}</span>
+        <span class="session-info-value">${state.sessionState.outputTokens.toLocaleString()}</span>
       </div>
       <div class="session-info-item">
         <span class="session-info-label">Proveedor</span>
-        <span class="session-info-value">${sessionState.provider}</span>
+        <span class="session-info-value">${state.sessionState.provider}</span>
       </div>
       <div class="session-info-item">
         <span class="session-info-label">Modelo</span>
-        <span class="session-info-value">${sessionState.model || '—'}</span>
+        <span class="session-info-value">${state.sessionState.model || '—'}</span>
       </div>
       <div class="session-info-item">
         <span class="session-info-label">Última actividad</span>
-        <span class="session-info-value">${sessionState.lastActivity}</span>
+        <span class="session-info-value">${state.sessionState.lastActivity}</span>
       </div>
     </div>
   `;
@@ -2632,25 +2608,25 @@ document.addEventListener('DOMContentLoaded', async () => {
   window.addEventListener('lms:profile-updated', (e) => {
     const avatarEl = document.getElementById('sidebarUserAvatar');
     if (e.detail.avatarData !== undefined) {
-      sessionState.avatarData = e.detail.avatarData;
-      if (avatarEl) renderAvatarInto(avatarEl, e.detail.avatarData, sessionState.name || sessionState.email);
+      state.sessionState.avatarData = e.detail.avatarData;
+      if (avatarEl) renderAvatarInto(avatarEl, e.detail.avatarData, state.sessionState.name || state.sessionState.email);
     }
     if (e.detail.name !== undefined) {
-      sessionState.name = e.detail.name;
+      state.sessionState.name = e.detail.name;
       const nameEl = document.getElementById('sidebarUserName');
       if (nameEl) nameEl.textContent = e.detail.name;
-      if (!e.detail.avatarData && avatarEl) renderAvatarInto(avatarEl, sessionState.avatarData, e.detail.name);
+      if (!e.detail.avatarData && avatarEl) renderAvatarInto(avatarEl, state.sessionState.avatarData, e.detail.name);
     }
   });
 
   document.getElementById('sidebarCollapseBtn').addEventListener('click', toggleSidebar);
   document.getElementById('sidebarToggleBtn').addEventListener('click', toggleSidebar);
   document.getElementById('sidebarNewChat').addEventListener('click', () => {
-    if (currentMode === 'exam') return; // modo examen aún sin funcionalidad
+    if (state.currentMode === 'exam') return; // modo examen aún sin funcionalidad
     newChat();
   });
   document.getElementById('modeToggleBtn').addEventListener('click', () => {
-    setMode(currentMode === 'chat' ? 'exam' : 'chat');
+    setMode(state.currentMode === 'chat' ? 'exam' : 'chat');
   });
 
   document.addEventListener('keydown', (e) => {
@@ -2707,7 +2683,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const item = e.target.closest('.sidebar-chat-item');
     if (!item) return;
     const sid = item.dataset.session;
-    if (!sid || sid === sessionId) return;
+    if (!sid || sid === state.sessionId) return;
     loadSession(sid);
   });
 
@@ -2724,9 +2700,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   refreshSidebarSessions();
 
-  if (!sessionId) {
-    sessionId = crypto.randomUUID();
-    sessionStorage.setItem('chatSessionId', sessionId);
+  if (!state.sessionId) {
+    state.sessionId = crypto.randomUUID();
+    sessionStorage.setItem('chatSessionId', state.sessionId);
   }
   await historyPromise;
   setupChatInput();
@@ -2760,7 +2736,7 @@ async function handleQuizResolve(msgRow) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'same-origin',
-      body: JSON.stringify({ sessionId, userMsgId }),
+      body: JSON.stringify({ sessionId: state.sessionId, userMsgId }),
     });
     const data = await res.json();
     hideTyping();
@@ -2787,7 +2763,7 @@ async function handleQuizExplain() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'same-origin',
-      body: JSON.stringify({ sessionId }),
+      body: JSON.stringify({ sessionId: state.sessionId }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -2807,7 +2783,7 @@ function handleQuizExplainDone() {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'same-origin',
-    body: JSON.stringify({ sessionId }),
+    body: JSON.stringify({ sessionId: state.sessionId }),
   }).catch(() => {});
 }
 
