@@ -3,6 +3,7 @@
 process.env.NINE_ROUTER_API_KEY ??= 'test-dummy-key';
 process.env.NVIDIA_API_KEY_EMBEDDINGS ??= 'test-dummy-key';
 process.env.JWT_SECRET ??= 'test-jwt-secret-not-for-production';
+process.env.INTERNAL_API_SECRET ??= 'test-internal-secret-not-for-production';
 
 import { vi } from 'vitest';
 import Database from 'better-sqlite3';

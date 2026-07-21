@@ -30,6 +30,21 @@ def transaction():
         conn.rollback()
         raise
 
+# SQLite's datetime('now') devuelve UTC como 'YYYY-MM-DD HH:MM:SS' (sin 'T'
+# ni offset). Antes, expires_at se guardaba con datetime.isoformat()
+# ('...THH:MM:SS.ffffff+00:00'); comparar ese string contra datetime('now')
+# en una cláusula WHERE compara ambos como texto, y como 'T' (0x54) es mayor
+# que el espacio (0x20) de SQLite, "expires_at > datetime('now')" resultaba
+# casi siempre verdadero para filas del mismo día sin importar la hora real
+# — el filtro nunca excluía nada vencido. format_expiry/parse_expiry
+# normalizan el formato de escritura para que la comparación de strings en
+# SQL sea correcta.
+def format_expiry(dt: datetime) -> str:
+    return dt.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
+def parse_expiry(value: str) -> datetime:
+    return datetime.strptime(value, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+
 SESSION_EXPIRY_HOURS = int(os.getenv("SESSION_EXPIRY_HOURS", "24"))
 OTP_EXPIRY_MINUTES = int(os.getenv("OTP_EXPIRY_MINUTES", "5"))
 IP_RATE_LIMIT = int(os.getenv("IP_RATE_LIMIT", "5"))
@@ -82,7 +97,7 @@ def store_otp(email: str, code_hash: str, salt: bytes, expires_at: datetime):
         conn.execute("""
             INSERT INTO auth_otp_codes (id, email, code_hash, salt, expires_at)
             VALUES (?, ?, ?, ?, ?)
-        """, (secrets.token_urlsafe(16), email, code_hash, salt, expires_at.isoformat()))
+        """, (secrets.token_urlsafe(16), email, code_hash, salt, format_expiry(expires_at)))
 
 def get_otp(email: str) -> dict | None:
     conn = get_conn()
@@ -111,7 +126,7 @@ def delete_otp(email: str):
 
 def create_session(email: str) -> str:
     token = secrets.token_urlsafe(32)
-    expires = (datetime.now(timezone.utc) + timedelta(hours=SESSION_EXPIRY_HOURS)).isoformat()
+    expires = format_expiry(datetime.now(timezone.utc) + timedelta(hours=SESSION_EXPIRY_HOURS))
     with transaction() as conn:
         conn.execute("""
             INSERT INTO auth_sessions (session_token, email, expires_at)
@@ -130,6 +145,19 @@ def validate_session(token: str) -> dict | None:
 def delete_session(token: str):
     with transaction() as conn:
         conn.execute("DELETE FROM auth_sessions WHERE session_token = ?", (token,))
+
+def touch_session(token: str) -> bool:
+    """Extiende el vencimiento de una sesión existente (usado por /auth/refresh
+    para renovar el JWT de corta duración sin recrear la fila). Devuelve False
+    si la sesión no existe o ya venció — el llamador no debe emitir un JWT
+    nuevo en ese caso."""
+    new_expires = format_expiry(datetime.now(timezone.utc) + timedelta(hours=SESSION_EXPIRY_HOURS))
+    with transaction() as conn:
+        cur = conn.execute(
+            "UPDATE auth_sessions SET expires_at = ? WHERE session_token = ? AND expires_at > datetime('now')",
+            (new_expires, token)
+        )
+        return cur.rowcount > 0
 
 def check_ip_rate_limit(ip: str) -> bool:
     now = datetime.now(timezone.utc)

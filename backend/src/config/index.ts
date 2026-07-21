@@ -46,6 +46,20 @@ export const config = {
   jwt: {
     secret: required('JWT_SECRET'),
     expiresIn: process.env.JWT_EXPIRES_IN || '24h',
+    // Ventana antes de que expire el JWT de sesión durante la cual authenticate
+    // dispara una revalidación/renovación (rara, no en el camino crítico normal)
+    // contra el servicio Python. Ver src/middleware/auth.ts.
+    refreshGraceWindowMs: parseInt(process.env.JWT_REFRESH_GRACE_WINDOW_MS || '3600000', 10),
+  },
+
+  // Secreto compartido para el endpoint interno servicio-a-servicio
+  // (Python -> Node) usado para revocar sesiones JWT en logout. Deliberadamente
+  // separado de JWT_SECRET: si este se filtra, el radio de explosión se limita
+  // a poder invalidar sesiones (molesto, no un riesgo de suplantación); si
+  // JWT_SECRET se filtra, separarlos evita que ese mismo secreto sirva también
+  // para golpear el endpoint interno.
+  internal: {
+    apiSecret: required('INTERNAL_API_SECRET'),
   },
 
   db: {

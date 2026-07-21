@@ -14,7 +14,7 @@ export default defineConfig({
         '**/config/**',
         '**/*.d.ts',
         '**/types/**',
-        '**/workers/**',
+        '**/workers/cron-entry.ts',
         'src/**/*.test.ts',
         'test/**',
       ],

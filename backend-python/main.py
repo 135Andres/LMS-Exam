@@ -11,6 +11,8 @@ from datetime import datetime, timedelta, timezone
 from email.mime.text import MIMEText
 from typing import Optional
 
+import httpx
+import jwt as pyjwt
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -19,8 +21,9 @@ from dotenv import load_dotenv
 from db import (
     init_db, store_otp, get_otp, increment_otp_attempts, delete_otp,
     create_session as db_create_session, validate_session as db_validate_session,
-    delete_session as db_delete_session,
+    delete_session as db_delete_session, touch_session as db_touch_session,
     check_ip_rate_limit, is_whitelisted, get_whitelist, cleanup_expired,
+    parse_expiry,
 )
 
 # ---------------------------------------------------------------------------
@@ -39,6 +42,45 @@ if ENVIRONMENT == "production" and ("*" in CORS_ORIGINS or not CORS_ORIGINS):
     print("[CONFIG] ERROR: CORS_ORIGINS no puede ser '*' en producción. Especifica dominios.")
     raise RuntimeError("CORS configuration invalid for production")
 TRUST_PROXY = os.getenv("TRUST_PROXY", "false").lower() == "true"
+
+# Compartido con backend/ (Node) — firma/verifica los JWT de sesión. Debe ser
+# idéntico en ambos servicios; nunca hardcodear, rotar como cualquier secreto.
+JWT_SECRET = os.getenv("JWT_SECRET", "")
+if not JWT_SECRET:
+    raise RuntimeError("JWT_SECRET no configurado — requerido para firmar sesiones (plan 09).")
+JWT_ALGORITHM = "HS256"
+JWT_CLOCK_LEEWAY_SECONDS = 30  # tolerancia a reloj desincronizado entre Node y Python
+
+# Compartido con backend/ (Node) — autentica la llamada saliente a
+# POST /internal/session/invalidate en /auth/logout. Deliberadamente distinto
+# de JWT_SECRET (ver nota equivalente en backend/src/config/index.ts): si este
+# se filtra, el radio de explosión se limita a poder invalidar sesiones ajenas,
+# no a poder forjar JWTs.
+INTERNAL_API_SECRET = os.getenv("INTERNAL_API_SECRET", "")
+if not INTERNAL_API_SECRET:
+    raise RuntimeError("INTERNAL_API_SECRET no configurado — requerido para notificar revocación a Node (plan 09).")
+
+# Valores de placeholder/dev usados en tests y documentación (ver
+# tests/conftest.py y backend/test/setup.ts) — si alguno de estos termina
+# copiado tal cual a un .env de producción, JWT_SECRET/INTERNAL_API_SECRET
+# quedarían adivinables. Mismo patrón que el guard de CORS de arriba: falla
+# el arranque en vez de arrancar con un secreto conocido públicamente.
+_PLACEHOLDER_SECRETS = {
+    "test-jwt-secret-not-for-production-needs-32-bytes-min",
+    "test-internal-secret-not-for-production",
+    "changeme", "change-me", "secret", "placeholder", "your-secret-here",
+}
+if ENVIRONMENT == "production":
+    if JWT_SECRET in _PLACEHOLDER_SECRETS:
+        print("[CONFIG] ERROR: JWT_SECRET sigue en un valor de placeholder/test. No se puede arrancar en producción con este valor.")
+        raise RuntimeError("JWT_SECRET placeholder value not allowed in production")
+    if INTERNAL_API_SECRET in _PLACEHOLDER_SECRETS:
+        print("[CONFIG] ERROR: INTERNAL_API_SECRET sigue en un valor de placeholder/test. No se puede arrancar en producción con este valor.")
+        raise RuntimeError("INTERNAL_API_SECRET placeholder value not allowed in production")
+
+# Base URL del backend Node, para la notificación de revocación en logout.
+NODE_SERVICE_URL = os.getenv("NODE_SERVICE_URL", "http://localhost:3000")
+NODE_INTERNAL_CALL_TIMEOUT_SECONDS = 2.0
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -155,6 +197,51 @@ def transmit_otp_email(email: str, otp_code: str):
 
 def create_session(email: str) -> str:
     return db_create_session(email)
+
+def sign_session_jwt(email: str, jti: str) -> str:
+    """Firma el JWT de sesión de corta duración que reemplaza el token opaco
+    como valor de la cookie. `jti` es el mismo id usado como PK en
+    auth_sessions — así logout/refresh pueden ubicar la fila server-side sin
+    un segundo mecanismo de mapeo."""
+    now = datetime.now(timezone.utc)
+    payload = {
+        "email": email,
+        "jti": jti,
+        "iat": now,
+        "exp": now + timedelta(hours=SESSION_EXPIRY_HOURS),
+    }
+    return pyjwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+def decode_session_jwt(token: str, verify_exp: bool = True) -> Optional[dict]:
+    try:
+        return pyjwt.decode(
+            token, JWT_SECRET, algorithms=[JWT_ALGORITHM],
+            leeway=JWT_CLOCK_LEEWAY_SECONDS,
+            options={"verify_exp": verify_exp},
+        )
+    except pyjwt.PyJWTError:
+        return None
+
+def looks_like_jwt(token: str) -> bool:
+    """Misma heurística de formato que backend/src/middleware/auth.ts: un JWT
+    tiene 3 segmentos separados por '.'; los tokens opacos legacy
+    (secrets.token_urlsafe) no llevan puntos."""
+    return token.count(".") == 2
+
+def notify_node_session_revoked(jti: str, exp: datetime) -> None:
+    """Llamada saliente best-effort a Node para revocar de inmediato el JWT en
+    logout. Nunca debe bloquear ni fallar el logout: timeout corto, cualquier
+    excepción se loguea y se ignora — la sesión local ya se borró de todos
+    modos, y el JWT igual expira solo si esta llamada no llega."""
+    try:
+        httpx.post(
+            f"{NODE_SERVICE_URL}/internal/session/invalidate",
+            json={"jti": jti, "exp": int(exp.timestamp())},
+            headers={"X-Internal-Secret": INTERNAL_API_SECRET},
+            timeout=NODE_INTERNAL_CALL_TIMEOUT_SECONDS,
+        )
+    except Exception as e:
+        print(f"[WARN] No se pudo notificar revocación de sesión a Node: {e}", flush=True)
 
 # ---------------------------------------------------------------------------
 # Background tasks
@@ -288,7 +375,7 @@ async def otp_verify(body: OtpVerify, request: Request):
     if not record:
         raise HTTPException(status_code=401, detail="Código inválido o expirado.")
 
-    if datetime.now(timezone.utc) > datetime.fromisoformat(record["expires_at"]):
+    if datetime.now(timezone.utc) > parse_expiry(record["expires_at"]):
         delete_otp(email)
         raise HTTPException(status_code=401, detail="Código expirado. Solicita uno nuevo.")
 
@@ -313,7 +400,8 @@ async def otp_verify(body: OtpVerify, request: Request):
         )
 
     delete_otp(email)
-    session_token = create_session(email)
+    jti = create_session(email)
+    session_jwt = sign_session_jwt(email, jti)
 
     response = JSONResponse(
         status_code=200,
@@ -321,7 +409,44 @@ async def otp_verify(body: OtpVerify, request: Request):
     )
     response.set_cookie(
         key=SESSION_COOKIE_NAME,
-        value=session_token,
+        value=session_jwt,
+        httponly=True,
+        secure=COOKIE_SECURE,
+        samesite="lax",
+        path="/",
+        max_age=SESSION_EXPIRY_HOURS * 3600,
+    )
+    return response
+
+@app.post("/auth/refresh")
+async def refresh_session(request: Request):
+    """Llamado por Node (backend/src/middleware/auth.ts) solo cuando un JWT
+    está por vencer — no en el camino normal de cada request. Revalida contra
+    la fila server-side en auth_sessions (que logout puede haber borrado) y,
+    si sigue viva, extiende su vencimiento y firma un JWT nuevo con el mismo
+    jti."""
+    body = await request.json()
+    current_token = body.get("session_token")
+    if not current_token:
+        raise HTTPException(status_code=401, detail="Falta session_token")
+
+    claims = decode_session_jwt(current_token, verify_exp=True)
+    if not claims:
+        raise HTTPException(status_code=401, detail="Token inválido o expirado")
+
+    jti = claims.get("jti")
+    email = claims.get("email")
+    if not jti or not email:
+        raise HTTPException(status_code=401, detail="Token inválido")
+
+    if not db_touch_session(jti):
+        raise HTTPException(status_code=401, detail="Sesión ya no existe (revocada o expirada)")
+
+    new_jwt = sign_session_jwt(email, jti)
+    response = JSONResponse(status_code=200, content={"session_token": new_jwt, "email": email})
+    response.set_cookie(
+        key=SESSION_COOKIE_NAME,
+        value=new_jwt,
         httponly=True,
         secure=COOKIE_SECURE,
         samesite="lax",
@@ -334,7 +459,22 @@ async def otp_verify(body: OtpVerify, request: Request):
 async def logout(request: Request):
     session_token = request.cookies.get(SESSION_COOKIE_NAME)
     if session_token:
-        db_delete_session(session_token)
+        if looks_like_jwt(session_token):
+            # No exigimos que no esté vencido: un logout explícito de un JWT
+            # ya vencido igual debe limpiar la fila local y, si se puede leer
+            # el jti, notificar a Node (idempotente si ya expiró solo).
+            claims = decode_session_jwt(session_token, verify_exp=False)
+            if claims and claims.get("jti"):
+                jti = claims["jti"]
+                db_delete_session(jti)
+                exp_ts = claims.get("exp")
+                if exp_ts:
+                    notify_node_session_revoked(jti, datetime.fromtimestamp(exp_ts, tz=timezone.utc))
+        else:
+            # Formato legacy (pre-JWT, ver plan 09): el cookie es directamente
+            # el token opaco usado como PK en auth_sessions.
+            db_delete_session(session_token)
+
     response = JSONResponse(status_code=200, content={"message": "Sesión cerrada."})
     response.delete_cookie(
         key=SESSION_COOKIE_NAME,
@@ -350,6 +490,13 @@ async def get_current_user(request: Request):
     session_token = request.cookies.get(SESSION_COOKIE_NAME)
     if not session_token:
         raise HTTPException(status_code=401, detail="No session")
+
+    if looks_like_jwt(session_token):
+        claims = decode_session_jwt(session_token, verify_exp=True)
+        if not claims:
+            raise HTTPException(status_code=401, detail="Invalid session")
+        return {"email": claims["email"], "status": "authenticated"}
+
     session = db_validate_session(session_token)
     if not session:
         raise HTTPException(status_code=401, detail="Invalid session")
@@ -357,6 +504,9 @@ async def get_current_user(request: Request):
 
 @app.post("/auth/validate")
 async def validate_session(request: Request):
+    """Camino legacy (pre-JWT): sigue existiendo solo para que Node valide
+    cookies emitidas antes de este cambio mientras dure la migración (ver
+    plan 09) — no se usa para cookies en formato JWT."""
     body = await request.json()
     session_token = body.get("session_token")
     if not session_token:
