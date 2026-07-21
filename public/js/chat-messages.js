@@ -19,19 +19,19 @@ export function renderKaTeX() {
     var replaced = wrapBareLatex(html);
     replaced = replaced.replace(/\\\[(.+?)\\\]/gs, function (_, expr) {
       try { return katex.renderToString(expr, { displayMode: true, throwOnError: false }); }
-      catch (_) { return '\\[' + expr + '\\]'; }
+      catch { return '\\[' + expr + '\\]'; }
     });
     replaced = replaced.replace(/\$\$(.+?)\$\$/gs, function (_, expr) {
       try { return katex.renderToString(expr, { displayMode: true, throwOnError: false }); }
-      catch (_) { return '$$' + expr + '$$'; }
+      catch { return '$$' + expr + '$$'; }
     });
     replaced = replaced.replace(/\\\((.+?)\\\)/gs, function (_, expr) {
       try { return katex.renderToString(expr, { displayMode: false, throwOnError: false }); }
-      catch (_) { return '\\(' + expr + '\\)'; }
+      catch { return '\\(' + expr + '\\)'; }
     });
     replaced = replaced.replace(/\$(.+?)\$/g, function (_, expr) {
       try { return katex.renderToString(expr, { displayMode: false, throwOnError: false }); }
-      catch (_) { return '$' + expr + '$'; }
+      catch { return '$' + expr + '$'; }
     });
     if (replaced !== html) {
       el.innerHTML = replaced;
@@ -63,7 +63,7 @@ export function addMessage(text, sender, attachments, msgId, isPinned) {
         img.src = dataUrl;
         img.alt = att.name || 'image';
         img.loading = 'lazy';
-        img.addEventListener('click', (e) => openLightbox(dataUrl, att.name || 'image', img));
+        img.addEventListener('click', () => openLightbox(dataUrl, att.name || 'image', img));
         attEl.appendChild(img);
       } else if (att.type === 'audio') {
         const aud = document.createElement('audio');
@@ -437,8 +437,8 @@ export async function handleReport(aiText, msgRow, btn) {
   let userPrompt = '';
   if (userRows.length > 0) {
     const lastUser = userRows[0];
-    const t = lastUser.querySelector('.bubble-text');
-    if (t) userPrompt = t.textContent;
+    const textEl = lastUser.querySelector('.bubble-text');
+    if (textEl) userPrompt = textEl.textContent;
   }
   try {
     const res = await fetch('/api/chat/report', {

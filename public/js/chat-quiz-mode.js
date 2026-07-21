@@ -78,7 +78,7 @@ export async function handleQuizResolve(msgRow) {
       return;
     }
     addMessage(data.response, 'ai');
-  } catch (err) {
+  } catch {
     hideTyping();
     addMessage(t('quizConnError'), 'ai');
   }

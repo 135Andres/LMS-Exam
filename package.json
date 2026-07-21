@@ -5,6 +5,7 @@
   "main": "dashboard.js",
   "scripts": {
     "dashboard": "node dashboard.js",
+    "lint": "eslint backend/src backend/server.ts public/js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -13,5 +14,11 @@
   "type": "commonjs",
   "dependencies": {
     "blessed": "^0.1.81"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.7.0",
+    "globals": "^17.7.0",
+    "typescript-eslint": "^8.65.0"
   }
 }

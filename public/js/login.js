@@ -193,7 +193,7 @@ async function validateOtp(code) {
   try {
     await apiRequest('/auth/verify', { method: 'POST', body: { email: state.email, otp: code } });
     triggerOtpFlood('success');
-  } catch (err) {
+  } catch {
     otpAttempts--;
     const attemptsEl = document.getElementById('otpAttempts');
     attemptsEl.textContent = `${otpAttempts} ${otpAttempts === 1 ? t('attemptSingular') : t('attemptPlural')}`;

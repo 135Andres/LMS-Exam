@@ -28,14 +28,6 @@ function renderContextRing() {
   text.textContent = Math.round(usage * 100) + '%';
 }
 
-function formatDate(iso) {
-  if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('es-MX', {
-    year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit',
-  });
-}
-
 let updateSessionTimeout = null;
 
 export async function updateSessionInfo() {
@@ -86,12 +78,12 @@ export async function updateSessionInfo() {
       let userChars = 0;
       let aiChars = 0;
       userRows.forEach(r => {
-        const t = r.querySelector('.bubble-text');
-        if (t) userChars += t.textContent.length;
+        const textEl = r.querySelector('.bubble-text');
+        if (textEl) userChars += textEl.textContent.length;
       });
       aiRows.forEach(r => {
-        const t = r.querySelector('.bubble-text');
-        if (t) aiChars += t.textContent.length;
+        const textEl = r.querySelector('.bubble-text');
+        if (textEl) aiChars += textEl.textContent.length;
       });
       const totalChars = userChars + aiChars;
       const ratio = totalChars > 0 ? userChars / totalChars : 0.5;

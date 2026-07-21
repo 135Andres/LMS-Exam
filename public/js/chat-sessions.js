@@ -266,23 +266,6 @@ async function fetchArchivedSessions() {
 }
 
 /* ── Sidebar ── */
-function openSidebar() {
-  const sidebar = document.getElementById('sidebar');
-  const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
-  if (isCollapsed) {
-    sidebar.classList.remove('open');
-    sidebar.classList.add('collapsed');
-  } else {
-    sidebar.classList.add('open');
-    sidebar.classList.remove('collapsed');
-  }
-}
-
-function closeSidebar() {
-  const sidebar = document.getElementById('sidebar');
-  sidebar.classList.remove('open', 'collapsed');
-}
-
 export function toggleSidebar() {
   const sidebar = document.getElementById('sidebar');
   const wasCollapsed = sidebar.classList.contains('collapsed');

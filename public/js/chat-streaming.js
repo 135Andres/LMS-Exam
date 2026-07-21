@@ -260,7 +260,7 @@ async function runRegenerate(targetRow, instruction) {
 
     hideTyping();
     if (fullTextRef) {
-      const { text: cleanText, marker: quizMarker } = stripQuizMarker(fullTextRef);
+      const { marker: quizMarker } = stripQuizMarker(fullTextRef);
       const actions = aiBubble ? aiBubble.querySelector('.msg-actions') : null;
       if (actions) {
         if (quizMarker === 'QUIZ_DETECTED') appendQuizButtons(actions, aiBubble, quizGoalRef);
@@ -512,7 +512,7 @@ export async function handleSend() {
     clearAttachments();
 
     if (fullTextRef) {
-      const { text: cleanText, marker: quizMarker } = stripQuizMarker(fullTextRef);
+      const { marker: quizMarker } = stripQuizMarker(fullTextRef);
       const actions = aiBubble ? aiBubble.querySelector('.msg-actions') : null;
       if (actions) {
         if (quizMarker === 'QUIZ_DETECTED') appendQuizButtons(actions, aiBubble, quizGoalRef);

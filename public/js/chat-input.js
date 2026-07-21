@@ -1,4 +1,4 @@
-import { escapeHtml, svgIcon, formatTime } from './lib/utils.js';
+import { escapeHtml, formatTime } from './lib/utils.js';
 import { t } from './lib/i18n.js';
 import { state } from './chat-state.js';
 import { handleSend, exitReExplicarMode } from './chat-streaming.js';
@@ -239,7 +239,7 @@ export function setupChatInput() {
         if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
           navigator.mediaDevices.getUserMedia({ video: true })
             .then((stream) => {
-              stream.getTracks().forEach(t => t.stop());
+              stream.getTracks().forEach(track => track.stop());
             })
             .catch(() => {});
         }

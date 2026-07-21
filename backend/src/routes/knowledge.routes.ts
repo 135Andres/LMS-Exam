@@ -59,7 +59,7 @@ router.post('/contribute', validate(contributeSchema), async (req, res) => {
       randomUUID(), knowledgeId,
       new Float32Array(vector), 'nvidia/nv-embed-v1', vector.length
     );
-  } catch (err) {
+  } catch {
     // Embedding failure is not fatal — item is published, embedding can be generated later
   }
 
