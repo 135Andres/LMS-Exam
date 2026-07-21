@@ -267,6 +267,23 @@ describe('extractBlocks', () => {
     expect(call.subject).toBe('fisica');
   });
 
+  it('repara un backslash de LaTeX suelto (\\sqrt) en la respuesta de títulos, sin tirar SyntaxError (FIX consolidado)', async () => {
+    const messages = [
+      { id: 'm1', role: 'assistant', content: 'la raíz cuadrada de 4 es 2' },
+    ];
+    const segments = [
+      { messageId: 'm1', class: 'verificable' as const, confidence: 'high' as const, method: 'heuristic' as const },
+    ];
+    // Un \sqrt sin escapar rompería un JSON.parse ingenuo con "Bad escaped character".
+    generateFromAIMock.mockResolvedValueOnce(aiResponse('{"items": [{"id": "m1", "title": "Resuelve \\sqrt{4}"}]}'));
+
+    const blocks = await extractBlocks('session1', messages, segments, MODEL);
+
+    expect(blocks).toHaveLength(1);
+    const call = addBlockMock.mock.calls[0][1];
+    expect(call.title).toBe('Resuelve \\sqrt{4}');
+  });
+
   it('salta re-extracción si ya existe un bloque para ese messageId (idempotencia)', async () => {
     getIndexMock.mockReturnValue({ narrativeCompactions: [], blocks: [] });
     getBlocksMock.mockReturnValue([

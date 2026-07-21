@@ -24,3 +24,13 @@ export function isModelMultimodal(modelId: string): boolean {
   const found = AVAILABLE_MODELS.find(m => m.id === modelId);
   return found ? found.multimodal : false;
 }
+
+// Label "bonito" del selector (ej. "GLM 5.2") en vez del slug crudo
+// (ej. "glm-5.2") — usar solo cuando el usuario ya eligió ese modelo a
+// sabiendas desde el selector (ver FIX 3, consolidado post-planes 01-06).
+// Nunca usar esto para nombrar un modelo al que Inkling delegó
+// automáticamente sin que el usuario lo pidiera.
+export function getModelLabel(modelId: string): string {
+  const found = AVAILABLE_MODELS.find(m => m.id === modelId);
+  return found ? found.label : modelId.split('/').pop() || modelId;
+}

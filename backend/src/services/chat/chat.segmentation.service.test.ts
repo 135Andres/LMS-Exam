@@ -121,6 +121,20 @@ describe('segmentMessages', () => {
     ]);
   });
 
+  it('repara un backslash de LaTeX suelto (\\sqrt) en la respuesta del batch, sin tirar SyntaxError (FIX consolidado)', async () => {
+    const messages = [{ id: 'm1', role: 'user', content: 'cuál es la capital de Francia' }];
+    // Un \sqrt sin escapar rompería un JSON.parse ingenuo con "Bad escaped character".
+    generateFromAIMock.mockResolvedValueOnce(aiResponse(
+      '{"classifications": [{"messageId": "m1", "class": "narrativo", "confidence": "high", "note": "ver \\sqrt{4}"}]}',
+    ));
+
+    const results = await segmentMessages(messages, MODEL);
+
+    expect(results).toEqual([
+      { messageId: 'm1', class: 'narrativo', confidence: 'high', method: 'llm-batch' },
+    ]);
+  });
+
   it('cobertura total: segmentMessages(newMessages).length === newMessages.length siempre', async () => {
     const messages = [
       { id: 'm1', role: 'user', content: 'gracias' },

@@ -41,7 +41,18 @@ app.use(cors({
   credentials: true,
 }));
 
-app.use(express.json({ limit: '50mb' }));
+// Los mensajes de chat pueden traer hasta 5 adjuntos (imagen/audio/archivo)
+// en base64 sin límite de tamaño propio hoy (ver attachmentSchema en
+// validators/chat.ts) — solo esas dos rutas necesitan un límite de payload
+// más alto que el resto de la API. Se registran ANTES del parser global:
+// body-parser marca `req._body` tras parsear, así que el parser global de
+// abajo no vuelve a leer ni a aplicar su límite más chico sobre estas rutas.
+// app.post (no app.use) para que el match sea exacto — app.use hace match
+// por prefijo y también capturaría /api/chat/tutor/summary, /quiz/resolve, etc.
+const attachmentJsonLimit = express.json({ limit: '20mb' });
+app.post(['/api/chat/tutor', '/api/chat/tutor/stream'], attachmentJsonLimit);
+
+app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
 
 // Redirect / to login.html

@@ -36,6 +36,35 @@ describe('prompts de cuestionario', () => {
   });
 });
 
+describe('identidad del tutor (plan 02) — nunca exponer el modelo real', () => {
+  it('SYSTEM_PROMPT_TUTOR no contiene el placeholder {MODEL_NAME}', () => {
+    expect(SYSTEM_PROMPT_TUTOR).not.toContain('{MODEL_NAME}');
+  });
+
+  it('SYSTEM_PROMPT_TUTOR instruye responder "Inkling" ante preguntas de identidad, sin mencionar proveedores', () => {
+    expect(SYSTEM_PROMPT_TUTOR).toContain('eres Inkling');
+    expect(SYSTEM_PROMPT_TUTOR.toLowerCase()).not.toMatch(/claude|gemini|glm|deepseek|nvidia|anthropic|google|z-ai/);
+  });
+
+  it('ningún prompt de sistema expone nombres de proveedores o modelos de terceros', () => {
+    const prompts = {
+      SYSTEM_PROMPT_TUTOR,
+      SYSTEM_PROMPT_QUIZ_SOLVE,
+      SYSTEM_PROMPT_QUIZ_VERIFY,
+      SYSTEM_PROMPT_QUIZ_EXPLAIN,
+      SYSTEM_PROMPT_COMPACTOR,
+      SYSTEM_PROMPT_NARRATIVE_COMPACTOR,
+      SYSTEM_PROMPT_EXAM,
+    };
+    for (const [name, prompt] of Object.entries(prompts)) {
+      expect(prompt, `${name} no debe contener {MODEL_NAME}`).not.toContain('{MODEL_NAME}');
+      expect(prompt.toLowerCase(), `${name} no debe mencionar proveedores/modelos reales`).not.toMatch(
+        /claude|gemini|glm|deepseek|nvidia|anthropic|google|z-ai|sonnet/,
+      );
+    }
+  });
+});
+
 describe('SYSTEM_PROMPT_COMPACTOR', () => {
   it('no impone un tope de palabras', () => {
     expect(SYSTEM_PROMPT_COMPACTOR).not.toMatch(/máximo.*palabras/i);

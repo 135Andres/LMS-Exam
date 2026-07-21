@@ -1,4 +1,4 @@
-import { escapeHtml } from './lib/utils.js';
+import { escapeHtml, isValidAvatarDataUrl } from './lib/utils.js';
 import { initSettingsModal } from './lib/settings-modal.js';
 import { initI18n, t } from './lib/i18n.js';
 
@@ -70,7 +70,7 @@ function subjectMeta(subject) {
 function userCardHtml(user, chatsCount, examsCount, subjectsCount) {
   const name = user.name || user.email || t('studentFallback');
   const initial = (name[0] || '?').toUpperCase();
-  const avatarInner = user.avatar_data ? `<img src="${user.avatar_data}" alt="avatar">` : escapeHtml(initial);
+  const avatarInner = isValidAvatarDataUrl(user.avatar_data) ? `<img src="${user.avatar_data}" alt="avatar">` : escapeHtml(initial);
   return `
     <div class="user-card-identity">
       <div class="user-card-avatar">${avatarInner}</div>

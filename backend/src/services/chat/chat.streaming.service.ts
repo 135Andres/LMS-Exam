@@ -107,7 +107,7 @@ export class ChatStreamingService {
     // manual y no se orquesta.
     const decision = modelId ? undefined : this.orchestrator.decide(message, ragContext.length, attachments, UserProfileService.getProfile(userId)?.subjects);
     const resolved = this.modelRouter.resolve(decision?.model ?? modelId);
-    this.modelRouter.validateMultimodal(resolved, attachments);
+    this.modelRouter.validateMultimodal(resolved, attachments, !!modelId);
 
     // Corre después de calcular `history` a propósito, ver comentario análogo
     // en chat.completion.service.ts.

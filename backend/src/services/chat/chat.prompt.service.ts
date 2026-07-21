@@ -21,7 +21,7 @@ export class ChatPromptService {
   buildSystemPrompt(modelLabel: string, ragContext: string, userId: string, regenerateInstruction?: string, sessionId?: string, crossChatContext?: string): string {
     const isQuizExplain = !!(sessionId && ChatQuizModeService.isActive(sessionId));
     const basePrompt = isQuizExplain ? SYSTEM_PROMPT_QUIZ_EXPLAIN : SYSTEM_PROMPT_TUTOR;
-    let prompt = basePrompt.replace(/\{MODEL_NAME\}/g, modelLabel);
+    let prompt = basePrompt;
 
     if (sessionId) {
       const summary = SessionSummaryService.getNarrative(sessionId);

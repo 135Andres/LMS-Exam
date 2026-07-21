@@ -1,6 +1,7 @@
 import { generateFromAI } from '../ai/index.js';
 import { config } from '../../config/index.js';
 import { logger } from '../../utils/logger.js';
+import { repairBackslashEscapes } from '../../utils/json-repair.js';
 import { ChatModel } from '../../models/chat.model.js';
 import { SessionSummaryService } from '../session-summary.service.js';
 import { compactSession } from './chat.compaction.service.js';
@@ -43,7 +44,7 @@ export async function buildCrossChatContext(message: string, userId: string, cur
       temperature: 0,
       max_tokens: 500,
     });
-    const parsed = JSON.parse(result.content) as { sessionIds?: string[] };
+    const parsed = JSON.parse(repairBackslashEscapes(result.content)) as { sessionIds?: string[] };
     sessionIds = (parsed.sessionIds || []).filter(id => candidates.some(c => c.session_id === id));
   } catch (err) {
     logger.warn('Clasificación cross-chat falló', { error: (err as Error).message });

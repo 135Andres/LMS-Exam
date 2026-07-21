@@ -2,6 +2,7 @@
 import { generateFromAI } from '../ai/index.js';
 import { hasCode } from './chat.classifier.service.js';
 import { logger } from '../../utils/logger.js';
+import { repairBackslashEscapes } from '../../utils/json-repair.js';
 
 export type SegmentClass = 'verificable' | 'narrativo';
 
@@ -87,7 +88,7 @@ async function classifyBatch(messages: SegmentableMessage[], model: string): Pro
       },
     }, { model, temperature: 0.1, max_tokens: 2000 });
 
-    const parsed = JSON.parse(result.content) as { classifications: BatchItem[] };
+    const parsed = JSON.parse(repairBackslashEscapes(result.content)) as { classifications: BatchItem[] };
     items = parsed.classifications || [];
   } catch (err) {
     logger.warn('Error en batch de clasificación de mensajes, default conservador a verificable', {

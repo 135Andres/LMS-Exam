@@ -40,9 +40,23 @@ export function svgIcon(name, size) {
 
 // Foto de perfil (data URL base64) o inicial como fallback — mismo criterio
 // en todos los lugares donde se muestra el avatar del usuario.
+const VALID_AVATAR_DATA_URL = /^data:image\/(png|jpeg|jpg|webp|gif);base64,[A-Za-z0-9+/=]+$/;
+
+// Usar antes de interpolar avatar_data en cualquier template de HTML (nunca
+// insertarlo crudo) — mismo patrón que renderAvatarInto pero para call sites
+// que arman un string en vez de un solo elemento DOM.
+export function isValidAvatarDataUrl(avatarData) {
+  return typeof avatarData === 'string' && VALID_AVATAR_DATA_URL.test(avatarData);
+}
+
 export function renderAvatarInto(el, avatarData, name) {
-  if (avatarData) {
-    el.innerHTML = `<img src="${avatarData}" alt="avatar">`;
+  el.textContent = ''; // limpiar contenido previo, sin innerHTML
+
+  if (avatarData && VALID_AVATAR_DATA_URL.test(avatarData)) {
+    const img = document.createElement('img');
+    img.src = avatarData;
+    img.alt = 'avatar';
+    el.appendChild(img);
   } else {
     el.textContent = (name || '?')[0].toUpperCase();
   }

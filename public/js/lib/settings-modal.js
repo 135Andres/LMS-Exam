@@ -2,7 +2,7 @@
 // la página que lo usa ya tiene el markup (#settingsOverlay, #memoryImportOverlay,
 // #avatarFileInput, #settingsBtn, etc. — ver chat.html/dashboard.html) y ya
 // importa 'Space Mono' / el CSS de welcome.css.
-import { escapeHtml, svgIcon, renderAvatarInto } from './utils.js';
+import { escapeHtml, svgIcon, isValidAvatarDataUrl } from './utils.js';
 import { t, setLanguage } from './i18n.js';
 
 const SETTINGS_CATEGORIES = [
@@ -153,7 +153,7 @@ function renderSettingsSection(key) {
 
 function configSectionHtml() {
   const initial = (currentUser.name || currentUser.email || '?')[0]?.toUpperCase() || '?';
-  const avatarInner = settingsData.avatar_data ? `<img src="${settingsData.avatar_data}" alt="avatar">` : initial;
+  const avatarInner = isValidAvatarDataUrl(settingsData.avatar_data) ? `<img src="${settingsData.avatar_data}" alt="avatar">` : initial;
   return `
     <h3 class="settings-section-title">${escapeHtml(t('settingsConfig'))}</h3>
 

@@ -1,5 +1,6 @@
 import { generateFromAI } from '../ai/index.js';
 import { logger } from '../../utils/logger.js';
+import { repairBackslashEscapes } from '../../utils/json-repair.js';
 import { ChatModel } from '../../models/chat.model.js';
 import { SessionSummaryService, type KnowledgeBlock } from '../session-summary.service.js';
 import { segmentMessages, VERIFICABLE_MARKERS, type SegmentationResult } from './chat.segmentation.service.js';
@@ -87,7 +88,7 @@ async function runNarrativeCompaction(sessionId: string, userPrompt: string, mod
   }
 
   try {
-    const parsed = JSON.parse(result.content) as { summary?: string; confidence?: 'high' | 'medium' | 'low' };
+    const parsed = JSON.parse(repairBackslashEscapes(result.content)) as { summary?: string; confidence?: 'high' | 'medium' | 'low' };
     if (!parsed.summary) return null;
     return { summary: parsed.summary, confidence: parsed.confidence || 'high' };
   } catch (err) {

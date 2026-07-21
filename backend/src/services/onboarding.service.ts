@@ -96,13 +96,7 @@ function resolveStepValues(payload: OnboardingStepPayload, values: Record<string
 }
 
 async function generateWelcome(profile: ReturnType<typeof UserProfileService.getProfile>, pendingMessage: string | null): Promise<string> {
-  // SYSTEM_PROMPT_TUTOR trae un placeholder {MODEL_NAME} que buildSystemPrompt()
-  // resuelve en el flujo normal de chat (chat.prompt.service.ts) — acá no hay
-  // "modelLabel" de por medio, así que se resuelve igual a mano para no dejar
-  // el literal "{MODEL_NAME}" sin reemplazar en el prompt real.
-  const modelLabel = config.models.chat.split('/').pop() || config.models.chat;
-  const basePrompt = SYSTEM_PROMPT_TUTOR.replace(/\{MODEL_NAME\}/g, modelLabel);
-  const systemPrompt = composeSystemPrompt(basePrompt, profile, 'full') + WELCOME_APPENDIX;
+  const systemPrompt = composeSystemPrompt(SYSTEM_PROMPT_TUTOR, profile, 'full') + WELCOME_APPENDIX;
   const userPrompt = pendingMessage || '(El estudiante no tenía un mensaje pendiente — solo dale la bienvenida.)';
   const result = await generateFromAI('nineRouter', systemPrompt, userPrompt, null, { model: config.models.chat });
   return result.content;

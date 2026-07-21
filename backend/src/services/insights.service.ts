@@ -3,6 +3,7 @@ import { getDb } from '../db/connection.js';
 import { generateFromAI } from './ai/index.js';
 import { config } from '../config/index.js';
 import { logger } from '../utils/logger.js';
+import { repairBackslashEscapes } from '../utils/json-repair.js';
 
 const INSIGHT_PROMPT = `Eres un analizador de progreso académico. Dado un conjunto de mensajes de conversación de tutoría de un estudiante, identifica:
 
@@ -46,7 +47,7 @@ export async function generateDailyInsights(userId: string, date: string): Promi
       max_tokens: 3000,
     });
 
-    const insights = JSON.parse(result.content) as {
+    const insights = JSON.parse(repairBackslashEscapes(result.content)) as {
       fortalezas: string[];
       debilidades: string[];
       recomendaciones: string;

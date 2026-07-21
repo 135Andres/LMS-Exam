@@ -408,6 +408,38 @@ describe('compactSession — límite a reintentos indefinidos de narrativa (Fase
   });
 });
 
+describe('compactSession — reparación de backslashes de LaTeX (FIX consolidado)', () => {
+  beforeEach(() => {
+    generateFromAIMock.mockReset();
+    chatModelMock.getSummaryCursor.mockReset().mockReturnValue(null);
+    chatModelMock.getMessagesSince.mockReset().mockReturnValue(NEW_MESSAGES);
+    chatModelMock.setSummaryCursor.mockReset();
+    chatModelMock.getLastAssistantModel.mockReset().mockReturnValue('nvidia/thinkingmachines/inkling');
+    sessionSummaryMock.getNarrative.mockReset().mockReturnValue(null);
+    sessionSummaryMock.saveNarrative.mockReset();
+    sessionSummaryMock.getNarrativeFailureCount.mockReset().mockReturnValue(0);
+    sessionSummaryMock.recordNarrativeFailure.mockReset().mockReturnValue(1);
+    sessionSummaryMock.resetNarrativeFailureCount.mockReset();
+    segmentMessagesMock.mockReset().mockResolvedValue(allNarrativo());
+    extractBlocksMock.mockReset().mockResolvedValue([]);
+    verifyCompactionMock.mockReset().mockResolvedValue({ missing: [], verified: true });
+    pickVerifierModelMock.mockReset().mockReturnValue('ag/gemini-3-flash');
+  });
+
+  it('repara un backslash de LaTeX suelto (\\sqrt) en el resumen narrativo, sin tirar SyntaxError', async () => {
+    // Un \sqrt sin escapar rompería un JSON.parse ingenuo con "Bad escaped character".
+    generateFromAIMock.mockResolvedValueOnce(aiResponse(
+      '{"summary": "El estudiante preguntó por \\sqrt{4}.", "confidence": "high"}', 'stop',
+    ));
+
+    await compactSession('s1', 'u1', true);
+
+    expect(sessionSummaryMock.saveNarrative).toHaveBeenCalledWith(
+      's1', 'El estudiante preguntó por \\sqrt{4}.', expect.any(Object),
+    );
+  });
+});
+
 describe('compactSession — outcomes tempranos', () => {
   it('devuelve status "skipped_no_new_messages" si no hay mensajes nuevos', async () => {
     chatModelMock.getSummaryCursor.mockReset().mockReturnValue(null);

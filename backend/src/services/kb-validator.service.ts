@@ -5,6 +5,7 @@ import { config } from '../config/index.js';
 import { logger } from '../utils/logger.js';
 import { KnowledgeModel } from '../models/knowledge.model.js';
 import { KnowledgeEmbeddingModel } from '../models/knowledge-embedding.model.js';
+import { repairBackslashEscapes } from '../utils/json-repair.js';
 
 const VALIDATION_PROMPT = `Eres un curador de una base de conocimiento colectiva para estudiantes. Recibes un intercambio de pregunta-respuesta detectado automáticamente en un chat de tutoría. Decide si vale la pena guardarlo como conocimiento reusable para otros estudiantes.
 
@@ -51,7 +52,7 @@ export async function validatePendingKnowledge(limit = 20): Promise<void> {
         max_tokens: 3000,
       });
 
-      const parsed = JSON.parse(result.content) as ValidationResult;
+      const parsed = JSON.parse(repairBackslashEscapes(result.content)) as ValidationResult;
 
       if (parsed.valuable && parsed.correct) {
         KnowledgeModel.publishWithAiVerification(item.id, {

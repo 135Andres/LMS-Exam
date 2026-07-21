@@ -1,5 +1,5 @@
 import { config } from '../../config/index.js';
-import { isModelMultimodal } from '../../config/models.js';
+import { isModelMultimodal, getModelLabel } from '../../config/models.js';
 
 export interface ResolvedModel {
   model: string;
@@ -19,9 +19,14 @@ export class ChatModelRouter {
     };
   }
 
-  validateMultimodal(resolved: ResolvedModel, attachments?: Array<{ type: string }>): void {
+  // isExplicitModel: true solo si el usuario eligió este modelo a mano desde
+  // el selector (modelId vino en la request) — si vino de la delegación
+  // automática del orquestador bajo "Inkling" por default, nunca se nombra el
+  // modelo real delegado (ver FIX 3, consolidado post-planes 01-06).
+  validateMultimodal(resolved: ResolvedModel, attachments: Array<{ type: string }> | undefined, isExplicitModel: boolean): void {
     if (attachments && attachments.length > 0 && !resolved.multimodal) {
-      throw new Error(`El modelo **${resolved.label}** no soporta archivos adjuntos.`);
+      const label = isExplicitModel ? getModelLabel(resolved.model) : 'Inkling';
+      throw new Error(`El modelo **${label}** no soporta archivos adjuntos.`);
     }
   }
 }

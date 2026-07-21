@@ -87,6 +87,18 @@ describe('verifyCompaction', () => {
     expect(result.verified).toBe(false);
   });
 
+  it('repara un backslash de LaTeX suelto (\\sqrt) en la descripción, sin tirar SyntaxError (FIX consolidado)', async () => {
+    // Un \sqrt sin escapar rompería un JSON.parse ingenuo con "Bad escaped character".
+    generateFromAIMock.mockResolvedValueOnce(aiResponse(
+      '{"missing": [{"description": "Falta \\sqrt{4}", "suggestedBlock": false}]}',
+    ));
+
+    const result = await verifyCompaction(originalMessages, narrative, blocks, 'ag/gemini-3-flash');
+
+    expect(result.verified).toBe(true);
+    expect(result.missing).toEqual([{ description: 'Falta \\sqrt{4}', suggestedBlock: false }]);
+  });
+
   it('ante error de la IA, devuelve missing: [] y verified: false en vez de lanzar', async () => {
     generateFromAIMock.mockRejectedValueOnce(new Error('timeout'));
 

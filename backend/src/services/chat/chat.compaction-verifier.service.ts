@@ -1,6 +1,7 @@
 // backend/src/services/chat/chat.compaction-verifier.service.ts
 import { generateFromAI } from '../ai/index.js';
 import { logger } from '../../utils/logger.js';
+import { repairBackslashEscapes } from '../../utils/json-repair.js';
 import type { KnowledgeBlock } from '../session-summary.service.js';
 
 export interface ChatMessage {
@@ -71,7 +72,7 @@ export async function verifyCompaction(
       },
     }, { model: verifierModel, temperature: 0.1, max_tokens: 1500 });
 
-    const parsed = JSON.parse(result.content) as { missing?: MissingContentItem[] };
+    const parsed = JSON.parse(repairBackslashEscapes(result.content)) as { missing?: MissingContentItem[] };
     if (!parsed || !Array.isArray(parsed.missing)) return { missing: [], verified: false };
     return { missing: parsed.missing, verified: true };
   } catch (err) {

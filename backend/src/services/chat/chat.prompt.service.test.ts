@@ -74,6 +74,24 @@ describe('ChatPromptService inyección del perfil estructurado (plan 03)', () =>
   });
 });
 
+describe('ChatPromptService — identidad del tutor (plan 02)', () => {
+  afterEach(() => {
+    ChatQuizModeService.deactivate(SESSION_ID);
+  });
+
+  it.each(['claude-sonnet-4-6', 'gemini-3.1-pro-low', 'glm-5.2'])(
+    'el prompt resultante nunca expone el modelLabel real ("%s") delegado por el orquestador',
+    (modelLabel) => {
+      const service = new ChatPromptService();
+      const prompt = service.buildSystemPrompt(modelLabel, '', 'user-1', undefined, SESSION_ID);
+
+      expect(prompt).not.toContain(modelLabel);
+      expect(prompt).not.toContain('{MODEL_NAME}');
+      expect(prompt).toContain('eres Inkling');
+    },
+  );
+});
+
 describe('ChatPromptService modo Explicar', () => {
   afterEach(() => {
     ChatQuizModeService.deactivate(SESSION_ID);

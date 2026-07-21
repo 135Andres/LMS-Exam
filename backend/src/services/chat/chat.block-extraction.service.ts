@@ -6,6 +6,7 @@ import { SessionSummaryService, type KnowledgeBlock } from '../session-summary.s
 import { KnowledgeModel, hashKnowledgeContent } from '../../models/knowledge.model.js';
 import { UserProfileService } from '../user-profile.service.js';
 import { logger } from '../../utils/logger.js';
+import { repairBackslashEscapes } from '../../utils/json-repair.js';
 import type { SegmentationResult } from './chat.segmentation.service.js';
 
 const VALID_SUBJECTS = [...Object.keys(SUBJECT_KEYWORDS), 'general'];
@@ -86,7 +87,7 @@ async function generateTitlesAndSubjectsBatch(
       },
     }, { model, temperature: 0.3, max_tokens: 800 });
 
-    const parsed = JSON.parse(result.content) as { items?: TitleBatchItem[] };
+    const parsed = JSON.parse(repairBackslashEscapes(result.content)) as { items?: TitleBatchItem[] };
     const byId = new Map((parsed.items || []).map(t => [t.id, t]));
 
     const out: Record<string, TitleBatchResult> = {};

@@ -2,6 +2,7 @@ import { generateFromAI } from '../ai/index.js';
 import { ProfileService } from '../profile.service.js';
 import { config } from '../../config/index.js';
 import { logger } from '../../utils/logger.js';
+import { repairBackslashEscapes } from '../../utils/json-repair.js';
 
 // Filtro barato antes de gastar una llamada IA (el clasificador de abajo).
 // Frases sin acentos — el mensaje se normaliza (sin acentos, minúsculas) antes
@@ -60,7 +61,7 @@ export class ChatProfileDetectionService {
         },
       }, { model: config.models.chat, temperature: 0.1, max_tokens: 150 });
 
-      const parsed = JSON.parse(result.content) as { update_profile: boolean; change?: string };
+      const parsed = JSON.parse(repairBackslashEscapes(result.content)) as { update_profile: boolean; change?: string };
       if (parsed.update_profile && parsed.change) {
         logger.info('Perfil actualizado desde chat', { userId, change: parsed.change });
         ProfileService.appendToProfile(userId, parsed.change);

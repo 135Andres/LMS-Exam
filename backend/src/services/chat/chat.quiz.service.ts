@@ -2,6 +2,7 @@
 import { generateFromAI } from '../ai/index.js';
 import { SYSTEM_PROMPT_QUIZ_SOLVE, SYSTEM_PROMPT_QUIZ_VERIFY } from '../../prompts/system.js';
 import { logger } from '../../utils/logger.js';
+import { repairBackslashEscapes } from '../../utils/json-repair.js';
 
 interface SolvedItem {
   num: number;
@@ -17,16 +18,6 @@ interface VerifyResult {
 }
 
 const MAX_SOLVE_ATTEMPTS = 3;
-
-// La IA mete LaTeX (\sqrt, \frac, \sum, etc.) dentro de strings JSON — pese a
-// que el prompt pide escapar backslashes como \\, no siempre lo hace, y un
-// \s/\f(letra)/\l/etc. no es un escape JSON válido: JSON.parse tira "Bad
-// escaped character" en CADA intento de un cuestionario real con matemáticas,
-// vaciando items y cayendo siempre al mensaje de "no pude resolver". Reparamos
-// duplicando cualquier backslash que no preceda a un escape JSON válido.
-function repairBackslashEscapes(json: string): string {
-  return json.replace(/\\(?!["\\/bfnrtu])/g, '\\\\');
-}
 
 function parseJSONArray<T>(raw: string): T[] {
   let cleaned = raw.trim();

@@ -1,5 +1,6 @@
 import { generateFromAI } from '../ai/index.js';
 import { logger } from '../../utils/logger.js';
+import { getModelLabel } from '../../config/models.js';
 import { ChatModel } from '../../models/chat.model.js';
 import { UserProfileService } from '../user-profile.service.js';
 import { detectAndSuggestKnowledge } from '../knowledge-detection.service.js';
@@ -72,7 +73,7 @@ export class ChatCompletionService {
     // manual y no se orquesta.
     const decision = modelId ? undefined : this.orchestrator.decide(message, ragContext.length, attachments, UserProfileService.getProfile(userId)?.subjects);
     const resolved = this.modelRouter.resolve(decision?.model ?? modelId);
-    this.modelRouter.validateMultimodal(resolved, attachments);
+    this.modelRouter.validateMultimodal(resolved, attachments, !!modelId);
 
     logger.info('Enviando mensaje al tutor IA', {
       messageLength: message.length,
@@ -115,7 +116,11 @@ export class ChatCompletionService {
 
       return { response: result.content };
     } catch {
-      return { response: `El modelo **${resolved.label}** no respondió a tiempo. Cambia a otro modelo desde el selector e intenta de nuevo.` };
+      // Si el usuario no eligió modelo explícito, resolved.model puede ser una
+      // delegación automática interna de Inkling — nunca se nombra al usuario
+      // (ver FIX 3, consolidado post-planes 01-06).
+      const label = modelId ? getModelLabel(resolved.model) : 'Inkling';
+      return { response: `El modelo **${label}** no respondió a tiempo. Cambia a otro modelo desde el selector e intenta de nuevo.` };
     } finally {
       clearTimeout(timeoutId);
     }
