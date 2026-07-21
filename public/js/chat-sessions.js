@@ -1,7 +1,8 @@
 import { formatTime, escapeHtml, svgIcon } from './lib/utils.js';
 import { t } from './lib/i18n.js';
 import { state } from './chat-state.js';
-import { addMessage, updateSessionInfo, playHeroToChatMorph } from './chat.js';
+import { updateSessionInfo, playHeroToChatMorph } from './chat.js';
+import { addMessage } from './chat-messages.js';
 
 async function fetchSessions() {
   try {

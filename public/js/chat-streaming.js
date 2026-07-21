@@ -4,11 +4,11 @@ import { t } from './lib/i18n.js';
 import { renderOnboardingStep, maybeOfferDeferredBanner } from './onboarding.js';
 import { state } from './chat-state.js';
 import { stripQuizMarker, appendQuizButtons, appendNextStepButton, handleQuizExplainDone } from './chat-quiz-mode.js';
+import { updateSessionInfo } from './chat.js';
 import {
   addMessage, showTyping, hideTyping, handleCopy, togglePinMessage, handleReport, renderKaTeX,
-  clearAttachments, updatePlusButton, SLASH_COMMANDS, closeSlashMenu, executeSlashCommand,
-  updateSessionInfo,
-} from './chat.js';
+} from './chat-messages.js';
+import { clearAttachments, updatePlusButton, SLASH_COMMANDS, closeSlashMenu, executeSlashCommand } from './chat-input.js';
 import { refreshSidebarSessions } from './chat-sessions.js';
 
 let reExplicarModeActive = false;

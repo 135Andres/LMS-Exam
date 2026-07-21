@@ -1,6 +1,7 @@
 import { t } from './lib/i18n.js';
 import { state } from './chat-state.js';
-import { addMessage, showTyping, hideTyping, addSystemMessage, handleSend } from './chat.js';
+import { addMessage, showTyping, hideTyping, addSystemMessage } from './chat-messages.js';
+import { handleSend } from './chat-streaming.js';
 
 const QUIZ_MARKERS = ['[[QUIZ_DETECTED]]', '[[QUIZ_EXPLAIN_DONE]]'];
 
