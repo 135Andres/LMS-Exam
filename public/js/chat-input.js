@@ -3,7 +3,8 @@ import { t } from './lib/i18n.js';
 import { state } from './chat-state.js';
 import { handleSend, exitReExplicarMode } from './chat-streaming.js';
 import { addMessage, showTyping, hideTyping, addSystemMessage, addSessionDivider } from './chat-messages.js';
-import { updateSessionInfo, modelsPromise } from './chat.js';
+import { modelsPromise } from './chat.js';
+import { updateSessionInfo } from './chat-context-panel.js';
 import { initHeroView } from './chat-hero.js';
 
 let linkModeActive = false;

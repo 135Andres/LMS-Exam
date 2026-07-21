@@ -5,7 +5,7 @@ import { state } from './chat-state.js';
 import { stripQuizMarker, appendQuizButtons, appendNextStepButton, handleQuizExplainDone } from './chat-quiz-mode.js';
 import { openReExplicarConfirm, handleSend } from './chat-streaming.js';
 import { loadSession } from './chat-sessions.js';
-import { closeContextPanel } from './chat.js';
+import { closeContextPanel } from './chat-context-panel.js';
 
 export function renderKaTeX() {
   if (typeof katex !== 'object') return;

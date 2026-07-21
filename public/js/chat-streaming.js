@@ -4,7 +4,7 @@ import { t } from './lib/i18n.js';
 import { renderOnboardingStep, maybeOfferDeferredBanner } from './onboarding.js';
 import { state } from './chat-state.js';
 import { stripQuizMarker, appendQuizButtons, appendNextStepButton, handleQuizExplainDone } from './chat-quiz-mode.js';
-import { updateSessionInfo } from './chat.js';
+import { updateSessionInfo } from './chat-context-panel.js';
 import {
   addMessage, showTyping, hideTyping, handleCopy, togglePinMessage, handleReport, renderKaTeX,
 } from './chat-messages.js';
