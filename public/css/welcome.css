@@ -2292,6 +2292,209 @@ body.exam-mode #showArchivedBtn {
   font-size: 0.65rem;
 }
 
+/* ── Resumen de la sesión (Fase 4 de compactación) — mismo patrón visual
+   que "Notas rápidas" arriba (.pinned-messages-section) ── */
+.session-summary-section {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 1rem 1.25rem;
+  flex-shrink: 0;
+}
+
+.session-summary-section summary {
+  cursor: pointer;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.7);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  list-style: none;
+}
+
+.session-summary-section summary::-webkit-details-marker {
+  display: none;
+}
+
+.session-summary-section summary::before {
+  content: '▸';
+  display: inline-block;
+  margin-right: 0.4rem;
+  transition: transform 150ms ease;
+}
+
+.session-summary-section[open] summary::before {
+  transform: rotate(90deg);
+}
+
+.session-summary-section #sessionSummaryBlockCount {
+  color: rgba(255, 255, 255, 0.4);
+  font-weight: 400;
+}
+
+.session-summary-body {
+  margin-top: 0.6rem;
+  max-height: 260px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+
+.session-summary-body::-webkit-scrollbar {
+  width: 5px;
+}
+.session-summary-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+.session-summary-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 999px;
+}
+
+.summary-narrative {
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.75);
+  line-height: 1.5;
+}
+
+.summary-narrative p {
+  margin: 0 0 0.5rem;
+}
+
+.summary-edit-btn {
+  margin-top: 0.6rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-family: 'Space Mono', monospace;
+  font-size: 0.65rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.7);
+  transition: background 150ms ease;
+}
+
+.summary-edit-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.summary-blocks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-top: 0.6rem;
+}
+
+.summary-block-item {
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 0.35rem 0.3rem;
+  transition: background 120ms ease;
+}
+
+.summary-block-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.summary-block-title {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.summary-block-subject {
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.4);
+  text-transform: uppercase;
+  font-size: 0.55rem;
+  letter-spacing: 0.03em;
+}
+
+.summary-block-content {
+  margin-top: 0.35rem;
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.5;
+}
+
+.summary-block-content.hidden {
+  display: none;
+}
+
+.summary-edit-textarea {
+  width: 100%;
+  min-height: 140px;
+  margin-top: 0.6rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 8px;
+  resize: vertical;
+  font-family: inherit;
+  font-size: 0.7rem;
+  line-height: 1.5;
+  color: var(--text-primary);
+  background: rgba(var(--ink-rgb), 0.04);
+  border: 1px solid rgba(var(--ink-rgb), 0.15);
+  outline: none;
+  box-sizing: border-box;
+}
+
+.summary-edit-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.summary-edit-actions button {
+  flex: 1;
+  padding: 0.4rem;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-family: 'Space Mono', monospace;
+  font-size: 0.7rem;
+  font-weight: 600;
+  transition: background 150ms ease;
+}
+
+#summarySaveBtn {
+  background: #6c5ce7;
+  color: #fff;
+}
+
+#summarySaveBtn:hover {
+  background: #5b4bd4;
+}
+
+#summaryCancelBtn {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.6);
+}
+
+#summaryCancelBtn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+#summaryEditError {
+  margin-top: 0.4rem;
+  font-size: 0.65rem;
+  color: #f87171;
+}
+
+#summaryEditError.hidden {
+  display: none;
+}
+
+/* Informativo, no un error — tono sutil, no alarmante (la conversación
+   original nunca se pierde, solo puede haber quedado desactualizado). */
+.summary-warning {
+  margin-bottom: 0.5rem;
+  padding: 0.4rem 0.5rem;
+  border-radius: 6px;
+  background: rgba(250, 204, 21, 0.08);
+  color: rgba(250, 204, 21, 0.85);
+  font-size: 0.6rem;
+  line-height: 1.4;
+}
+
 /* Resalte breve al saltar a un mensaje fijado desde el panel. */
 .msg-row.jump-highlight .bubble-user,
 .msg-row.jump-highlight .bubble-ai {
