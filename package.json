@@ -1,9 +1,10 @@
 {
-  "name": "webfinal",
+  "name": "lms-exam-dashboard",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Panel de terminal (blessed) para correr backend-python + backend en paralelo durante desarrollo — ver dashboard.js y docs/README.md.",
+  "main": "dashboard.js",
   "scripts": {
+    "dashboard": "node dashboard.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

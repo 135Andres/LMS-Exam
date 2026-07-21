@@ -51,6 +51,8 @@ npm run dev:all      # levanta Python (auth, :3001) + Node (API, :3000) juntos
 
 O por separado: `npm run dev` (Node) / `npm run dev:python` (auth).
 
+Alternativa: `npm run dashboard` en la raíz del repo levanta ambos procesos a la vez en un panel de terminal dividido (`dashboard.js`, usa `blessed`) — por eso existe un `package.json` en la raíz aparte del de `backend/`, no es residuo de scaffold.
+
 Frontend: servir `public/` estático (o abrir directo si el backend ya sirve esa carpeta) — entra por `login.html`.
 
 Tests: `npm test` (backend). Typecheck: `npm run typecheck`.
