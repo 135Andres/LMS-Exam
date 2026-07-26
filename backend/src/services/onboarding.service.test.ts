@@ -54,8 +54,16 @@ describe('OnboardingService', () => {
     expect(result.type).toBe('passthrough');
   });
 
-  it('usuario skipped nunca recibe onboarding_step', () => {
+  it('usuario skipped SIN perfil guardado → intercept se comporta como pending (wizard)', () => {
     getTestDb().prepare("UPDATE users SET onboarding_state = 'skipped' WHERE id = ?").run(USER_A);
+    const result = OnboardingService.intercept(USER_A, 'hola', SESSION_A) as any;
+    expect(result.type).toBe('onboarding_step');
+    expect(result.step).toBe(1);
+  });
+
+  it('usuario skipped CON perfil guardado → passthrough, no se reactiva', () => {
+    getTestDb().prepare("UPDATE users SET onboarding_state = 'skipped' WHERE id = ?").run(USER_A);
+    UserProfileService.saveProfile(USER_A, { displayName: 'Andrés', level: 'uni', field: 'Ingeniería' });
     const result = OnboardingService.intercept(USER_A, 'hola', SESSION_A);
     expect(result.type).toBe('passthrough');
   });
@@ -269,6 +277,17 @@ describe('OnboardingService', () => {
   it('getState: completed/skipped → sin step', () => {
     getTestDb().prepare("UPDATE users SET onboarding_state = 'completed', onboarding_current_step = 0 WHERE id = ?").run(USER_A);
     expect(OnboardingService.getState(USER_A)).toEqual({ state: 'completed', step: null });
+  });
+
+  it('getState: skipped sin perfil → pending (autocorrección)', () => {
+    getTestDb().prepare("UPDATE users SET onboarding_state = 'skipped' WHERE id = ?").run(USER_A);
+    expect(OnboardingService.getState(USER_A)).toEqual({ state: 'pending', step: null });
+  });
+
+  it('getState: skipped con perfil → skipped', () => {
+    getTestDb().prepare("UPDATE users SET onboarding_state = 'skipped' WHERE id = ?").run(USER_A);
+    UserProfileService.saveProfile(USER_A, { displayName: 'Andrés' });
+    expect(OnboardingService.getState(USER_A)).toEqual({ state: 'skipped', step: null });
   });
 
   it('respuesta en texto libre sobre chips matchea por contains (lowercase)', async () => {

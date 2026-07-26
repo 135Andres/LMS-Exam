@@ -20,6 +20,8 @@
   --text-primary: #1a1a1a;
   --ink-rgb: 0, 0, 0;
   --paper-rgb: 255, 255, 255;
+  --danger: #e74c3c;
+  --danger-hover: #c0392b;
 }
 
 :root[data-theme="dark"] {
@@ -32,6 +34,8 @@
   --text-primary: #f0f0f0;
   --ink-rgb: 255, 255, 255;
   --paper-rgb: 20, 20, 20;
+  --danger: #e74c3c;
+  --danger-hover: #c0392b;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -45,6 +49,8 @@
     --text-primary: #f0f0f0;
     --ink-rgb: 255, 255, 255;
     --paper-rgb: 20, 20, 20;
+    --danger: #e74c3c;
+    --danger-hover: #c0392b;
   }
 }
 
@@ -3663,11 +3669,11 @@ body[data-font="mono"] {
 }
 
 .settings-reset-btn {
-  background: #e74c3c;
+  background: var(--danger);
 }
 
 .settings-reset-btn:hover:not(:disabled) {
-  background: #c0392b;
+  background: var(--danger-hover);
 }
 
 .settings-guided-setup-stub {
