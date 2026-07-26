@@ -12,14 +12,16 @@ vi.mock('../models/user.model.js', () => ({
 
 const getProfileMock = vi.fn();
 const saveProfileMock = vi.fn();
+const resetProfileMock = vi.fn();
 vi.mock('../services/user-profile.service.js', () => ({
   UserProfileService: {
     getProfile: (...args: unknown[]) => getProfileMock(...args),
     saveProfile: (...args: unknown[]) => saveProfileMock(...args),
+    resetProfile: (...args: unknown[]) => resetProfileMock(...args),
   },
 }));
 
-import { getProfileHandler, getProfileOptionsHandler, updateProfileHandler, restartWizardHandler } from './profile.controller.js';
+import { getProfileHandler, getProfileOptionsHandler, updateProfileHandler, restartWizardHandler, resetProfileHandler } from './profile.controller.js';
 
 function mockReqRes(body: Record<string, unknown> = {}) {
   const req = { validatedBody: body, user: { id: 'user-1' } } as unknown as Request;
@@ -36,6 +38,7 @@ describe('profile.controller', () => {
     updateOnboardingMock.mockReset();
     getProfileMock.mockReset();
     saveProfileMock.mockReset();
+    resetProfileMock.mockReset();
   });
 
   it('getProfileHandler devuelve el perfil y el estado de onboarding', async () => {
@@ -86,6 +89,20 @@ describe('profile.controller', () => {
     const { req, res } = mockReqRes();
     await restartWizardHandler(req, res);
 
+    expect(updateOnboardingMock).toHaveBeenCalledWith('user-1', {
+      state: 'pending',
+      step: 0,
+      pendingMessage: null,
+      pendingSessionId: null,
+    });
+    expect(res.json).toHaveBeenCalledWith({ success: true });
+  });
+
+  it('resetProfileHandler borra el perfil y deja onboarding_state en pending', async () => {
+    const { req, res } = mockReqRes();
+    await resetProfileHandler(req, res);
+
+    expect(resetProfileMock).toHaveBeenCalledWith('user-1');
     expect(updateOnboardingMock).toHaveBeenCalledWith('user-1', {
       state: 'pending',
       step: 0,

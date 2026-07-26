@@ -1,4 +1,5 @@
 import type { Request, Response } from 'express';
+import { getDb } from '../db/connection.js';
 import { UserModel } from '../models/user.model.js';
 import { UserProfileService, type UserProfileInput } from '../services/user-profile.service.js';
 import { getProfileFieldOptions } from '../prompts/onboarding.steps.js';
@@ -40,5 +41,20 @@ export async function restartWizardHandler(req: Request, res: Response): Promise
   const userId = req.user!.id;
   UserModel.updateOnboarding(userId, { state: 'pending', step: 0, pendingMessage: null, pendingSessionId: null });
   logger.info('Wizard de onboarding re-disparado desde Settings', { userId });
+  res.json({ success: true });
+}
+
+// Settings → "Restablecer perfil" — borra por completo la fila de user_profile
+// (nombre, nivel, materias, formato de respuesta, etc.) y reactiva el wizard
+// poniendo onboarding_state='pending'. El usuario queda como si nunca hubiera
+// configurado nada: el próximo mensaje corto en el chat dispara el wizard de
+// configuración desde cero.
+export async function resetProfileHandler(req: Request, res: Response): Promise<void> {
+  const userId = req.user!.id;
+  getDb().transaction(() => {
+    UserProfileService.resetProfile(userId);
+    UserModel.updateOnboarding(userId, { state: 'pending', step: 0, pendingMessage: null, pendingSessionId: null });
+  })();
+  logger.info('Perfil restablecido desde Settings', { userId });
   res.json({ success: true });
 }

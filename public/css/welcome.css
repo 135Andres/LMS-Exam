@@ -3656,6 +3656,20 @@ body[data-font="mono"] {
   cursor: default;
 }
 
+.settings-profile-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.settings-reset-btn {
+  background: #e74c3c;
+}
+
+.settings-reset-btn:hover:not(:disabled) {
+  background: #c0392b;
+}
+
 .settings-guided-setup-stub {
   display: flex;
   flex-direction: column;

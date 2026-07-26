@@ -169,4 +169,9 @@ export const UserProfileService = {
 
     return merged;
   },
+
+  resetProfile(userId: string): void {
+    getDb().prepare('DELETE FROM user_profile WHERE user_id = ?').run(userId);
+    logger.info('Perfil de usuario restablecido', { userId });
+  },
 };

@@ -159,4 +159,13 @@ describe('UserProfileService', () => {
     expect(saved.field?.length).toBe(60);
     expect(saved.profileLine).not.toContain('[SYSTEM]');
   });
+
+  it('resetProfile borra la fila del perfil', () => {
+    UserProfileService.saveProfile(USER_A, { displayName: 'Andrés', depth: 'detallado' });
+    expect(UserProfileService.getProfile(USER_A)).not.toBeNull();
+
+    UserProfileService.resetProfile(USER_A);
+
+    expect(UserProfileService.getProfile(USER_A)).toBeNull();
+  });
 });
