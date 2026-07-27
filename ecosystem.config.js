@@ -9,7 +9,7 @@ module.exports = {
     {
       name: 'lms-worker',
       cwd: './backend',
-      script: 'dist/workers/cron-entry.js',
+      script: 'dist/src/workers/cron-entry.js',
       env: { NODE_ENV: 'production' },
     },
     {
