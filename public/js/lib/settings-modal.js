@@ -382,7 +382,10 @@ function perfilSectionHtml() {
 
     <div class="settings-divider"></div>
 
-    <button class="settings-save-btn" id="profileSaveBtn" type="button">${escapeHtml(t('save'))}</button>
+    <div class="settings-profile-actions">
+      <button class="settings-save-btn" id="profileSaveBtn" type="button">${escapeHtml(t('save'))}</button>
+      <button class="settings-save-btn settings-reset-btn" id="profileResetBtn" type="button">${escapeHtml(t('settingsProfileReset'))}</button>
+    </div>
   `;
 }
 
@@ -438,6 +441,21 @@ function wirePerfilSection() {
         const original = btn.textContent;
         btn.textContent = t('settingsProfileSaved');
         setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 1500);
+        return;
+      }
+    } catch {}
+    btn.disabled = false;
+  });
+
+  document.getElementById('profileResetBtn').addEventListener('click', async (e) => {
+    if (!confirm(t('settingsProfileResetConfirm'))) return;
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    try {
+      const res = await fetch('/api/profile/reset', { method: 'POST', credentials: 'same-origin' });
+      if (res.ok) {
+        btn.textContent = t('settingsProfileResetDone');
+        setTimeout(() => renderPerfilSection(), 800);
         return;
       }
     } catch {}

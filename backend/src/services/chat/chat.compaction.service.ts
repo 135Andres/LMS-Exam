@@ -7,7 +7,7 @@ import { segmentMessages, VERIFICABLE_MARKERS, type SegmentationResult } from '.
 import { extractBlocks } from './chat.block-extraction.service.js';
 import { pickVerifierModel, verifyCompaction, type MissingContentItem } from './chat.compaction-verifier.service.js';
 import { SYSTEM_PROMPT_NARRATIVE_COMPACTOR } from '../../prompts/system.js';
-import { INKLING_MODEL_ID } from '../../config/models.js';
+import { INKLING_MODEL_ID, DEFAULT_ORCHESTRATOR_MODEL_ID } from '../../config/models.js';
 
 // Tope de pasadas de narrativa fallidas consecutivas (mismo rango) antes de
 // forzar el avance del cursor sin narrativa actualizada — evita gastar IA
@@ -36,8 +36,8 @@ const COMPACTION_MODEL_MAP: Record<string, string> = {
 function resolveCompactionModel(sessionId: string): string {
   const lastModel = ChatModel.getLastAssistantModel(sessionId);
   if (lastModel && COMPACTION_MODEL_MAP[lastModel]) return COMPACTION_MODEL_MAP[lastModel];
-  // Sesión nueva sin modelo previo aún — Inkling es el default del chat.
-  return INKLING_MODEL_ID;
+  // Sesión nueva sin modelo previo aún — Gemini Flash es el default del chat.
+  return DEFAULT_ORCHESTRATOR_MODEL_ID;
 }
 
 interface NarrativeMessage {

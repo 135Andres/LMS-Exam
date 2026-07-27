@@ -1,20 +1,20 @@
 // backend/src/services/chat/chat.orchestrator.service.test.ts
 import { describe, it, expect } from 'vitest';
 import { ChatOrchestratorService, buildEffortInstruction } from './chat.orchestrator.service.js';
-import { INKLING_MODEL_ID } from '../../config/models.js';
+import { DEFAULT_ORCHESTRATOR_MODEL_ID } from '../../config/models.js';
 
 describe('ChatOrchestratorService', () => {
   const orchestrator = new ChatOrchestratorService();
 
-  it('manda directo a Inkling si hay adjunto de imagen o audio, sin clasificar', () => {
+  it('manda directo a Gemini Flash si hay adjunto de imagen o audio, sin clasificar', () => {
     const decision = orchestrator.decide('hola', 0, [{ type: 'image', mime: 'image/png', data: 'x' }]);
-    expect(decision.model).toBe(INKLING_MODEL_ID);
+    expect(decision.model).toBe(DEFAULT_ORCHESTRATOR_MODEL_ID);
     expect(decision.effort).toBe(0.6);
   });
 
-  it('default: Inkling con effort acorde a la complejidad', () => {
+  it('default: Gemini Flash con effort acorde a la complejidad', () => {
     const decision = orchestrator.decide('¿Qué es una célula?', 0);
-    expect(decision.model).toBe(INKLING_MODEL_ID);
+    expect(decision.model).toBe(DEFAULT_ORCHESTRATOR_MODEL_ID);
     expect(decision.effort).toBe(0.3);
   });
 

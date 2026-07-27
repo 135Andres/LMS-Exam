@@ -42,6 +42,16 @@ export interface OnboardingStateResult {
   step: OnboardingStepPayload | null;
 }
 
+function resolveEffectiveState(user: { id: string; onboarding_state: string }): 'pending' | 'skipped' | 'completed' {
+  // 'skipped' sin fila en user_profile = nunca configuró nada de
+  // verdad (típicamente el backfill de cuentas viejas) — se trata
+  // como 'pending' para que el wizard vuelva a ofrecerse.
+  if (user.onboarding_state === 'skipped' && !UserProfileService.getProfile(user.id)) {
+    return 'pending';
+  }
+  return user.onboarding_state as 'pending' | 'skipped' | 'completed';
+}
+
 const FIELD_MAP: Record<string, keyof UserProfileInput> = {
   display_name: 'displayName',
   level: 'level',
@@ -106,7 +116,7 @@ export const OnboardingService = {
   // Disparo: se llama ANTES de cualquier llamada a la IA en el controller de chat.
   intercept(userId: string, message: string, sessionId: string): OnboardingInterceptResult {
     const user = UserModel.findById(userId);
-    if (!user || user.onboarding_state !== 'pending') return { type: 'passthrough' };
+    if (!user || resolveEffectiveState(user) !== 'pending') return { type: 'passthrough' };
 
     if (user.onboarding_current_step === 0) {
       if (isRealFirstMessage(message)) {
@@ -114,7 +124,7 @@ export const OnboardingService = {
         // vía banner, una sola vez por sesión.
         return { type: 'passthrough' };
       }
-      UserModel.updateOnboarding(userId, { step: 1, pendingMessage: message, pendingSessionId: sessionId });
+      UserModel.updateOnboarding(userId, { state: 'pending', step: 1, pendingMessage: message, pendingSessionId: sessionId });
       return getStepPayload(1, { suggestedDisplayName: user.username ?? undefined });
     }
 
@@ -199,13 +209,15 @@ export const OnboardingService = {
     const user = UserModel.findById(userId);
     if (!user) return { state: 'pending', step: null };
 
-    if (user.onboarding_state === 'pending' && user.onboarding_current_step > 0) {
+    const effectiveState = resolveEffectiveState(user);
+
+    if (effectiveState === 'pending' && user.onboarding_current_step > 0) {
       return {
         state: 'pending',
         step: getStepPayload(user.onboarding_current_step, { suggestedDisplayName: user.username ?? undefined }),
       };
     }
-    return { state: user.onboarding_state, step: null };
+    return { state: effectiveState, step: null };
   },
 
   skip(userId: string): OnboardingSkipResult {

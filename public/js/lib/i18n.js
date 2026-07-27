@@ -205,6 +205,9 @@ const translations = {
     settingsProfileGuidedSetup: 'Iniciar configuración guiada',
     settingsProfileGuidedSetupDone: 'Se activará en tu próximo mensaje',
     settingsProfileSaved: 'Guardado ✓',
+    settingsProfileReset: 'Restablecer perfil',
+    settingsProfileResetConfirm: '¿Seguro? Se borrará todo tu perfil de estudio (nombre, nivel, materias, formato de respuesta). Podrás configurarlo de nuevo.',
+    settingsProfileResetDone: 'Perfil restablecido ✓',
   },
   en: {
     brand: 'LMS Exams',
@@ -395,6 +398,9 @@ const translations = {
     settingsProfileGuidedSetup: 'Start guided setup',
     settingsProfileGuidedSetupDone: 'It will kick in on your next message',
     settingsProfileSaved: 'Saved ✓',
+    settingsProfileReset: 'Reset profile',
+    settingsProfileResetConfirm: 'Are you sure? This will erase your whole study profile (name, level, subjects, response format). You can set it up again.',
+    settingsProfileResetDone: 'Profile reset ✓',
   },
 };
 
