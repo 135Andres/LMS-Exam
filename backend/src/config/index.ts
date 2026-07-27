@@ -1,5 +1,5 @@
 import dotenv from 'dotenv';
-import { INKLING_MODEL_ID } from './models.js';
+import { DEFAULT_ORCHESTRATOR_MODEL_ID } from './models.js';
 dotenv.config();
 
 function required(key: string): string {
@@ -28,7 +28,7 @@ export const config = {
   models: {
     generate: process.env.GENERATE_MODEL || 'nvidia/minimaxai/minimax-m3',
     polish: process.env.POLISH_MODEL || 'nvidia/minimaxai/minimax-m3',
-    chat: process.env.CHAT_MODEL || INKLING_MODEL_ID,
+    chat: process.env.CHAT_MODEL || DEFAULT_ORCHESTRATOR_MODEL_ID,
     // Validador batch de la KB colectiva.
     kbValidator: process.env.KB_VALIDATOR_MODEL || 'oc/deepseek-v4-flash-free',
     // Análisis nocturno de progreso (insights.service.ts).

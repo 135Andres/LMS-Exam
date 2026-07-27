@@ -1,5 +1,5 @@
 // backend/src/services/chat/chat.orchestrator.service.ts
-import { INKLING_MODEL_ID } from '../../config/models.js';
+import { DEFAULT_ORCHESTRATOR_MODEL_ID } from '../../config/models.js';
 import { logger } from '../../utils/logger.js';
 import { classifyMessage, type Complexity, type ClassificationResult, type DelegateTarget } from './chat.classifier.service.js';
 import type { Attachment } from './chat.prompt.service.js';
@@ -34,10 +34,10 @@ export class ChatOrchestratorService {
   // clasificador heurístico de materias, nunca lo secuestra (ver
   // detectSubjectByKeywords en subject-keywords.ts).
   decide(message: string, ragContextLength: number, attachments?: Attachment[], boostSubjects?: string[]): OrchestrationDecision {
-    // Inkling es el único modelo con visión + audio nativo de la lista — un
+    // Gemini Flash es el único modelo con visión real por este canal — un
     // adjunto de imagen/audio nunca se delega, se manda directo.
     if (attachments?.some(a => a.type === 'image' || a.type === 'audio')) {
-      const decision: OrchestrationDecision = { model: INKLING_MODEL_ID, effort: 0.6, classification: MULTIMODAL_CLASSIFICATION };
+      const decision: OrchestrationDecision = { model: DEFAULT_ORCHESTRATOR_MODEL_ID, effort: 0.6, classification: MULTIMODAL_CLASSIFICATION };
       this.log(decision);
       return decision;
     }
@@ -46,7 +46,7 @@ export class ChatOrchestratorService {
 
     const decision: OrchestrationDecision = classification.delegateTo
       ? { model: DELEGATE_MODEL_MAP[classification.delegateTo], classification }
-      : { model: INKLING_MODEL_ID, effort: EFFORT_BY_COMPLEXITY[classification.complexity], classification };
+      : { model: DEFAULT_ORCHESTRATOR_MODEL_ID, effort: EFFORT_BY_COMPLEXITY[classification.complexity], classification };
 
     this.log(decision);
     return decision;
