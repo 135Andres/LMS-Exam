@@ -6,6 +6,7 @@ import { UserModel } from '../../models/user.model.js';
 import { SessionSummaryService } from '../session-summary.service.js';
 import { ImportedMemoryService } from '../imported-memory.service.js';
 import { ChatQuizModeService } from './chat.quiz-mode.service.js';
+import { extractAttachmentText } from '../../utils/attachment-text.js';
 
 // ponytail: presupuesto simple por caracteres, prioriza recencia — no hay
 // ranking por relevancia; si hace falta afinar, Fase 3 con la UI real.
@@ -97,7 +98,7 @@ export class ChatPromptService {
     return prompt;
   }
 
-  buildContent(message: string, attachments?: Attachment[]): Array<Record<string, unknown>> {
+  async buildContent(message: string, attachments?: Attachment[]): Promise<Array<Record<string, unknown>>> {
     const content: Array<Record<string, unknown>> = [{ type: 'text', text: message }];
 
     if (attachments && attachments.length > 0) {
@@ -107,7 +108,12 @@ export class ChatPromptService {
         } else if (att.type === 'audio') {
           content.push({ type: 'audio_url', audio_url: { url: `data:${att.mime};base64,${att.data}` } });
         } else if (att.type === 'file') {
-          content.push({ type: 'text', text: `\n\n[Archivo adjunto: ${att.mime}, ${att.data.length} chars base64]` });
+          const extracted = await extractAttachmentText(att.mime, att.data);
+          if (extracted) {
+            content.push({ type: 'text', text: `\n\n[Contenido del archivo adjunto (${att.mime})]:\n${extracted}` });
+          } else {
+            content.push({ type: 'text', text: `\n\n[No se pudo extraer texto de este archivo adjunto (${att.mime}) — probablemente es un PDF escaneado sin texto real. Avisale al usuario que por ahora no podés leer este tipo de archivo.]` });
+          }
         }
       }
     }

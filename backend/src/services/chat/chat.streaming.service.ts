@@ -127,7 +127,7 @@ export class ChatStreamingService {
 
     let systemPrompt = this.promptService.buildSystemPrompt(resolved.label, ragContext, userId, undefined, sessionId, crossChatContext);
     if (decision?.effort !== undefined) systemPrompt += buildEffortInstruction(decision.effort);
-    const content = this.promptService.buildContent(message, attachments);
+    const content = await this.promptService.buildContent(message, attachments);
 
     let responseBody: ReadableStream<Uint8Array>;
     let usedModel = resolved.model;
@@ -212,7 +212,7 @@ export class ChatStreamingService {
 
     let systemPrompt = this.promptService.buildSystemPrompt(resolved.label, ragContext, userId, instruction ?? '', sessionId);
     if (decision?.effort !== undefined) systemPrompt += buildEffortInstruction(decision.effort);
-    const content = this.promptService.buildContent(prev.content);
+    const content = await this.promptService.buildContent(prev.content);
 
     let responseBody: ReadableStream<Uint8Array>;
     let usedModel = resolved.model;

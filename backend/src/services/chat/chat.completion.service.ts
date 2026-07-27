@@ -94,7 +94,7 @@ export class ChatCompletionService {
 
     let systemPrompt = this.promptService.buildSystemPrompt(resolved.label, ragContext, userId, undefined, sessionId);
     if (decision?.effort !== undefined) systemPrompt += buildEffortInstruction(decision.effort);
-    const content = this.promptService.buildContent(message, attachments);
+    const content = await this.promptService.buildContent(message, attachments);
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
