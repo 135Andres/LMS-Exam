@@ -133,7 +133,7 @@ describe('compactSession — modelo dinámico', () => {
     );
   });
 
-  it('usa Inkling por default si la sesión todavía no tiene modelo previo', async () => {
+  it('usa Gemini Flash por default si la sesión todavía no tiene modelo previo', async () => {
     chatModelMock.getLastAssistantModel.mockReturnValue(null);
     generateFromAIMock.mockResolvedValueOnce(aiResponse(VALID_RESULT));
 
@@ -141,7 +141,7 @@ describe('compactSession — modelo dinámico', () => {
 
     expect(generateFromAIMock).toHaveBeenCalledWith(
       'nineRouter', expect.any(String), expect.any(String), null,
-      expect.objectContaining({ model: 'nvidia/thinkingmachines/inkling' }),
+      expect.objectContaining({ model: 'ag/gemini-3-flash' }),
     );
   });
 });

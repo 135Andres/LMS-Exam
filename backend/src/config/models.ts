@@ -1,7 +1,8 @@
 // Lista curada de modelos ofrecidos en el selector del chat (no todo lo que
 // expone 9router). multimodal verificado en vivo mandando una imagen real a
-// cada uno: solo los gemini la describieron correctamente — claude-sonnet-4-6,
-// glm-5.2 y deepseek-flash respondieron "no tengo visión".
+// cada uno: solo gemini-flash y gemini-pro describieron correctamente la
+// imagen. claude-sonnet-4-6, glm-5.2, deepseek-flash y inkling respondieron
+// "no tengo visión" — inkling por NIM no expone visión real.
 export interface ChatModelOption {
   id: string;
   label: string;
@@ -10,9 +11,10 @@ export interface ChatModelOption {
 
 // Confirmado en vivo contra 9router: 200 OK.
 export const INKLING_MODEL_ID = 'nvidia/thinkingmachines/inkling';
+export const DEFAULT_ORCHESTRATOR_MODEL_ID = 'ag/gemini-3-flash';
 
 export const AVAILABLE_MODELS: ChatModelOption[] = [
-  { id: INKLING_MODEL_ID, label: 'Inkling', multimodal: true },
+  { id: INKLING_MODEL_ID, label: 'Inkling', multimodal: false },
   { id: 'oc/deepseek-v4-flash-free', label: 'DeepSeek Flash', multimodal: false },
   { id: 'ag/gemini-3-flash', label: 'Gemini Flash', multimodal: true },
   { id: 'ag/gemini-3.1-pro-low', label: 'Gemini Pro', multimodal: true },
