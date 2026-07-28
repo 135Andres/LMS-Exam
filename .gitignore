@@ -48,6 +48,7 @@ Desktop.ini
 #  OpenCode / IA (config local del agente)
 .opencode/
 .ai_context/
+.claude/
 
 #  IDE
 .idea/

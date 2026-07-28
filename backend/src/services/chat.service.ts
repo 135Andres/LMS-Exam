@@ -25,7 +25,7 @@ const completionService = new ChatCompletionService(
   persistence, embeddingService, ragService, profileDetectionService, modelRouter, promptService, orchestrator,
 );
 
-export function buildContent(message: string, attachments?: Attachment[]): Array<Record<string, unknown>> {
+export async function buildContent(message: string, attachments?: Attachment[]): Promise<Array<Record<string, unknown>>> {
   return promptService.buildContent(message, attachments);
 }
 
