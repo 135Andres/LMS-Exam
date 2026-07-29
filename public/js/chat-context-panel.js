@@ -97,7 +97,7 @@ export async function updateSessionInfo() {
       const m = state.availableModels.find(x => x.id === modelSelect.value);
       if (m) {
         state.sessionState.model = m.label || m.id;
-        state.sessionState.provider = m.provider || 'NVIDIA';
+        state.sessionState.provider = m.provider || '—';
         state.sessionState.contextLength = m.contextLength || 128000;
       } else {
         state.sessionState.model = modelSelect.value;

@@ -41,6 +41,7 @@ router.get('/models', (_req, res) => {
       label: m.label,
       model: m.id,
       multimodal: m.multimodal,
+      provider: m.provider,
       contextLength: 128000,
     })),
   });

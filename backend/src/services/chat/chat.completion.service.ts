@@ -1,6 +1,7 @@
 import { generateFromAI } from '../ai/index.js';
 import { logger } from '../../utils/logger.js';
 import { getModelLabel } from '../../config/models.js';
+import { looksLikeQuizBlock } from '../../utils/quiz-block-detector.js';
 import { ChatModel } from '../../models/chat.model.js';
 import { UserProfileService } from '../user-profile.service.js';
 import { detectAndSuggestKnowledge } from '../knowledge-detection.service.js';
@@ -92,7 +93,7 @@ export class ChatCompletionService {
       logger.warn('Profile detection async failed', { error: (err as Error).message })
     );
 
-    let systemPrompt = this.promptService.buildSystemPrompt(resolved.label, ragContext, userId, undefined, sessionId);
+    let systemPrompt = this.promptService.buildSystemPrompt(resolved.label, ragContext, userId, undefined, sessionId, undefined, looksLikeQuizBlock(message));
     if (decision?.effort !== undefined) systemPrompt += buildEffortInstruction(decision.effort);
     const content = await this.promptService.buildContent(message, attachments);
 

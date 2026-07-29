@@ -1,4 +1,4 @@
-import { SYSTEM_PROMPT_TUTOR, SYSTEM_PROMPT_TUTOR_ADMIN_OVERRIDE, SYSTEM_PROMPT_QUIZ_EXPLAIN } from '../../prompts/system.js';
+import { SYSTEM_PROMPT_TUTOR, SYSTEM_PROMPT_TUTOR_ADMIN_OVERRIDE, SYSTEM_PROMPT_QUIZ_EXPLAIN, QUIZ_DETECTION_RULE } from '../../prompts/system.js';
 import { composeSystemPrompt, type ProfileMode } from '../../prompts/prompt-composer.js';
 import { ProfileService } from '../profile.service.js';
 import { UserProfileService } from '../user-profile.service.js';
@@ -19,7 +19,7 @@ export interface Attachment {
 }
 
 export class ChatPromptService {
-  buildSystemPrompt(modelLabel: string, ragContext: string, userId: string, regenerateInstruction?: string, sessionId?: string, crossChatContext?: string): string {
+  buildSystemPrompt(modelLabel: string, ragContext: string, userId: string, regenerateInstruction?: string, sessionId?: string, crossChatContext?: string, quizBlockLikely?: boolean): string {
     const isQuizExplain = !!(sessionId && ChatQuizModeService.isActive(sessionId));
     const basePrompt = isQuizExplain ? SYSTEM_PROMPT_QUIZ_EXPLAIN : SYSTEM_PROMPT_TUTOR;
     let prompt = basePrompt;
@@ -86,6 +86,10 @@ export class ChatPromptService {
 
     if (crossChatContext) {
       prompt += crossChatContext;
+    }
+
+    if (quizBlockLikely) {
+      prompt += `\n\n${QUIZ_DETECTION_RULE}`;
     }
 
     // Plan 03: la profile_line del perfil estructurado (distinto del
