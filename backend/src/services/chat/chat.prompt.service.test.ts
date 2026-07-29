@@ -14,6 +14,7 @@ import { ChatPromptService } from './chat.prompt.service.js';
 import { ChatQuizModeService } from './chat.quiz-mode.service.js';
 import { SessionSummaryService, type KnowledgeBlock } from '../session-summary.service.js';
 import { UserProfileService, compileProfileLine, type UserProfile } from '../user-profile.service.js';
+import { QUIZ_DETECTION_RULE } from '../../prompts/system.js';
 
 const SESSION_ID = 'prompt-swap-test-session';
 
@@ -178,5 +179,28 @@ describe('ChatPromptService inyección de bloques de conocimiento', () => {
     expect(prompt).not.toContain(hugeContent);
     expect(prompt).toContain('Y'.repeat(100));
     expect(prompt).toContain('(truncado)');
+  });
+});
+
+describe('ChatPromptService — QUIZ_DETECTION_RULE condicional', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    ChatQuizModeService.deactivate(SESSION_ID);
+  });
+
+  it('incluye QUIZ_DETECTION_RULE cuando quizBlockLikely es true', () => {
+    vi.spyOn(UserProfileService, 'getProfile').mockReturnValue(null);
+    const service = new ChatPromptService();
+    const prompt = service.buildSystemPrompt('Modelo X', '', 'user-1', undefined, SESSION_ID, undefined, true);
+    expect(prompt).toContain(QUIZ_DETECTION_RULE);
+    expect(prompt).toContain('[[QUIZ_DETECTED]]');
+  });
+
+  it('no incluye QUIZ_DETECTION_RULE cuando quizBlockLikely es false/undefined', () => {
+    vi.spyOn(UserProfileService, 'getProfile').mockReturnValue(null);
+    const service = new ChatPromptService();
+    const prompt = service.buildSystemPrompt('Modelo X', '', 'user-1', undefined, SESSION_ID);
+    expect(prompt).not.toContain('[[QUIZ_DETECTED]]');
+    expect(prompt).not.toContain('bloque de ejercicios');
   });
 });

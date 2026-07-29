@@ -7,15 +7,21 @@ import {
   SYSTEM_PROMPT_COMPACTOR,
   SYSTEM_PROMPT_NARRATIVE_COMPACTOR,
   SYSTEM_PROMPT_EXAM,
+  QUIZ_DETECTION_RULE,
   FORMAT_MATH_RULES_SIMPLE,
   FORMAT_MATH_RULES_ESCAPED,
   FORMAT_JSON_NEWLINE_RULE,
 } from './system.js';
 
 describe('prompts de cuestionario', () => {
-  it('SYSTEM_PROMPT_TUTOR instruye detectar cuestionario y usar el marcador', () => {
-    expect(SYSTEM_PROMPT_TUTOR).toContain('[[QUIZ_DETECTED]]');
-    expect(SYSTEM_PROMPT_TUTOR).toContain('¿Quieres que los responda todos o vamos por partes?');
+  it('QUIZ_DETECTION_RULE instruye detectar cuestionario y usar el marcador', () => {
+    expect(QUIZ_DETECTION_RULE).toContain('[[QUIZ_DETECTED]]');
+    expect(QUIZ_DETECTION_RULE).toContain('¿Quieres que los responda todos o vamos por partes?');
+  });
+
+  it('SYSTEM_PROMPT_TUTOR no contiene la directriz de detección de quiz (vive en QUIZ_DETECTION_RULE)', () => {
+    expect(SYSTEM_PROMPT_TUTOR).not.toContain('[[QUIZ_DETECTED]]');
+    expect(SYSTEM_PROMPT_TUTOR).not.toContain('bloque de ejercicios');
   });
 
   it('SYSTEM_PROMPT_QUIZ_SOLVE pide JSON con num/pregunta/desarrollo/respuesta', () => {
@@ -183,13 +189,13 @@ describe('regla de saltos de línea en JSON + few-shot (plan 11)', () => {
   });
 });
 
-describe('directiva 4 de SYSTEM_PROMPT_TUTOR — criterio numérico de "bloque de ejercicios" (plan 11)', () => {
+describe('directiva 4 de QUIZ_DETECTION_RULE — criterio numérico de "bloque de ejercicios" (plan 11)', () => {
   it('define "bloque de ejercicios" como 3 o más preguntas diferenciables', () => {
-    expect(SYSTEM_PROMPT_TUTOR).toMatch(/3 o más/);
+    expect(QUIZ_DETECTION_RULE).toMatch(/3 o más/);
   });
 
   it('aclara que una sola pregunta con varios incisos NO cuenta como bloque', () => {
-    expect(SYSTEM_PROMPT_TUTOR.toLowerCase()).toContain('incisos');
-    expect(SYSTEM_PROMPT_TUTOR).toMatch(/incisos.*no cuenta como bloque/i);
+    expect(QUIZ_DETECTION_RULE.toLowerCase()).toContain('incisos');
+    expect(QUIZ_DETECTION_RULE).toMatch(/incisos.*no cuenta como bloque/i);
   });
 });
