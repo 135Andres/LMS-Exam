@@ -33,8 +33,21 @@ CREATE TABLE IF NOT EXISTS chat_logs (
 CREATE TABLE IF NOT EXISTS chat_sessions (
   session_id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id),
   is_archived INTEGER DEFAULT 0, archived_at TEXT,
-  summary_covers_until TEXT, title TEXT,
+  summary_covers_until TEXT, title TEXT, project_id TEXT, folder_id TEXT,
+  is_main INTEGER NOT NULL DEFAULT 0,
   created_at TEXT DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS projects (
+  id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), name TEXT NOT NULL,
+  is_active INTEGER NOT NULL DEFAULT 0, is_archived INTEGER NOT NULL DEFAULT 0,
+  archived_at TEXT, main_session_id TEXT, created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS folders (
+  id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  parent_id TEXT REFERENCES folders(id) ON DELETE CASCADE, name TEXT NOT NULL,
+  kind TEXT NOT NULL DEFAULT 'normal', is_content_folder INTEGER NOT NULL DEFAULT 0,
+  resource_scope TEXT, created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now'))
 );
 CREATE TABLE IF NOT EXISTS chat_embeddings (
   id TEXT PRIMARY KEY, message_id TEXT NOT NULL REFERENCES chat_logs(id) ON DELETE CASCADE,
@@ -85,6 +98,8 @@ export function resetDb(): void {
   testDb.exec('DELETE FROM embedding_outbox');
   testDb.exec('DELETE FROM chat_logs');
   testDb.exec('DELETE FROM chat_sessions');
+  testDb.exec('DELETE FROM folders');
+  testDb.exec('DELETE FROM projects');
   testDb.exec('DELETE FROM user_profile');
   testDb.exec('DELETE FROM users');
 }

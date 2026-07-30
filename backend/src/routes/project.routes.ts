@@ -1,0 +1,10 @@
+import { Router } from 'express';
+import { authenticate } from '../middleware/auth.js';
+import { validate } from '../middleware/validate.js';
+import { archiveProject, createFolder, createProject, deleteFolder, getProjectTree, listProjects, moveSession, renameProject, updateFolder, activateProject } from '../controllers/project.controller.js';
+import { createFolderSchema, createProjectSchema, moveSessionSchema, updateFolderSchema, updateProjectSchema } from '../validators/project.js';
+const router = Router(); router.use(authenticate);
+router.get('/', listProjects); router.post('/', validate(createProjectSchema), createProject);
+router.get('/:projectId/tree', getProjectTree); router.put('/:projectId', validate(updateProjectSchema), renameProject); router.post('/:projectId/activate', activateProject); router.post('/:projectId/archive', archiveProject);
+router.post('/:projectId/folders', validate(createFolderSchema), createFolder); router.put('/:projectId/folders/:folderId', validate(updateFolderSchema), updateFolder); router.delete('/:projectId/folders/:folderId', deleteFolder); router.post('/:projectId/sessions/:sessionId/move', validate(moveSessionSchema), moveSession);
+export default router;
