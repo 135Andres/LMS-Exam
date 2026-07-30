@@ -8,6 +8,7 @@ import { UserProfileService } from '../user-profile.service.js';
 import { detectAndSuggestKnowledge } from '../knowledge-detection.service.js';
 import { compactSession } from './chat.compaction.service.js';
 import { mightReferenceOtherChat, buildCrossChatContext } from './chat.cross-reference.service.js';
+import { looksLikeQuizBlock } from '../../utils/quiz-block-detector.js';
 import type { ChatPersistenceService } from './chat.persistence.service.js';
 import type { ChatEmbeddingService } from './chat.embedding.service.js';
 import type { ChatRAGService } from './chat.rag.service.js';
@@ -125,7 +126,7 @@ export class ChatStreamingService {
       ? await buildCrossChatContext(message, userId, sessionId)
       : '';
 
-    let systemPrompt = this.promptService.buildSystemPrompt(resolved.label, ragContext, userId, undefined, sessionId, crossChatContext);
+    let systemPrompt = this.promptService.buildSystemPrompt(resolved.label, ragContext, userId, undefined, sessionId, crossChatContext, looksLikeQuizBlock(message));
     if (decision?.effort !== undefined) systemPrompt += buildEffortInstruction(decision.effort);
     const content = await this.promptService.buildContent(message, attachments);
 

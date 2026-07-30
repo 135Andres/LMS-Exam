@@ -220,10 +220,11 @@ export async function unarchiveSession(sid) {
 
 export async function deleteSession(sid) {
   if (!sid || !confirm(t('confirmDeleteChat'))) return;
+  if (!confirm('Esta acción elimina el chat y sus mensajes de forma irreversible. ¿Continuar?')) return;
   try {
     await fetch('/api/chat/delete', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin',
-      body: JSON.stringify({ sessionId: sid }),
+      body: JSON.stringify({ sessionId: sid, confirmed: true }),
     });
     if (sid === state.sessionId) {
       state.sessionId = '';

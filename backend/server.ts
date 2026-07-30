@@ -14,6 +14,7 @@ import chatRoutes from './src/routes/chat.routes.js';
 import userRoutes from './src/routes/user.routes.js';
 import knowledgeRoutes from './src/routes/knowledge.routes.js';
 import profileRoutes from './src/routes/profile.routes.js';
+import projectRoutes from './src/routes/project.routes.js';
 import internalRoutes from './src/routes/internal.routes.js';
 import { startScheduler, stopScheduler } from './src/workers/scheduler.js';
 import { startEmbeddingWorker, stopEmbeddingWorker, processEmbeddingOutbox } from './src/workers/embedding-worker.js';
@@ -109,6 +110,7 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/knowledge', knowledgeRoutes);
 app.use('/api/profile', profileRoutes);
+app.use('/api/projects', projectRoutes);
 // Servicio-a-servicio (Python -> Node), protegido por secreto compartido,
 // no por `authenticate` — ver src/routes/internal.routes.ts.
 app.use('/internal', internalRoutes);

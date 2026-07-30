@@ -466,9 +466,10 @@ export async function renameSessionHandler(req: Request, res: Response): Promise
 }
 
 export async function deleteSessionHandler(req: Request, res: Response): Promise<void> {
-  const { sessionId } = req.body as { sessionId: string };
+  const { sessionId, confirmed } = req.body as { sessionId: string; confirmed?: boolean };
   const userId = req.user!.id;
   if (!sessionId) { res.status(400).json({ error: 'sessionId requerido' }); return; }
+  if (confirmed !== true) { res.status(400).json({ error: 'Confirma la eliminación irreversible del chat' }); return; }
   if (!requireOwnedSession(sessionId, userId, res)) return;
   ChatModel.deleteSession(sessionId, userId);
   ChatQuizModeService.deactivate(sessionId);

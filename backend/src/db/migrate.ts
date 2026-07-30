@@ -100,6 +100,35 @@ CREATE TABLE IF NOT EXISTS chat_sessions (
 );
 CREATE INDEX IF NOT EXISTS idx_chat_sessions_user ON chat_sessions(user_id);
 
+-- Proyectos y explorador de estudio. Los chats existentes se asignan durante
+-- la migracion posterior para que ninguna sesion quede huerfana.
+CREATE TABLE IF NOT EXISTS projects (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  is_active INTEGER NOT NULL DEFAULT 0 CHECK(is_active IN (0, 1)),
+  is_archived INTEGER NOT NULL DEFAULT 0 CHECK(is_archived IN (0, 1)),
+  archived_at TEXT,
+  main_session_id TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_projects_user_active ON projects(user_id, is_active);
+
+CREATE TABLE IF NOT EXISTS folders (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  parent_id TEXT REFERENCES folders(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  kind TEXT NOT NULL DEFAULT 'normal' CHECK(kind IN ('normal', 'important')),
+  is_content_folder INTEGER NOT NULL DEFAULT 0 CHECK(is_content_folder IN (0, 1)),
+  resource_scope TEXT CHECK(resource_scope IN ('general', 'per_chat')),
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now')),
+  CHECK((is_content_folder = 0 AND resource_scope IS NULL) OR (is_content_folder = 1 AND resource_scope IS NOT NULL))
+);
+CREATE INDEX IF NOT EXISTS idx_folders_project_parent ON folders(project_id, parent_id);
+
 -- Vectores como JSON string (sin sqlite-vec, similitud coseno en TS puro)
 CREATE TABLE IF NOT EXISTS chat_embeddings (
   id TEXT PRIMARY KEY,
@@ -423,6 +452,30 @@ function deduplicateChatEmbeddings(db: Database.Database): void {
   }
 }
 
+function migrateProjectsAndFolders(db: Database.Database): void {
+  addColumnIfMissing(db, 'chat_sessions', 'project_id', 'TEXT REFERENCES projects(id)');
+  addColumnIfMissing(db, 'chat_sessions', 'folder_id', 'TEXT REFERENCES folders(id)');
+  addColumnIfMissing(db, 'chat_sessions', 'is_main', 'INTEGER NOT NULL DEFAULT 0');
+
+  // Una sola migracion de legado por usuario: conserva cada sesion y la pone
+  // en un contenedor explicito en vez de inventar una materia.
+  const users = db.prepare(`SELECT DISTINCT user_id FROM chat_sessions WHERE project_id IS NULL`).all() as Array<{ user_id: string }>;
+  const tx = db.transaction(() => {
+    for (const { user_id } of users) {
+      const projectId = `legacy-${user_id}`;
+      const folderId = `legacy-folder-${user_id}`;
+      db.prepare(`INSERT OR IGNORE INTO projects (id, user_id, name, is_active) VALUES (?, ?, 'Chats anteriores', 1)`).run(projectId, user_id);
+      db.prepare(`INSERT OR IGNORE INTO folders (id, project_id, parent_id, name, is_content_folder, resource_scope) VALUES (?, ?, NULL, 'Chats anteriores', 1, 'general')`).run(folderId, projectId);
+      db.prepare('UPDATE chat_sessions SET project_id = ?, folder_id = ? WHERE user_id = ? AND project_id IS NULL').run(projectId, folderId, user_id);
+    }
+    // Garantiza la invariante de un unico proyecto activo por usuario.
+    db.exec(`UPDATE projects SET is_active = 0 WHERE is_archived = 1`);
+  });
+  tx();
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS uq_one_active_project_per_user ON projects(user_id) WHERE is_active = 1');
+  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS uq_one_important_folder_per_project ON folders(project_id) WHERE kind = 'important'");
+}
+
 function migrate(): void {
   const db = getDb();
   
@@ -486,6 +539,8 @@ function migrate(): void {
   addColumnIfMissing(db, 'users', 'onboarding_current_step', 'INTEGER NOT NULL DEFAULT 0');
   addColumnIfMissing(db, 'users', 'onboarding_pending_message', 'TEXT');
   addColumnIfMissing(db, 'users', 'onboarding_pending_session_id', 'TEXT');
+
+  migrateProjectsAndFolders(db);
 
   logger.info('Migración completada: tablas creadas/verificadas');
   closeDb();
